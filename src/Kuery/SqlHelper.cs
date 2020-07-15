@@ -1481,22 +1481,6 @@ namespace Kuery
     }
 
     [Flags]
-    public enum SQLiteOpenFlags
-    {
-        ReadOnly = 1,
-        ReadWrite = 2,
-        Create = 4,
-        NoMutex = 0x8000,
-        FullMutex = 0x10000,
-        SharedCache = 0x20000,
-        PrivateCache = 0x40000,
-        ProtectionComplete = 0x00100000,
-        ProtectionCompleteUnlessOpen = 0x00200000,
-        ProtectionCompleteUntilFirstUserAuthentication = 0x00300000,
-        ProtectionNone = 0x00400000,
-    }
-
-    [Flags]
     public enum CreateFlags
     {
         None = 0x000,
@@ -1506,22 +1490,6 @@ namespace Kuery
         AutoIncPK = 0x004,
         FullTextSearch3 = 0x100,
         FullTextSearch4 = 0x200,
-    }
-
-    public enum CreateTableResult
-    {
-        Created,
-        Migrated,
-    }
-
-    public class CreateTablesResult
-    {
-        public Dictionary<Type, CreateTableResult> Results { get; }
-
-        public CreateTablesResult()
-        {
-            Results = new Dictionary<Type, CreateTableResult>();
-        }
     }
 
     public abstract class BaseTableQuery
