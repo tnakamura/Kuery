@@ -1,18 +1,19 @@
-using System;
 using System.Data.Common;
 using Microsoft.Data.SqlClient;
-using Xunit;
 
 namespace Kuery.Tests
 {
     public class SqlServerFixture
     {
-        const string DbName = "kuery_test";
+        public string DbName { get; }
 
-        public DbConnection CreateConnection(string database = DbName)
+        public DbConnection CreateConnection() =>
+            CreateConnection(DbName);
+
+        DbConnection CreateConnection(string database)
         {
             var csb = new SqlConnectionStringBuilder();
-            csb.InitialCatalog = database ?? DbName;
+            csb.InitialCatalog = database;
             csb.IntegratedSecurity = true;
             csb.DataSource = "(local)\\SQLEXPRESS";
             return new SqlConnection(csb.ToString());
@@ -20,9 +21,12 @@ namespace Kuery.Tests
 
         public SqlServerFixture()
         {
+            DbName = "kuery_test";
+
             using (var connection = CreateConnection("master"))
             {
                 connection.Open();
+
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
@@ -30,6 +34,7 @@ namespace Kuery.Tests
                             DROP DATABASE [{DbName}]";
                     command.ExecuteNonQuery();
                 }
+
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =

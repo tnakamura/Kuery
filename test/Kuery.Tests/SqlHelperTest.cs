@@ -11,11 +11,11 @@ namespace Kuery.Tests
     {
         readonly TransactionScope transactionScope;
 
-        readonly SqlServerFixture sqlServer;
+        readonly SqlServerFixture fixture;
 
-        public SqlHelperTest(SqlServerFixture sqlServer)
+        public SqlHelperTest(SqlServerFixture fixture)
         {
-            this.sqlServer = sqlServer;
+            this.fixture = fixture;
             transactionScope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
         }
 
@@ -27,7 +27,7 @@ namespace Kuery.Tests
         [Fact]
         public void ToListTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -50,7 +50,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task ToListAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -73,7 +73,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task CountAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -93,7 +93,7 @@ namespace Kuery.Tests
         [Fact]
         public void CountTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -113,7 +113,7 @@ namespace Kuery.Tests
         [Fact]
         public void DeleteWithPredicateTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -133,7 +133,7 @@ namespace Kuery.Tests
         [Fact]
         public void DeleteWithWhereTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -155,7 +155,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task InsertAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -179,7 +179,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task UpdateAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -211,7 +211,7 @@ namespace Kuery.Tests
         [Fact]
         public void WhereTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -235,7 +235,7 @@ namespace Kuery.Tests
         [Fact]
         public void WhereAndWhereTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -260,7 +260,7 @@ namespace Kuery.Tests
         [Fact]
         public void InsertTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -284,7 +284,7 @@ namespace Kuery.Tests
         [Fact]
         public void UpdateTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -316,7 +316,7 @@ namespace Kuery.Tests
         [Fact]
         public void DeleteItemTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -342,7 +342,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task DeleteItemAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -368,7 +368,7 @@ namespace Kuery.Tests
         [Fact]
         public void ToArrayTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -391,7 +391,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task ToArrayAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -414,7 +414,7 @@ namespace Kuery.Tests
         [Fact]
         public void CountWithExpressionTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -434,7 +434,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task CountAsyncWithExpressionTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -454,7 +454,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task DeleteAsyncWithPredicateTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -474,7 +474,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task DeleteAsyncWithWhereTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -496,7 +496,7 @@ namespace Kuery.Tests
         [Fact]
         public void OrderByTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -521,7 +521,7 @@ namespace Kuery.Tests
         [Fact]
         public void OrderByDescendingTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -548,7 +548,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task OrderByAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -573,7 +573,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task OrderByDescendingAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -600,7 +600,7 @@ namespace Kuery.Tests
         [Fact]
         public void TakeTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -625,7 +625,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task TakeAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -650,7 +650,7 @@ namespace Kuery.Tests
         [Fact]
         public void SkipTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -676,7 +676,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task SkipAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -702,7 +702,7 @@ namespace Kuery.Tests
         [Fact]
         public void TakeSkipTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -728,7 +728,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task TakeSkipAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -754,7 +754,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task FirstAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -777,7 +777,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task FirstAsyncWithPredicateTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -800,7 +800,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task FirstOrDefaultAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -823,7 +823,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task FirstOrDefaultAsyncWithPredicateTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -846,7 +846,7 @@ namespace Kuery.Tests
         [Fact]
         public void FirstTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -869,7 +869,7 @@ namespace Kuery.Tests
         [Fact]
         public void FirstWithPredicateTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -892,7 +892,7 @@ namespace Kuery.Tests
         [Fact]
         public void FirstOrDefaultTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -915,7 +915,7 @@ namespace Kuery.Tests
         [Fact]
         public void FirstOrDefaultWithPredicateTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -938,7 +938,7 @@ namespace Kuery.Tests
         [Fact]
         public void ElementAtTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -961,7 +961,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task ElementAtAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -984,7 +984,7 @@ namespace Kuery.Tests
         [Fact]
         public void GetEnumeratorTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1013,7 +1013,7 @@ namespace Kuery.Tests
         [Fact]
         public void ThenByTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1040,7 +1040,7 @@ namespace Kuery.Tests
         [Fact]
         public void ThenByDescendingTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1067,7 +1067,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task ThenByAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1094,7 +1094,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task ThenByDescendingAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1121,7 +1121,7 @@ namespace Kuery.Tests
         [Fact]
         public void FindTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1145,7 +1145,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task FindAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1169,7 +1169,7 @@ namespace Kuery.Tests
         [Fact]
         public void GetTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1193,7 +1193,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task GetAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1217,7 +1217,7 @@ namespace Kuery.Tests
         [Fact]
         public void GetWithPredicateTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1241,7 +1241,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task GetAsyncWithPredicateTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1265,7 +1265,7 @@ namespace Kuery.Tests
         [Fact]
         public void FindWithPredicateTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1289,7 +1289,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task FindAsyncWithPredicateTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1313,7 +1313,7 @@ namespace Kuery.Tests
         [Fact]
         public void DeleteWithPrimaryKeyTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1335,7 +1335,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task DeleteAsyncWithPrimaryKeyTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1357,7 +1357,7 @@ namespace Kuery.Tests
         [Fact]
         public void InsertAllTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1384,7 +1384,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task InsertAllAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1411,7 +1411,7 @@ namespace Kuery.Tests
         [Fact]
         public void InsertAllWithTypeTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1440,7 +1440,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task InsertAllAsyncWithTypeTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1469,7 +1469,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task UpdateAllAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1507,7 +1507,7 @@ namespace Kuery.Tests
         [Fact]
         public void UpdateAllTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1545,7 +1545,7 @@ namespace Kuery.Tests
         [Fact]
         public void InsertOrReplaceWhenInsertTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1574,7 +1574,7 @@ namespace Kuery.Tests
         [Fact]
         public void InsertOrReplaceWhenUpdateTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1603,7 +1603,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task InsertOrReplaceAsyncWhenInsertTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1632,7 +1632,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task InsertOrReplaceAsyncWhenUpdateTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1661,7 +1661,7 @@ namespace Kuery.Tests
         [Fact]
         public void QueryTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1688,7 +1688,7 @@ namespace Kuery.Tests
         [Fact]
         public void FindWithQueryTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1712,7 +1712,7 @@ namespace Kuery.Tests
         [Fact]
         public void FindWithQueryWithTableMappingTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1737,7 +1737,7 @@ namespace Kuery.Tests
         [Fact]
         public void QueryWithParamTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1768,7 +1768,7 @@ namespace Kuery.Tests
         [Fact]
         public void FindWithQueryWithParamTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1796,7 +1796,7 @@ namespace Kuery.Tests
         [Fact]
         public void FindWithQueryWithTableMappingAndParamTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -1825,7 +1825,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task QueryAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1853,7 +1853,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task FindWithQueryAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1877,7 +1877,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task FindWithQueryAsyncWithTableMappingTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1902,7 +1902,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task QueryAsyncWithParamTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1934,7 +1934,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task FindWithQueryAsyncWithParamTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1961,7 +1961,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task FindWithQueryAsyncWithTableMappingAndParamTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1989,7 +1989,7 @@ namespace Kuery.Tests
         [Fact]
         public void ExecuteTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -2010,7 +2010,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task ExecuteAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -2031,7 +2031,7 @@ namespace Kuery.Tests
         [Fact]
         public void QueryWithTableMappingTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -2059,7 +2059,7 @@ namespace Kuery.Tests
         [Fact]
         public void QueryWithTableMappingAndParamTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -2091,7 +2091,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task QueryAsyncWithTableMappingTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -2120,7 +2120,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task QueryAsyncWithTableMappingAndParamTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -2153,7 +2153,7 @@ namespace Kuery.Tests
         [Fact]
         public void ExecuteScalarTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
 
@@ -2180,7 +2180,7 @@ namespace Kuery.Tests
         [Fact]
         public async Task ExecuteScalarAsyncTest()
         {
-            using (var connection = sqlServer.CreateConnection())
+            using (var connection = fixture.CreateConnection())
             {
                 await connection.OpenAsync();
 
