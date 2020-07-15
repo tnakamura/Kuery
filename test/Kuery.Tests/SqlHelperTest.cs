@@ -1,87 +1,33 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Configuration;
-using System.Data.Common;
-using System.Data.SqlClient;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Transactions;
-using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Xunit;
 
 namespace Kuery.Tests
 {
-    [TestClass]
-    public class SqlHelperTest
+    public class SqlHelperTest : IClassFixture<SqlServerFixture>, IDisposable
     {
-        const string DbName = "kuery_test";
+        readonly TransactionScope transactionScope;
 
-        static DbConnection CreateConnection(string database = DbName)
+        readonly SqlServerFixture sqlServer;
+
+        public SqlHelperTest(SqlServerFixture sqlServer)
         {
-            var css = ConfigurationManager.ConnectionStrings["Default"];
-            var csb = new SqlConnectionStringBuilder(css.ConnectionString);
-            csb.InitialCatalog = database ?? DbName;
-            return new SqlConnection(csb.ToString());
-        }
-
-        [ClassInitialize]
-        public static void ClassInitialize(TestContext testContext)
-        {
-            using (var connection = CreateConnection("master"))
-            {
-                connection.Open();
-                using (var command = connection.CreateCommand())
-                {
-                    command.CommandText =
-                       $@"IF DB_ID (N'{DbName}') IS NOT NULL
-                            DROP DATABASE [{DbName}]";
-                    command.ExecuteNonQuery();
-                }
-                using (var command = connection.CreateCommand())
-                {
-                    command.CommandText =
-                        $@"IF DB_ID (N'{DbName}') IS NULL
-                            CREATE DATABASE [{DbName}]";
-                    command.ExecuteNonQuery();
-                }
-            }
-
-            using (var connection = CreateConnection())
-            {
-                connection.Open();
-                using (var command = connection.CreateCommand())
-                {
-                    command.CommandText =
-                        @"IF OBJECT_ID (N'dbo.customers') IS NULL
-                            CREATE TABLE customers (
-                              id INTEGER PRIMARY KEY NOT NULL,
-                              code NVARCHAR(50) NOT NULL,
-                              name NVARCHAR(50) NOT NULL
-                            )";
-                    command.ExecuteNonQuery();
-                }
-            }
-        }
-
-        TransactionScope transactionScope;
-
-        [TestInitialize]
-        public void TestInitialize()
-        {
+            this.sqlServer = sqlServer;
             transactionScope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
         }
 
-        [TestCleanup]
-        public void TestCleanup()
+        public void Dispose()
         {
             transactionScope?.Dispose();
         }
 
-        public TestContext TestContext { get; set; }
-
-        [TestMethod]
+        [Fact]
         public void ToListTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -94,17 +40,17 @@ namespace Kuery.Tests
                 }
 
                 var result = connection.Table<Customer>().ToList();
-                Assert.AreEqual(1, result.Count);
-                Assert.AreEqual(2, result[0].Id);
-                Assert.AreEqual("2", result[0].Code);
-                Assert.AreEqual("Google", result[0].Name);
+                Assert.Single(result);
+                Assert.Equal(2, result[0].Id);
+                Assert.Equal("2", result[0].Code);
+                Assert.Equal("Google", result[0].Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task ToListAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -117,17 +63,17 @@ namespace Kuery.Tests
                 }
 
                 var result = await connection.Table<Customer>().ToListAsync();
-                Assert.AreEqual(1, result.Count);
-                Assert.AreEqual(3, result[0].Id);
-                Assert.AreEqual("3", result[0].Code);
-                Assert.AreEqual("Apple", result[0].Name);
+                Assert.Single(result);
+                Assert.Equal(3, result[0].Id);
+                Assert.Equal("3", result[0].Code);
+                Assert.Equal("Apple", result[0].Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task CountAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -140,14 +86,14 @@ namespace Kuery.Tests
                 }
 
                 var result = await connection.Table<Customer>().CountAsync();
-                Assert.AreEqual(1, result);
+                Assert.Equal(1, result);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void CountTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -160,14 +106,14 @@ namespace Kuery.Tests
                 }
 
                 var result = connection.Table<Customer>().Count();
-                Assert.AreEqual(1, result);
+                Assert.Equal(1, result);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void DeleteWithPredicateTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -180,14 +126,14 @@ namespace Kuery.Tests
                 }
 
                 var result = connection.Table<Customer>().Delete(x => x.Code == "1");
-                Assert.AreEqual(1, result);
+                Assert.Equal(1, result);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void DeleteWithWhereTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -202,14 +148,14 @@ namespace Kuery.Tests
                 var result = connection.Table<Customer>()
                     .Where(x => x.Code == "6")
                     .Delete();
-                Assert.AreEqual(1, result);
+                Assert.Equal(1, result);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task InsertAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -220,20 +166,20 @@ namespace Kuery.Tests
                     Name = "Salesforce",
                 };
                 var inserted = await connection.InsertAsync(expected);
-                Assert.AreEqual(1, inserted);
+                Assert.Equal(1, inserted);
 
                 var actual = await connection.Table<Customer>()
                     .ToListAsync();
-                Assert.AreEqual(1, actual.Count);
-                Assert.AreEqual(expected.Name, actual[0].Name);
-                Assert.AreEqual(expected.Id, actual[0].Id);
+                Assert.Single(actual);
+                Assert.Equal(expected.Name, actual[0].Name);
+                Assert.Equal(expected.Id, actual[0].Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task UpdateAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -252,20 +198,20 @@ namespace Kuery.Tests
                     Name = "Shopify",
                 };
                 var updated = await connection.UpdateAsync(expected);
-                Assert.AreEqual(1, updated);
+                Assert.Equal(1, updated);
 
                 var actual = await connection.Table<Customer>()
                     .ToListAsync();
-                Assert.AreEqual(1, actual.Count);
-                Assert.AreEqual(expected.Name, actual[0].Name);
-                Assert.AreEqual(expected.Id, actual[0].Id);
+                Assert.Single(actual);
+                Assert.Equal(expected.Name, actual[0].Name);
+                Assert.Equal(expected.Id, actual[0].Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void WhereTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -280,16 +226,16 @@ namespace Kuery.Tests
                 var actual = connection.Table<Customer>()
                     .Where(x => x.Code == "9")
                     .ToList();
-                Assert.AreEqual(1, actual.Count);
-                Assert.AreEqual(9, actual[0].Id);
-                Assert.AreEqual("GitHub", actual[0].Name);
+                Assert.Single(actual);
+                Assert.Equal(9, actual[0].Id);
+                Assert.Equal("GitHub", actual[0].Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void WhereAndWhereTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -305,16 +251,16 @@ namespace Kuery.Tests
                     .Where(x => x.Code == "10")
                     .Where(x => x.Name == "Netflix")
                     .ToList();
-                Assert.AreEqual(1, actual.Count);
-                Assert.AreEqual(10, actual[0].Id);
-                Assert.AreEqual("Netflix", actual[0].Name);
+                Assert.Single(actual);
+                Assert.Equal(10, actual[0].Id);
+                Assert.Equal("Netflix", actual[0].Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void InsertTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -325,20 +271,20 @@ namespace Kuery.Tests
                     Name = "Slack",
                 };
                 var inserted = connection.Insert(expected);
-                Assert.AreEqual(1, inserted);
+                Assert.Equal(1, inserted);
 
                 var actual = connection.Table<Customer>()
                     .ToList();
-                Assert.AreEqual(1, actual.Count);
-                Assert.AreEqual(expected.Name, actual[0].Name);
-                Assert.AreEqual(expected.Id, actual[0].Id);
+                Assert.Single(actual);
+                Assert.Equal(expected.Name, actual[0].Name);
+                Assert.Equal(expected.Id, actual[0].Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void UpdateTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -357,20 +303,20 @@ namespace Kuery.Tests
                     Name = "SCE",
                 };
                 var updated = connection.Update(expected);
-                Assert.AreEqual(1, updated);
+                Assert.Equal(1, updated);
 
                 var actual = connection.Table<Customer>()
                     .ToList();
-                Assert.AreEqual(1, actual.Count);
-                Assert.AreEqual(expected.Name, actual[0].Name);
-                Assert.AreEqual(expected.Id, actual[0].Id);
+                Assert.Single(actual);
+                Assert.Equal(expected.Name, actual[0].Name);
+                Assert.Equal(expected.Id, actual[0].Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void DeleteItemTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -389,14 +335,14 @@ namespace Kuery.Tests
                     Name = "NINTENDO",
                 };
                 var result = connection.Delete(customer);
-                Assert.AreEqual(1, result);
+                Assert.Equal(1, result);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task DeleteItemAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -415,14 +361,14 @@ namespace Kuery.Tests
                     Name = "SEGA",
                 };
                 var result = await connection.DeleteAsync(customer);
-                Assert.AreEqual(1, result);
+                Assert.Equal(1, result);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void ToArrayTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -435,17 +381,17 @@ namespace Kuery.Tests
                 }
 
                 var result = connection.Table<Customer>().ToArray();
-                Assert.AreEqual(1, result.Length);
-                Assert.AreEqual(15, result[0].Id);
-                Assert.AreEqual("15", result[0].Code);
-                Assert.AreEqual("Soundcloud", result[0].Name);
+                Assert.Single(result);
+                Assert.Equal(15, result[0].Id);
+                Assert.Equal("15", result[0].Code);
+                Assert.Equal("Soundcloud", result[0].Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task ToArrayAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -458,17 +404,17 @@ namespace Kuery.Tests
                 }
 
                 var result = await connection.Table<Customer>().ToArrayAsync();
-                Assert.AreEqual(1, result.Length);
-                Assert.AreEqual(16, result[0].Id);
-                Assert.AreEqual("16", result[0].Code);
-                Assert.AreEqual("Cloudflare", result[0].Name);
+                Assert.Single(result);
+                Assert.Equal(16, result[0].Id);
+                Assert.Equal("16", result[0].Code);
+                Assert.Equal("Cloudflare", result[0].Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void CountWithExpressionTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -481,14 +427,14 @@ namespace Kuery.Tests
                 }
 
                 var result = connection.Table<Customer>().Count(x => x.Code == "17");
-                Assert.AreEqual(1, result);
+                Assert.Equal(1, result);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task CountAsyncWithExpressionTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -501,14 +447,14 @@ namespace Kuery.Tests
                 }
 
                 var result = await connection.Table<Customer>().CountAsync(x => x.Code == "18");
-                Assert.AreEqual(1, result);
+                Assert.Equal(1, result);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task DeleteAsyncWithPredicateTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -521,14 +467,14 @@ namespace Kuery.Tests
                 }
 
                 var result = await connection.Table<Customer>().DeleteAsync(x => x.Code == "19");
-                Assert.AreEqual(1, result);
+                Assert.Equal(1, result);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task DeleteAsyncWithWhereTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -543,14 +489,14 @@ namespace Kuery.Tests
                 var result = await connection.Table<Customer>()
                     .Where(x => x.Code == "20")
                     .DeleteAsync();
-                Assert.AreEqual(1, result);
+                Assert.Equal(1, result);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void OrderByTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -566,16 +512,16 @@ namespace Kuery.Tests
                 var result = connection.Table<Customer>()
                     .OrderBy(x => x.Code)
                     .ToList();
-                Assert.AreEqual(2, result.Count);
-                Assert.AreEqual("21", result[0].Code);
-                Assert.AreEqual("22", result[1].Code);
+                Assert.Equal(2, result.Count);
+                Assert.Equal("21", result[0].Code);
+                Assert.Equal("22", result[1].Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void OrderByDescendingTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -592,17 +538,17 @@ namespace Kuery.Tests
                 var result = connection.Table<Customer>()
                     .OrderByDescending(x => x.Code)
                     .ToList();
-                Assert.AreEqual(3, result.Count);
-                Assert.AreEqual("25", result[0].Code);
-                Assert.AreEqual("24", result[1].Code);
-                Assert.AreEqual("23", result[2].Code);
+                Assert.Equal(3, result.Count);
+                Assert.Equal("25", result[0].Code);
+                Assert.Equal("24", result[1].Code);
+                Assert.Equal("23", result[2].Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task OrderByAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -618,16 +564,16 @@ namespace Kuery.Tests
                 var result = await connection.Table<Customer>()
                     .OrderBy(x => x.Code)
                     .ToListAsync();
-                Assert.AreEqual(2, result.Count);
-                Assert.AreEqual("21", result[0].Code);
-                Assert.AreEqual("22", result[1].Code);
+                Assert.Equal(2, result.Count);
+                Assert.Equal("21", result[0].Code);
+                Assert.Equal("22", result[1].Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task OrderByDescendingAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -644,17 +590,17 @@ namespace Kuery.Tests
                 var result = await connection.Table<Customer>()
                     .OrderByDescending(x => x.Code)
                     .ToListAsync();
-                Assert.AreEqual(3, result.Count);
-                Assert.AreEqual("25", result[0].Code);
-                Assert.AreEqual("24", result[1].Code);
-                Assert.AreEqual("23", result[2].Code);
+                Assert.Equal(3, result.Count);
+                Assert.Equal("25", result[0].Code);
+                Assert.Equal("24", result[1].Code);
+                Assert.Equal("23", result[2].Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void TakeTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -671,15 +617,15 @@ namespace Kuery.Tests
                 var result = connection.Table<Customer>()
                     .Take(1)
                     .ToList();
-                Assert.AreEqual(1, result.Count);
-                Assert.AreEqual("23", result[0].Code);
+                Assert.Single(result);
+                Assert.Equal("23", result[0].Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task TakeAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -696,15 +642,15 @@ namespace Kuery.Tests
                 var result = await connection.Table<Customer>()
                     .Take(1)
                     .ToListAsync();
-                Assert.AreEqual(1, result.Count);
-                Assert.AreEqual("23", result[0].Code);
+                Assert.Single(result);
+                Assert.Equal("23", result[0].Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void SkipTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -721,16 +667,16 @@ namespace Kuery.Tests
                 var result = connection.Table<Customer>()
                     .Skip(1)
                     .ToList();
-                Assert.AreEqual(2, result.Count);
-                Assert.AreEqual("24", result[0].Code);
-                Assert.AreEqual("25", result[1].Code);
+                Assert.Equal(2, result.Count);
+                Assert.Equal("24", result[0].Code);
+                Assert.Equal("25", result[1].Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task SkipAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -747,16 +693,16 @@ namespace Kuery.Tests
                 var result = await connection.Table<Customer>()
                     .Skip(1)
                     .ToListAsync();
-                Assert.AreEqual(2, result.Count);
-                Assert.AreEqual("24", result[0].Code);
-                Assert.AreEqual("25", result[1].Code);
+                Assert.Equal(2, result.Count);
+                Assert.Equal("24", result[0].Code);
+                Assert.Equal("25", result[1].Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void TakeSkipTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -774,15 +720,15 @@ namespace Kuery.Tests
                     .Skip(1)
                     .Take(1)
                     .ToList();
-                Assert.AreEqual(1, result.Count);
-                Assert.AreEqual("24", result[0].Code);
+                Assert.Single(result);
+                Assert.Equal("24", result[0].Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task TakeSkipAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -800,15 +746,15 @@ namespace Kuery.Tests
                     .Skip(1)
                     .Take(1)
                     .ToListAsync();
-                Assert.AreEqual(1, result.Count);
-                Assert.AreEqual("24", result[0].Code);
+                Assert.Single(result);
+                Assert.Equal("24", result[0].Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task FirstAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -824,14 +770,14 @@ namespace Kuery.Tests
 
                 var result = await connection.Table<Customer>()
                     .FirstAsync();
-                Assert.AreEqual("23", result.Code);
+                Assert.Equal("23", result.Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task FirstAsyncWithPredicateTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -847,14 +793,14 @@ namespace Kuery.Tests
 
                 var result = await connection.Table<Customer>()
                     .FirstAsync(x => x.Code == "24");
-                Assert.AreEqual("24", result.Code);
+                Assert.Equal("24", result.Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task FirstOrDefaultAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -870,14 +816,14 @@ namespace Kuery.Tests
 
                 var result = await connection.Table<Customer>()
                     .FirstOrDefaultAsync();
-                Assert.AreEqual("23", result.Code);
+                Assert.Equal("23", result.Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task FirstOrDefaultAsyncWithPredicateTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -893,14 +839,14 @@ namespace Kuery.Tests
 
                 var result = await connection.Table<Customer>()
                     .FirstOrDefaultAsync(x => x.Code == "24");
-                Assert.AreEqual("24", result.Code);
+                Assert.Equal("24", result.Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void FirstTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -916,14 +862,14 @@ namespace Kuery.Tests
 
                 var result = connection.Table<Customer>()
                     .First();
-                Assert.AreEqual("23", result.Code);
+                Assert.Equal("23", result.Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void FirstWithPredicateTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -939,14 +885,14 @@ namespace Kuery.Tests
 
                 var result = connection.Table<Customer>()
                     .First(x => x.Code == "24");
-                Assert.AreEqual("24", result.Code);
+                Assert.Equal("24", result.Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void FirstOrDefaultTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -962,14 +908,14 @@ namespace Kuery.Tests
 
                 var result = connection.Table<Customer>()
                     .FirstOrDefault();
-                Assert.AreEqual("23", result.Code);
+                Assert.Equal("23", result.Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void FirstOrDefaultWithPredicateTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -985,14 +931,14 @@ namespace Kuery.Tests
 
                 var result = connection.Table<Customer>()
                     .FirstOrDefault(x => x.Code == "24");
-                Assert.AreEqual("24", result.Code);
+                Assert.Equal("24", result.Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void ElementAtTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1008,14 +954,14 @@ namespace Kuery.Tests
 
                 var result = connection.Table<Customer>()
                     .ElementAt(0);
-                Assert.AreEqual("23", result.Code);
+                Assert.Equal("23", result.Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task ElementAtAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1031,14 +977,14 @@ namespace Kuery.Tests
 
                 var result = await connection.Table<Customer>()
                     .ElementAtAsync(1);
-                Assert.AreEqual("24", result.Code);
+                Assert.Equal("24", result.Code);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void GetEnumeratorTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1054,20 +1000,20 @@ namespace Kuery.Tests
 
                 var result = connection.Table<Customer>()
                     .GetEnumerator();
-                Assert.IsTrue(result.MoveNext());
-                Assert.AreEqual("23", result.Current.Code);
-                Assert.IsTrue(result.MoveNext());
-                Assert.AreEqual("24", result.Current.Code);
-                Assert.IsTrue(result.MoveNext());
-                Assert.AreEqual("25", result.Current.Code);
-                Assert.IsFalse(result.MoveNext());
+                Assert.True(result.MoveNext());
+                Assert.Equal("23", result.Current.Code);
+                Assert.True(result.MoveNext());
+                Assert.Equal("24", result.Current.Code);
+                Assert.True(result.MoveNext());
+                Assert.Equal("25", result.Current.Code);
+                Assert.False(result.MoveNext());
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void ThenByTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1085,16 +1031,16 @@ namespace Kuery.Tests
                     .OrderBy(x => x.Code)
                     .ThenBy(x => x.Name)
                     .ToList();
-                Assert.AreEqual("aaa", result[0].Name);
-                Assert.AreEqual("bbb", result[1].Name);
-                Assert.AreEqual("ccc", result[2].Name);
+                Assert.Equal("aaa", result[0].Name);
+                Assert.Equal("bbb", result[1].Name);
+                Assert.Equal("ccc", result[2].Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void ThenByDescendingTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1112,16 +1058,16 @@ namespace Kuery.Tests
                     .OrderBy(x => x.Code)
                     .ThenByDescending(x => x.Name)
                     .ToList();
-                Assert.AreEqual("ccc", result[0].Name);
-                Assert.AreEqual("bbb", result[1].Name);
-                Assert.AreEqual("aaa", result[2].Name);
+                Assert.Equal("ccc", result[0].Name);
+                Assert.Equal("bbb", result[1].Name);
+                Assert.Equal("aaa", result[2].Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task ThenByAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1139,16 +1085,16 @@ namespace Kuery.Tests
                     .OrderBy(x => x.Code)
                     .ThenBy(x => x.Name)
                     .ToListAsync();
-                Assert.AreEqual("aaa", result[0].Name);
-                Assert.AreEqual("bbb", result[1].Name);
-                Assert.AreEqual("ccc", result[2].Name);
+                Assert.Equal("aaa", result[0].Name);
+                Assert.Equal("bbb", result[1].Name);
+                Assert.Equal("ccc", result[2].Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task ThenByDescendingAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1166,16 +1112,16 @@ namespace Kuery.Tests
                     .OrderBy(x => x.Code)
                     .ThenByDescending(x => x.Name)
                     .ToListAsync();
-                Assert.AreEqual("ccc", result[0].Name);
-                Assert.AreEqual("bbb", result[1].Name);
-                Assert.AreEqual("aaa", result[2].Name);
+                Assert.Equal("ccc", result[0].Name);
+                Assert.Equal("bbb", result[1].Name);
+                Assert.Equal("aaa", result[2].Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void FindTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1190,16 +1136,16 @@ namespace Kuery.Tests
                 }
 
                 var result = connection.Find<Customer>(2);
-                Assert.AreEqual(2, result.Id);
-                Assert.AreEqual("2", result.Code);
-                Assert.AreEqual("bbb", result.Name);
+                Assert.Equal(2, result.Id);
+                Assert.Equal("2", result.Code);
+                Assert.Equal("bbb", result.Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task FindAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1214,16 +1160,16 @@ namespace Kuery.Tests
                 }
 
                 var result = await connection.FindAsync<Customer>(2);
-                Assert.AreEqual(2, result.Id);
-                Assert.AreEqual("2", result.Code);
-                Assert.AreEqual("bbb", result.Name);
+                Assert.Equal(2, result.Id);
+                Assert.Equal("2", result.Code);
+                Assert.Equal("bbb", result.Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void GetTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1238,16 +1184,16 @@ namespace Kuery.Tests
                 }
 
                 var result = connection.Get<Customer>(2);
-                Assert.AreEqual(2, result.Id);
-                Assert.AreEqual("2", result.Code);
-                Assert.AreEqual("bbb", result.Name);
+                Assert.Equal(2, result.Id);
+                Assert.Equal("2", result.Code);
+                Assert.Equal("bbb", result.Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task GetAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1262,16 +1208,16 @@ namespace Kuery.Tests
                 }
 
                 var result = await connection.GetAsync<Customer>(2);
-                Assert.AreEqual(2, result.Id);
-                Assert.AreEqual("2", result.Code);
-                Assert.AreEqual("bbb", result.Name);
+                Assert.Equal(2, result.Id);
+                Assert.Equal("2", result.Code);
+                Assert.Equal("bbb", result.Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void GetWithPredicateTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1286,16 +1232,16 @@ namespace Kuery.Tests
                 }
 
                 var result = connection.Get<Customer>(x => x.Code == "2");
-                Assert.AreEqual(2, result.Id);
-                Assert.AreEqual("2", result.Code);
-                Assert.AreEqual("bbb", result.Name);
+                Assert.Equal(2, result.Id);
+                Assert.Equal("2", result.Code);
+                Assert.Equal("bbb", result.Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task GetAsyncWithPredicateTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1310,16 +1256,16 @@ namespace Kuery.Tests
                 }
 
                 var result = await connection.GetAsync<Customer>(x => x.Code == "2");
-                Assert.AreEqual(2, result.Id);
-                Assert.AreEqual("2", result.Code);
-                Assert.AreEqual("bbb", result.Name);
+                Assert.Equal(2, result.Id);
+                Assert.Equal("2", result.Code);
+                Assert.Equal("bbb", result.Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void FindWithPredicateTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1334,16 +1280,16 @@ namespace Kuery.Tests
                 }
 
                 var result = connection.Find<Customer>(x => x.Code == "2");
-                Assert.AreEqual(2, result.Id);
-                Assert.AreEqual("2", result.Code);
-                Assert.AreEqual("bbb", result.Name);
+                Assert.Equal(2, result.Id);
+                Assert.Equal("2", result.Code);
+                Assert.Equal("bbb", result.Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task FindAsyncWithPredicateTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1358,16 +1304,16 @@ namespace Kuery.Tests
                 }
 
                 var result = await connection.FindAsync<Customer>(x => x.Code == "2");
-                Assert.AreEqual(2, result.Id);
-                Assert.AreEqual("2", result.Code);
-                Assert.AreEqual("bbb", result.Name);
+                Assert.Equal(2, result.Id);
+                Assert.Equal("2", result.Code);
+                Assert.Equal("bbb", result.Name);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void DeleteWithPrimaryKeyTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1382,14 +1328,14 @@ namespace Kuery.Tests
                 }
 
                 var deleteCount = connection.Delete<Customer>(2);
-                Assert.AreEqual(1, deleteCount);
+                Assert.Equal(1, deleteCount);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task DeleteAsyncWithPrimaryKeyTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1404,14 +1350,14 @@ namespace Kuery.Tests
                 }
 
                 var deleteCount = await connection.DeleteAsync<Customer>(2);
-                Assert.AreEqual(1, deleteCount);
+                Assert.Equal(1, deleteCount);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void InsertAllTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1431,14 +1377,14 @@ namespace Kuery.Tests
                     },
                 });
 
-                Assert.AreEqual(2, insertedCount);
+                Assert.Equal(2, insertedCount);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task InsertAllAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1458,14 +1404,14 @@ namespace Kuery.Tests
                     },
                 });
 
-                Assert.AreEqual(2, insertedCount);
+                Assert.Equal(2, insertedCount);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void InsertAllWithTypeTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1487,14 +1433,14 @@ namespace Kuery.Tests
                     },
                     typeof(Customer));
 
-                Assert.AreEqual(2, insertedCount);
+                Assert.Equal(2, insertedCount);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task InsertAllAsyncWithTypeTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1516,14 +1462,14 @@ namespace Kuery.Tests
                     },
                     typeof(Customer));
 
-                Assert.AreEqual(2, insertedCount);
+                Assert.Equal(2, insertedCount);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task UpdateAllAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1554,14 +1500,14 @@ namespace Kuery.Tests
                         },
                     });
 
-                Assert.AreEqual(2, updatedCount);
+                Assert.Equal(2, updatedCount);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void UpdateAllTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1592,14 +1538,14 @@ namespace Kuery.Tests
                         },
                     });
 
-                Assert.AreEqual(2, updatedCount);
+                Assert.Equal(2, updatedCount);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void InsertOrReplaceWhenInsertTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1621,14 +1567,14 @@ namespace Kuery.Tests
                         Name = "hoge",
                     });
 
-                Assert.AreEqual(1, insertedCount);
+                Assert.Equal(1, insertedCount);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void InsertOrReplaceWhenUpdateTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1650,14 +1596,14 @@ namespace Kuery.Tests
                         Name = "foo",
                     });
 
-                Assert.AreEqual(1, updatedCount);
+                Assert.Equal(1, updatedCount);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task InsertOrReplaceAsyncWhenInsertTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1679,14 +1625,14 @@ namespace Kuery.Tests
                         Name = "hoge",
                     });
 
-                Assert.AreEqual(1, insertedCount);
+                Assert.Equal(1, insertedCount);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task InsertOrReplaceAsyncWhenUpdateTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1708,14 +1654,14 @@ namespace Kuery.Tests
                         Name = "foo",
                     });
 
-                Assert.AreEqual(1, updatedCount);
+                Assert.Equal(1, updatedCount);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void QueryTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1733,16 +1679,16 @@ namespace Kuery.Tests
                     @"SELECT * FROM customers WHERE id > 1")
                     .ToList();
 
-                Assert.AreEqual(2, customers.Count);
-                Assert.AreEqual(2, customers[0].Id);
-                Assert.AreEqual(3, customers[1].Id);
+                Assert.Equal(2, customers.Count);
+                Assert.Equal(2, customers[0].Id);
+                Assert.Equal(3, customers[1].Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void FindWithQueryTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1759,14 +1705,14 @@ namespace Kuery.Tests
                 var customer = connection.FindWithQuery<Customer>(
                     @"SELECT * FROM customers WHERE id > 1");
 
-                Assert.AreEqual(2, customer.Id);
+                Assert.Equal(2, customer.Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void FindWithQueryWithTableMappingTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1784,14 +1730,14 @@ namespace Kuery.Tests
                     new TableMapping(typeof(Customer)),
                     @"SELECT * FROM customers WHERE id > 1");
 
-                Assert.AreEqual(2, ((Customer)customer).Id);
+                Assert.Equal(2, ((Customer)customer).Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void QueryWithParamTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1813,16 +1759,16 @@ namespace Kuery.Tests
                     })
                     .ToList();
 
-                Assert.AreEqual(2, customers.Count);
-                Assert.AreEqual(2, customers[0].Id);
-                Assert.AreEqual(3, customers[1].Id);
+                Assert.Equal(2, customers.Count);
+                Assert.Equal(2, customers[0].Id);
+                Assert.Equal(3, customers[1].Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void FindWithQueryWithParamTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1843,14 +1789,14 @@ namespace Kuery.Tests
                         id = 1
                     });
 
-                Assert.AreEqual(2, customer.Id);
+                Assert.Equal(2, customer.Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void FindWithQueryWithTableMappingAndParamTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -1872,14 +1818,14 @@ namespace Kuery.Tests
                         id = 1
                     });
 
-                Assert.AreEqual(2, ((Customer)customer).Id);
+                Assert.Equal(2, ((Customer)customer).Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task QueryAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1898,16 +1844,16 @@ namespace Kuery.Tests
                         @"SELECT * FROM customers WHERE id > 1")
                 ).ToList();
 
-                Assert.AreEqual(2, customers.Count);
-                Assert.AreEqual(2, customers[0].Id);
-                Assert.AreEqual(3, customers[1].Id);
+                Assert.Equal(2, customers.Count);
+                Assert.Equal(2, customers[0].Id);
+                Assert.Equal(3, customers[1].Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task FindWithQueryAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1924,14 +1870,14 @@ namespace Kuery.Tests
                 var customer = await connection.FindWithQueryAsync<Customer>(
                     @"SELECT * FROM customers WHERE id > 1");
 
-                Assert.AreEqual(2, customer.Id);
+                Assert.Equal(2, customer.Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task FindWithQueryAsyncWithTableMappingTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1949,14 +1895,14 @@ namespace Kuery.Tests
                     new TableMapping(typeof(Customer)),
                     @"SELECT * FROM customers WHERE id > 1");
 
-                Assert.AreEqual(2, ((Customer)customer).Id);
+                Assert.Equal(2, ((Customer)customer).Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task QueryAsyncWithParamTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -1979,16 +1925,16 @@ namespace Kuery.Tests
                         })
                 ).ToList();
 
-                Assert.AreEqual(2, customers.Count);
-                Assert.AreEqual(2, customers[0].Id);
-                Assert.AreEqual(3, customers[1].Id);
+                Assert.Equal(2, customers.Count);
+                Assert.Equal(2, customers[0].Id);
+                Assert.Equal(3, customers[1].Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task FindWithQueryAsyncWithParamTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -2008,14 +1954,14 @@ namespace Kuery.Tests
                     {
                         id = 1
                     });
-                Assert.AreEqual(2, customer.Id);
+                Assert.Equal(2, customer.Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task FindWithQueryAsyncWithTableMappingAndParamTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -2036,14 +1982,14 @@ namespace Kuery.Tests
                     {
                         id = 1
                     });
-                Assert.AreEqual(2, ((Customer)customer).Id);
+                Assert.Equal(2, ((Customer)customer).Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void ExecuteTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -2057,14 +2003,14 @@ namespace Kuery.Tests
                         name = "aaa",
                     });
 
-                Assert.AreEqual(1, result);
+                Assert.Equal(1, result);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task ExecuteAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -2078,14 +2024,14 @@ namespace Kuery.Tests
                         name = "aaa",
                     });
 
-                Assert.AreEqual(1, result);
+                Assert.Equal(1, result);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void QueryWithTableMappingTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -2104,16 +2050,16 @@ namespace Kuery.Tests
                     @"SELECT * FROM customers WHERE id > 1")
                     .ToList();
 
-                Assert.AreEqual(2, customers.Count);
-                Assert.AreEqual(2, ((Customer)customers[0]).Id);
-                Assert.AreEqual(3, ((Customer)customers[1]).Id);
+                Assert.Equal(2, customers.Count);
+                Assert.Equal(2, ((Customer)customers[0]).Id);
+                Assert.Equal(3, ((Customer)customers[1]).Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void QueryWithTableMappingAndParamTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -2136,16 +2082,16 @@ namespace Kuery.Tests
                     })
                     .ToList();
 
-                Assert.AreEqual(2, customers.Count);
-                Assert.AreEqual(2, ((Customer)customers[0]).Id);
-                Assert.AreEqual(3, ((Customer)customers[1]).Id);
+                Assert.Equal(2, customers.Count);
+                Assert.Equal(2, ((Customer)customers[0]).Id);
+                Assert.Equal(3, ((Customer)customers[1]).Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task QueryAsyncWithTableMappingTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -2165,16 +2111,16 @@ namespace Kuery.Tests
                         @"SELECT * FROM customers WHERE id > 1")
                 ).ToList();
 
-                Assert.AreEqual(2, customers.Count);
-                Assert.AreEqual(2, ((Customer)customers[0]).Id);
-                Assert.AreEqual(3, ((Customer)customers[1]).Id);
+                Assert.Equal(2, customers.Count);
+                Assert.Equal(2, ((Customer)customers[0]).Id);
+                Assert.Equal(3, ((Customer)customers[1]).Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task QueryAsyncWithTableMappingAndParamTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -2198,16 +2144,16 @@ namespace Kuery.Tests
                         })
                 ).ToList();
 
-                Assert.AreEqual(2, customers.Count);
-                Assert.AreEqual(2, ((Customer)customers[0]).Id);
-                Assert.AreEqual(3, ((Customer)customers[1]).Id);
+                Assert.Equal(2, customers.Count);
+                Assert.Equal(2, ((Customer)customers[0]).Id);
+                Assert.Equal(3, ((Customer)customers[1]).Id);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public void ExecuteScalarTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 connection.Open();
 
@@ -2227,14 +2173,14 @@ namespace Kuery.Tests
                     {
                         id = 1
                     });
-                Assert.AreEqual(2, result);
+                Assert.Equal(2, result);
             }
         }
 
-        [TestMethod]
+        [Fact]
         public async Task ExecuteScalarAsyncTest()
         {
-            using (var connection = CreateConnection())
+            using (var connection = sqlServer.CreateConnection())
             {
                 await connection.OpenAsync();
 
@@ -2254,7 +2200,7 @@ namespace Kuery.Tests
                     {
                         id = 1
                     });
-                Assert.AreEqual(2, result);
+                Assert.Equal(2, result);
             }
         }
     }
