@@ -4,6 +4,12 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <Copyright>tnakamura</Copyright>
     <Authors>tnakamura</Authors>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Version>0.0.1-alpha</Version>
+    <Description>Simple ORM for .NET</Description>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>sql orm database</PackageTags>
   </PropertyGroup>
 
 </Project>
