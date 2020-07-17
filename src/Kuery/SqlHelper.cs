@@ -67,7 +67,7 @@ namespace Kuery
                     columns.Append(",");
                     values.Append(",");
                 }
-                columns.Append(col.Name);
+                columns.Append("[" + col.Name + "]");
                 values.Append("@" + col.Name);
             }
 
@@ -1806,8 +1806,9 @@ namespace Kuery
                 cmdText.Append(" ");
             }
             cmdText.Append(selectionList);
-            cmdText.Append(" from ");
+            cmdText.Append(" from [");
             cmdText.Append(Table.TableName);
+            cmdText.Append("]");
             var args = new List<object>();
             if (_where != null)
             {
@@ -1825,7 +1826,9 @@ namespace Kuery
                         cmdText.Append(" , ");
                     }
                     var o = _orderBys[i];
+                    cmdText.Append("[");
                     cmdText.Append(o.ColumnName);
+                    cmdText.Append("]");
                     if (!o.Ascending)
                     {
                         cmdText.Append(" desc ");
@@ -1836,8 +1839,9 @@ namespace Kuery
             {
                 if (_orderBys == null || _orderBys.Count == 0)
                 {
-                    cmdText.Append(" order by ");
+                    cmdText.Append(" order by [");
                     cmdText.Append(Table.PK.Name);
+                    cmdText.Append("]");
                 }
 
                 cmdText.Append(" offset ");
