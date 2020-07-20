@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 
 namespace Kuery.Tests
@@ -17,6 +18,38 @@ namespace Kuery.Tests
             csb.IntegratedSecurity = true;
             csb.DataSource = "(local)\\SQLEXPRESS";
             return new SqlConnection(csb.ToString());
+        }
+
+        public async Task<DbConnection> OpenNewConnectionAsync()
+        {
+            DbConnection connection = null;
+            try
+            {
+                connection = CreateConnection();
+                await connection.OpenAsync();
+                return connection;
+            }
+            catch
+            {
+                connection?.Close();
+                throw;
+            }
+        }
+
+        public DbConnection OpenNewConnection()
+        {
+            DbConnection connection = null;
+            try
+            {
+                connection = CreateConnection();
+                connection.Open();
+                return connection;
+            }
+            catch
+            {
+                connection?.Close();
+                throw;
+            }
         }
 
         public SqlServerFixture()
