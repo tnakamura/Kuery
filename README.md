@@ -186,4 +186,43 @@
   - [x] `FirstOrDefault()`
   - [x] `First(Expression<Func<T, bool>>)`
   - [x] `FirstOrDefault(Expression<Func<T, bool>>)`
+- [ ] `Tests`
+  - [ ] AsyncTests
+  - ~~BackupTest~~
+  - [x] BooleanTest
+  - [ ] ByteArrayTest
+  - [ ] CollateTest
+  - [ ] ConcurrencyTest
+  - [ ] ContainsTest
+  - ~~CreateTableImplicitTest~~
+  - ~~CreateTableTest~~
+  - [ ] DateTimeOffsetTest
+  - [ ] DateTimeTest
+  - [x] DeleteTest
+  - ~~DropTableTest~~
+  - [ ] EnumCacheTest
+  - [ ] EnumNullableTest
+  - [ ] EnumTest
+  - [ ] EqualsTest
+  - [ ] GuidTest
+  - [ ] InheritanceTest
+  - [ ] InsertTest
+  - ~~JoinTest~~
+  - [ ] LinqTest
+  - [ ] MappingTest
+  - ~~MigrationTest~~
+  - [ ] NotNullAttributeTest
+  - [ ] NullableTest
+  - [ ] OpenTest
+  - [x] QueryTest
+  - [ ] ReadmeTest
+  - [ ] ScalarTest
+  - [x] SkipTest
+  - ~~SQLCipherTest~~
+  - [x] StringQueryTest
+  - ~~TableChangedTest~~
+  - [ ] TimeSpanTest
+  - [ ] TransactionTest
+  - [ ] UnicodeTest
+  - [ ] UniqueTest
 
