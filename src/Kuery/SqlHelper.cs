@@ -894,7 +894,15 @@ namespace Kuery
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                return (T)command.ExecuteScalar();
+                var result = command.ExecuteScalar();
+                if (result is DBNull)
+                {
+                    return default;
+                }
+                else
+                {
+                    return (T)result;
+                }
             }
         }
 
@@ -902,7 +910,15 @@ namespace Kuery
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                return (T)(await command.ExecuteScalarAsync());
+                var result = await command.ExecuteScalarAsync();
+                if (result is DBNull)
+                {
+                    return default;
+                }
+                else
+                {
+                    return (T)result;
+                }
             }
         }
     }

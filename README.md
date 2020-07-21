@@ -191,8 +191,8 @@
   - ~~BackupTest~~
   - [x] BooleanTest
   - [ ] ByteArrayTest
-  - [ ] CollateTest
-  - [ ] ConcurrencyTest
+  - ~~CollateTest~~
+  - ~~ConcurrencyTest~~
   - [ ] ContainsTest
   - ~~CreateTableImplicitTest~~
   - ~~CreateTableTest~~
@@ -213,10 +213,10 @@
   - ~~MigrationTest~~
   - [ ] NotNullAttributeTest
   - [ ] NullableTest
-  - [ ] OpenTest
+  - ~~OpenTest~~
   - [x] QueryTest
-  - [ ] ReadmeTest
-  - [ ] ScalarTest
+  - ~~ReadmeTest~~
+  - [x] ScalarTest
   - [x] SkipTest
   - ~~SQLCipherTest~~
   - [x] StringQueryTest
