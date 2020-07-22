@@ -56,19 +56,28 @@ namespace Kuery
 
             for (var i = 0; i < map.InsertColumns.Length; i++)
             {
-                var col = map.InsertColumns[i];
-                var parameter = command.CreateParameter();
-                parameter.ParameterName = "@" + col.Name;
-                parameter.Value = col.GetValue(item);
-                command.Parameters.Add(parameter);
-
                 if (i > 0)
                 {
                     columns.Append(",");
                     values.Append(",");
                 }
+
+                var col = map.InsertColumns[i];
                 columns.Append("[" + col.Name + "]");
-                values.Append("@" + col.Name);
+
+                var value = col.GetValue(item);
+                if (value is null && col.IsNullable)
+                {
+                    values.Append("NULL");
+                }
+                else
+                {
+                    var parameter = command.CreateParameter();
+                    parameter.ParameterName = "@" + col.Name;
+                    parameter.Value = col.GetValue(item);
+                    command.Parameters.Add(parameter);
+                    values.Append("@" + col.Name);
+                }
             }
 
             command.CommandText = "insert into "
@@ -77,7 +86,7 @@ namespace Kuery
                 + columns.ToString()
                 + ") values ("
                 + values.ToString()
-                + ")";
+                + ");";
             return command;
         }
 

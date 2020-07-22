@@ -197,7 +197,7 @@
   - ~~CreateTableImplicitTest~~
   - ~~CreateTableTest~~
   - [ ] DateTimeOffsetTest
-  - [ ] DateTimeTest
+  - [x] DateTimeTest
   - [x] DeleteTest
   - ~~DropTableTest~~
   - [ ] EnumCacheTest
