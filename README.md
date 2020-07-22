@@ -193,7 +193,7 @@
   - [ ] ByteArrayTest
   - ~~CollateTest~~
   - ~~ConcurrencyTest~~
-  - [ ] ContainsTest
+  - [x] ContainsTest
   - ~~CreateTableImplicitTest~~
   - ~~CreateTableTest~~
   - [ ] DateTimeOffsetTest
