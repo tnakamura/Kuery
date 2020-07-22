@@ -40,7 +40,7 @@ namespace Kuery.Tests
                     if object_id (N'{nameof(DtoTestObj)}') is null
                         create table {nameof(DtoTestObj)} (
                             {nameof(DtoTestObj.Id)} integer identity(1,1) primary key not null,
-                            {nameof(DtoTestObj.Name)} nvarchar(50) null
+                            {nameof(DtoTestObj.Name)} nvarchar(50) null,
                             {nameof(DtoTestObj.ModifiedTime)} datetimeoffset null
                         );";
                 cmd.ExecuteNonQuery();

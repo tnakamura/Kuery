@@ -223,6 +223,6 @@
   - ~~TableChangedTest~~
   - [ ] TimeSpanTest
   - [ ] TransactionTest
-  - [ ] UnicodeTest
+  - [x] UnicodeTest
   - [ ] UniqueTest
 
