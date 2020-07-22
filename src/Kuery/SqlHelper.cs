@@ -87,6 +87,7 @@ namespace Kuery
                 + ") values ("
                 + values.ToString()
                 + ");";
+
             return command;
         }
 

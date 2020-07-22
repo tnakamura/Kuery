@@ -196,7 +196,7 @@
   - [x] ContainsTest
   - ~~CreateTableImplicitTest~~
   - ~~CreateTableTest~~
-  - [ ] DateTimeOffsetTest
+  - [x] DateTimeOffsetTest
   - [x] DateTimeTest
   - [x] DeleteTest
   - ~~DropTableTest~~
