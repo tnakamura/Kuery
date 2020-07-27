@@ -211,7 +211,7 @@
   - [ ] LinqTest
   - [x] MappingTest
   - ~~MigrationTest~~
-  - [ ] NotNullAttributeTest
+  - ~~NotNullAttributeTest~~
   - [x] NullableTest
   - ~~OpenTest~~
   - [x] QueryTest
