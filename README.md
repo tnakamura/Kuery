@@ -209,7 +209,7 @@
   - [ ] InsertTest
   - ~~JoinTest~~
   - [ ] LinqTest
-  - [ ] MappingTest
+  - [x] MappingTest
   - ~~MigrationTest~~
   - [ ] NotNullAttributeTest
   - [ ] NullableTest
@@ -224,5 +224,5 @@
   - [x] TimeSpanTest
   - [ ] TransactionTest
   - [x] UnicodeTest
-  - [ ] UniqueTest
+  - ~~UniqueTest~~
 

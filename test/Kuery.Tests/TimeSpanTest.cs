@@ -23,6 +23,7 @@ namespace Kuery.Tests
 
             public TimeSpan Duration { get; set; }
         }
+
         static void CreateTestTable(DbConnection connection)
         {
             using (var cmd = connection.CreateCommand())
