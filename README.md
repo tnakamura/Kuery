@@ -212,7 +212,7 @@
   - [x] MappingTest
   - ~~MigrationTest~~
   - [ ] NotNullAttributeTest
-  - [ ] NullableTest
+  - [x] NullableTest
   - ~~OpenTest~~
   - [x] QueryTest
   - ~~ReadmeTest~~
