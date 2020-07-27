@@ -221,7 +221,7 @@
   - ~~SQLCipherTest~~
   - [x] StringQueryTest
   - ~~TableChangedTest~~
-  - [ ] TimeSpanTest
+  - [x] TimeSpanTest
   - [ ] TransactionTest
   - [x] UnicodeTest
   - [ ] UniqueTest
