@@ -206,7 +206,7 @@
   - [x] EqualsTest
   - [x] GuidTest
   - [x] IgnoreTest
-  - [ ] InheritanceTest
+  - [x] InheritanceTest
   - [ ] InsertTest
   - ~~JoinTest~~
   - [ ] LinqTest
