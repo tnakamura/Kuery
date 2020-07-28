@@ -205,6 +205,7 @@
   - [ ] EnumTest
   - [ ] EqualsTest
   - [x] GuidTest
+  - [x] IgnoreTest
   - [ ] InheritanceTest
   - [ ] InsertTest
   - ~~JoinTest~~
