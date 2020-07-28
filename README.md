@@ -203,7 +203,7 @@
   - [ ] EnumCacheTest
   - [ ] EnumNullableTest
   - [ ] EnumTest
-  - [ ] EqualsTest
+  - [x] EqualsTest
   - [x] GuidTest
   - [x] IgnoreTest
   - [ ] InheritanceTest
