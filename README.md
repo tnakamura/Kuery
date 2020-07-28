@@ -201,7 +201,7 @@
   - [x] DeleteTest
   - ~~DropTableTest~~
   - [x] EnumCacheTest
-  - [ ] EnumNullableTest
+  - [x] EnumNullableTest
   - [x] EnumTest
   - [x] EqualsTest
   - [x] GuidTest
@@ -223,7 +223,7 @@
   - [x] StringQueryTest
   - ~~TableChangedTest~~
   - [x] TimeSpanTest
-  - [ ] TransactionTest
+  - ~~TransactionTest~~
   - [x] UnicodeTest
   - ~~UniqueTest~~
 
