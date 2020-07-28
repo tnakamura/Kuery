@@ -202,7 +202,7 @@
   - ~~DropTableTest~~
   - [x] EnumCacheTest
   - [ ] EnumNullableTest
-  - [ ] EnumTest
+  - [x] EnumTest
   - [x] EqualsTest
   - [x] GuidTest
   - [x] IgnoreTest
