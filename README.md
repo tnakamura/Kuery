@@ -200,7 +200,7 @@
   - [x] DateTimeTest
   - [x] DeleteTest
   - ~~DropTableTest~~
-  - [ ] EnumCacheTest
+  - [x] EnumCacheTest
   - [ ] EnumNullableTest
   - [ ] EnumTest
   - [x] EqualsTest
