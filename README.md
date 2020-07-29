@@ -190,7 +190,7 @@
   - [ ] AsyncTests
   - ~~BackupTest~~
   - [x] BooleanTest
-  - [ ] ByteArrayTest
+  - [x] ByteArrayTest
   - ~~CollateTest~~
   - ~~ConcurrencyTest~~
   - [x] ContainsTest

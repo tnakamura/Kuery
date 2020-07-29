@@ -1236,6 +1236,10 @@ namespace Kuery
                 {
                     _prop.SetValue(obj, Enum.ToObject(ColumnType, val));
                 }
+                else if (val == DBNull.Value)
+                {
+                    _prop.SetValue(obj, null, null);
+                }
                 else
                 {
                     _prop.SetValue(obj, val, null);
