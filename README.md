@@ -209,7 +209,7 @@
   - [x] InheritanceTest
   - [x] InsertTest
   - ~~JoinTest~~
-  - [ ] LinqTest
+  - [x] LinqTest
   - [x] MappingTest
   - ~~MigrationTest~~
   - ~~NotNullAttributeTest~~
