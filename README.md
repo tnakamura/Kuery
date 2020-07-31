@@ -186,8 +186,8 @@
   - [x] `FirstOrDefault()`
   - [x] `First(Expression<Func<T, bool>>)`
   - [x] `FirstOrDefault(Expression<Func<T, bool>>)`
-- [ ] `Tests`
-  - [ ] AsyncTests
+- [x] `Tests`
+  - [x] AsyncTests
   - ~~BackupTest~~
   - [x] BooleanTest
   - [x] ByteArrayTest
