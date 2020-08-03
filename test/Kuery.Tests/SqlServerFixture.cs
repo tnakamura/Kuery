@@ -1,10 +1,11 @@
+using System;
 using System.Data.Common;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 
 namespace Kuery.Tests
 {
-    public class SqlServerFixture
+    public class SqlServerFixture : IDisposable
     {
         public string DbName { get; }
 
@@ -54,19 +55,11 @@ namespace Kuery.Tests
 
         public SqlServerFixture()
         {
-            DbName = "kuery_test";
+            DbName = $"kuery_test_{Guid.NewGuid():N}";
 
             using (var connection = CreateConnection("master"))
             {
                 connection.Open();
-
-                using (var command = connection.CreateCommand())
-                {
-                    command.CommandText =
-                       $@"IF DB_ID (N'{DbName}') IS NOT NULL
-                            DROP DATABASE [{DbName}]";
-                    command.ExecuteNonQuery();
-                }
 
                 using (var command = connection.CreateCommand())
                 {
@@ -89,6 +82,24 @@ namespace Kuery.Tests
                               code NVARCHAR(50) NOT NULL,
                               name NVARCHAR(50) NOT NULL
                             )";
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            using (var connection = CreateConnection("master"))
+            {
+                connection.Open();
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText =
+                        $@"IF DB_ID (N'{DbName}') IS NOT NULL
+                           BEGIN
+                             ALTER DATABASE [{DbName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                             DROP DATABASE [{DbName}];
+                           END";
                     command.ExecuteNonQuery();
                 }
             }
