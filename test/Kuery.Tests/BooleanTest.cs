@@ -12,7 +12,7 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class BooleanTest : IClassFixture<SqlServerFixture>
+    public class BooleanTest : IClassFixture<SqliteFixture>
     {
         public class VO
         {
@@ -24,9 +24,9 @@ namespace Kuery.Tests
             public string Text { get; set; }
         }
 
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public BooleanTest(SqlServerFixture fixture)
+        public BooleanTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

@@ -5,11 +5,11 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class DeleteTest : IClassFixture<SqlServerFixture>
+    public class DeleteTest : IClassFixture<SqliteFixture>
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public DeleteTest(SqlServerFixture fixture)
+        public DeleteTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

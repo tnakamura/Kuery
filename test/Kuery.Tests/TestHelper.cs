@@ -10,8 +10,7 @@ namespace Kuery.Tests
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = $@"
-                    if object_id (N'{tableName}') is not null
-                        drop table [{tableName}];";
+                    drop table if exists [{tableName}];";
                 command.ExecuteNonQuery();
             }
         }

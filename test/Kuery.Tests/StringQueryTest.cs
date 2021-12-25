@@ -4,13 +4,13 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class StringQueryTest : IClassFixture<SqlServerFixture>, IDisposable
+    public class StringQueryTest : IClassFixture<SqliteFixture>, IDisposable
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
         readonly TransactionScope ts;
 
-        public StringQueryTest(SqlServerFixture fixture)
+        public StringQueryTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
 

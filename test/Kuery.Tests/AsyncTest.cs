@@ -7,11 +7,11 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class AsyncTest : IClassFixture<SqlServerFixture>
+    public class AsyncTest : IClassFixture<SqliteFixture>
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public AsyncTest(SqlServerFixture fixture)
+        public AsyncTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

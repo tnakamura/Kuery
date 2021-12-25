@@ -5,11 +5,11 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class MappingTest : IClassFixture<SqlServerFixture>
+    public class MappingTest : IClassFixture<SqliteFixture>
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public MappingTest(SqlServerFixture fixture)
+        public MappingTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

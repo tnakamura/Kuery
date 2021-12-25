@@ -3,16 +3,16 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class QueryTest : IClassFixture<SqlServerFixture>
+    public class QueryTest : IClassFixture<SqliteFixture>
     {
         class GenericObject
         {
             public int Value { get; set; }
         }
 
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public QueryTest(SqlServerFixture fixture)
+        public QueryTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

@@ -5,11 +5,11 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class DateTimeTest : IClassFixture<SqlServerFixture>
+    public class DateTimeTest : IClassFixture<SqliteFixture>
     {
-        public SqlServerFixture fixture;
+        public SqliteFixture fixture;
 
-        public DateTimeTest(SqlServerFixture fixture)
+        public DateTimeTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

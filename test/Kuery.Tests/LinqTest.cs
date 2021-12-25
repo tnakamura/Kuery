@@ -6,11 +6,11 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class LinqTest : IClassFixture<SqlServerFixture>
+    public class LinqTest : IClassFixture<SqliteFixture>
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public LinqTest(SqlServerFixture fixture)
+        public LinqTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

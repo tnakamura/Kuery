@@ -8,11 +8,11 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class EnumTest : IClassFixture<SqlServerFixture>
+    public class EnumTest : IClassFixture<SqliteFixture>
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public EnumTest(SqlServerFixture fixture)
+        public EnumTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

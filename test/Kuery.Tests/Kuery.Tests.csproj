@@ -16,10 +16,14 @@
     <PackageReference Include="coverlet.collector" Version="3.1.0"><IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 <PrivateAssets>all</PrivateAssets>
 </PackageReference>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="6.0.1" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Kuery\Kuery.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="Microsoft.Data.Sqlite" />
+  </ItemGroup>
 </Project>

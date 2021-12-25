@@ -7,13 +7,13 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class SqlHelperTest : IClassFixture<SqlServerFixture>, IDisposable
+    public class SqlHelperTest : IClassFixture<SqliteFixture>, IDisposable
     {
         readonly TransactionScope transactionScope;
 
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public SqlHelperTest(SqlServerFixture fixture)
+        public SqlHelperTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
             transactionScope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);

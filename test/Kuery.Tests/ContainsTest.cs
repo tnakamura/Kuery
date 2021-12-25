@@ -5,11 +5,11 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class ContainsTest : IClassFixture<SqlServerFixture>
+    public class ContainsTest : IClassFixture<SqliteFixture>
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public ContainsTest(SqlServerFixture fixture)
+        public ContainsTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

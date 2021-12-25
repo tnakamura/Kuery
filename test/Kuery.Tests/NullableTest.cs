@@ -3,11 +3,11 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class NullableTest : IClassFixture<SqlServerFixture>
+    public class NullableTest : IClassFixture<SqliteFixture>
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public NullableTest(SqlServerFixture fixture)
+        public NullableTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

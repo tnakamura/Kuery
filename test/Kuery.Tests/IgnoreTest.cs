@@ -4,11 +4,11 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class IgnoreTest : IClassFixture<SqlServerFixture>
+    public class IgnoreTest : IClassFixture<SqliteFixture>
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public IgnoreTest(SqlServerFixture fixture)
+        public IgnoreTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

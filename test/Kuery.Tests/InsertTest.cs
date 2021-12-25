@@ -7,13 +7,13 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class InsertTest : IClassFixture<SqlServerFixture>, IDisposable
+    public class InsertTest : IClassFixture<SqliteFixture>, IDisposable
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
         readonly DbConnection connection;
 
-        public InsertTest(SqlServerFixture fixture)
+        public InsertTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
             connection = fixture.OpenNewConnection();
@@ -74,39 +74,35 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(InsertTestObj)}') is null
-                        create table {nameof(InsertTestObj)} (
-                            {nameof(InsertTestObj.Id)} int identity(1,1) primary key not null,
-                            {nameof(InsertTestObj.Text)} nvarchar(64) null
-                        );";
+                    create table if not exists {nameof(InsertTestObj)} (
+                        {nameof(InsertTestObj.Id)} integer primary key autoincrement,
+                        {nameof(InsertTestObj.Text)} text null
+                    );";
                 cmd.ExecuteNonQuery();
             }
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(InsertTestObj2)}') is null
-                        create table {nameof(InsertTestObj2)} (
-                            {nameof(InsertTestObj2.Id)} int identity(1,1) primary key not null,
-                            {nameof(InsertTestObj2.Text)} nvarchar(64) null
-                        );";
+                    create table if not exists {nameof(InsertTestObj2)} (
+                        {nameof(InsertTestObj2.Id)} integer primary key autoincrement,
+                        {nameof(InsertTestObj2.Text)} text null
+                    );";
                 cmd.ExecuteNonQuery();
             }
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(OneColumnObj)}') is null
-                        create table {nameof(OneColumnObj)} (
-                            {nameof(OneColumnObj.Id)} int identity(1,1) primary key not null
-                        );";
+                    create table if not exists {nameof(OneColumnObj)} (
+                        {nameof(OneColumnObj.Id)} integer primary key autoincrement
+                    );";
                 cmd.ExecuteNonQuery();
             }
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(UniqueObj)}') is null
-                        create table {nameof(UniqueObj)} (
-                            {nameof(UniqueObj.Id)} int primary key not null
-                        );";
+                    create table if not exists {nameof(UniqueObj)} (
+                        {nameof(UniqueObj.Id)} integer primary key autoincrement
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }

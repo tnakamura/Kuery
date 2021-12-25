@@ -4,11 +4,11 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class SkipTest : IClassFixture<SqlServerFixture>
+    public class SkipTest : IClassFixture<SqliteFixture>
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public SkipTest(SqlServerFixture fixture)
+        public SkipTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

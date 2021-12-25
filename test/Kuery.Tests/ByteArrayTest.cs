@@ -8,11 +8,11 @@ using System.Data.Common;
 
 namespace Kuery.Tests
 {
-    public class ByteArrayTest : IClassFixture<SqlServerFixture>
+    public class ByteArrayTest : IClassFixture<SqliteFixture>
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public ByteArrayTest(SqlServerFixture fixture)
+        public ByteArrayTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

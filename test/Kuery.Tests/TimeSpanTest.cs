@@ -5,11 +5,11 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class TimeSpanTest : IClassFixture<SqlServerFixture>
+    public class TimeSpanTest : IClassFixture<SqliteFixture>
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public TimeSpanTest(SqlServerFixture fixture)
+        public TimeSpanTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }

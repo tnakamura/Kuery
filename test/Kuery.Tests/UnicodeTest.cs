@@ -4,11 +4,11 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class UnicodeTest : IClassFixture<SqlServerFixture>
+    public class UnicodeTest : IClassFixture<SqliteFixture>
     {
-        readonly SqlServerFixture fixture;
+        readonly SqliteFixture fixture;
 
-        public UnicodeTest(SqlServerFixture fixture)
+        public UnicodeTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
         }
