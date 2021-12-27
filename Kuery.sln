@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.30225.117
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.32014.148
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{FF012E6D-0B81-4D99-8AD5-0BBEF3111204}"
 EndProject
@@ -9,7 +9,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{A4C8A879-A
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kuery", "src\Kuery\Kuery.csproj", "{D4AD5C09-1CF2-40FD-8B69-C9E56EF267CF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kuery.Tests", "test\Kuery.Tests\Kuery.Tests.csproj", "{340FE0D6-983C-4701-9EBB-1923EFFD5300}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kuery.Tests", "test\Kuery.Tests\Kuery.Tests.csproj", "{340FE0D6-983C-4701-9EBB-1923EFFD5300}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "benchmark", "benchmark", "{E3685C70-ACC9-4697-AC5A-11C53D8BE40D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kuery.Benchmark", "benchmark\Kuery.Benchmark\Kuery.Benchmark.csproj", "{BCFA0A2F-96A3-4576-8BA9-51312984AB6C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -25,6 +29,10 @@ Global
 		{340FE0D6-983C-4701-9EBB-1923EFFD5300}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{340FE0D6-983C-4701-9EBB-1923EFFD5300}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{340FE0D6-983C-4701-9EBB-1923EFFD5300}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BCFA0A2F-96A3-4576-8BA9-51312984AB6C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BCFA0A2F-96A3-4576-8BA9-51312984AB6C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BCFA0A2F-96A3-4576-8BA9-51312984AB6C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BCFA0A2F-96A3-4576-8BA9-51312984AB6C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -32,6 +40,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{D4AD5C09-1CF2-40FD-8B69-C9E56EF267CF} = {FF012E6D-0B81-4D99-8AD5-0BBEF3111204}
 		{340FE0D6-983C-4701-9EBB-1923EFFD5300} = {A4C8A879-ABF0-4E2C-9502-2EA4E599B50E}
+		{BCFA0A2F-96A3-4576-8BA9-51312984AB6C} = {E3685C70-ACC9-4697-AC5A-11C53D8BE40D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {B5262332-A818-45B8-9AE7-98D31CD629C8}
