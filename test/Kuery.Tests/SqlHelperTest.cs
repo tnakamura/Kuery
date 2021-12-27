@@ -9,19 +9,24 @@ namespace Kuery.Tests
 {
     public class SqlHelperTest : IClassFixture<SqliteFixture>, IDisposable
     {
-        readonly TransactionScope transactionScope;
-
         readonly SqliteFixture fixture;
 
         public SqlHelperTest(SqliteFixture fixture)
         {
             this.fixture = fixture;
-            transactionScope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
         }
 
         public void Dispose()
         {
-            transactionScope?.Dispose();
+            using (var connection = fixture.CreateConnection())
+            {
+                connection.Open();
+                using (var command=connection.CreateCommand())
+                {
+                    command.CommandText = "DELETE FROM customers";
+                    command.ExecuteNonQuery();
+                }
+            }
         }
 
         [Fact]
@@ -1752,7 +1757,7 @@ namespace Kuery.Tests
                 }
 
                 var customers = connection.Query<Customer>(
-                    @"SELECT * FROM customers WHERE id > @id",
+                    @"SELECT * FROM customers WHERE id > $id",
                     new
                     {
                         id = 1
@@ -1783,7 +1788,7 @@ namespace Kuery.Tests
                 }
 
                 var customer = connection.FindWithQuery<Customer>(
-                    @"SELECT * FROM customers WHERE id > @id",
+                    @"SELECT * FROM customers WHERE id > $id",
                     new
                     {
                         id = 1
@@ -1812,7 +1817,7 @@ namespace Kuery.Tests
 
                 var customer = connection.FindWithQuery(
                     new TableMapping(typeof(Customer)),
-                    @"SELECT * FROM customers WHERE id > @id",
+                    @"SELECT * FROM customers WHERE id > $id",
                     new
                     {
                         id = 1
@@ -1918,7 +1923,7 @@ namespace Kuery.Tests
 
                 var customers = (
                     await connection.QueryAsync<Customer>(
-                        @"SELECT * FROM customers WHERE id > @id",
+                        @"SELECT * FROM customers WHERE id > $id",
                         new
                         {
                             id = 1
@@ -1949,7 +1954,7 @@ namespace Kuery.Tests
                 }
 
                 var customer = await connection.FindWithQueryAsync<Customer>(
-                    @"SELECT * FROM customers WHERE id > @id",
+                    @"SELECT * FROM customers WHERE id > $id",
                     new
                     {
                         id = 1
@@ -1977,7 +1982,7 @@ namespace Kuery.Tests
 
                 var customer = await connection.FindWithQueryAsync(
                     new TableMapping(typeof(Customer)),
-                    @"SELECT * FROM customers WHERE id > @id",
+                    @"SELECT * FROM customers WHERE id > $id",
                     new
                     {
                         id = 1
@@ -1995,7 +2000,7 @@ namespace Kuery.Tests
 
                 var result = connection.Execute(
                     @"INSERT INTO customers (id, code, name)
-                      VALUES (@id, @code, @name)",
+                      VALUES ($id, $code, $name)",
                     new
                     {
                         id = 1,
@@ -2016,7 +2021,7 @@ namespace Kuery.Tests
 
                 var result = await connection.ExecuteAsync(
                     @"INSERT INTO customers (id, code, name)
-                      VALUES (@id, @code, @name)",
+                      VALUES ($id, $code, $name)",
                     new
                     {
                         id = 1,
@@ -2075,7 +2080,7 @@ namespace Kuery.Tests
 
                 var customers = connection.Query(
                     new TableMapping(typeof(Customer)),
-                    @"SELECT * FROM customers WHERE id > @id",
+                    @"SELECT * FROM customers WHERE id > $id",
                     new
                     {
                         id = 1
@@ -2137,7 +2142,7 @@ namespace Kuery.Tests
                 var customers = (
                     await connection.QueryAsync(
                         new TableMapping(typeof(Customer)),
-                        @"SELECT * FROM customers WHERE id > @id",
+                        @"SELECT * FROM customers WHERE id > $id",
                         new
                         {
                             id = 1
@@ -2168,7 +2173,7 @@ namespace Kuery.Tests
                 }
 
                 var result = connection.ExecuteScalar<int>(
-                    @"SELECT COUNT(*) FROM customers WHERE id > @id",
+                    @"SELECT COUNT(*) FROM customers WHERE id > $id",
                     new
                     {
                         id = 1
@@ -2195,7 +2200,7 @@ namespace Kuery.Tests
                 }
 
                 var result = await connection.ExecuteScalarAsync<int>(
-                    @"SELECT COUNT(*) FROM customers WHERE id > @id",
+                    @"SELECT COUNT(*) FROM customers WHERE id > $id",
                     new
                     {
                         id = 1

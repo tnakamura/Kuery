@@ -26,19 +26,17 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(UnicodeTestObj)}') is not null
-                        drop table {nameof(UnicodeTestObj)};";
+                    drop table if exists {nameof(UnicodeTestObj)};";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(UnicodeTestObj)}') is null
-                        create table {nameof(UnicodeTestObj)} (
-                            {nameof(UnicodeTestObj.Id)} integer identity(1,1) primary key not null,
-                            {nameof(UnicodeTestObj.Name)} nvarchar(50) null
-                        );";
+                    create table if not exists {nameof(UnicodeTestObj)} (
+                        {nameof(UnicodeTestObj.Id)} integer primary key autoincrement,
+                        {nameof(UnicodeTestObj.Name)} nvarchar(50) null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }

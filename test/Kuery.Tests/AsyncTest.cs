@@ -38,12 +38,12 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                        create table if not exists {nameof(AsyncCustomer)} (
-                            {nameof(AsyncCustomer.Id)} integer primary key autoincrement,
-                            {nameof(AsyncCustomer.FirstName)} nvarchar(64) not null,
-                            {nameof(AsyncCustomer.LastName)} nvarchar(64) null,
-                            {nameof(AsyncCustomer.Email)} nvarchar(64) null
-                        );";
+                    create table if not exists {nameof(AsyncCustomer)} (
+                        {nameof(AsyncCustomer.Id)} integer primary key autoincrement,
+                        {nameof(AsyncCustomer.FirstName)} nvarchar(64) not null,
+                        {nameof(AsyncCustomer.LastName)} nvarchar(64) null,
+                        {nameof(AsyncCustomer.Email)} nvarchar(64) null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }
@@ -61,7 +61,7 @@ namespace Kuery.Tests
 
             await connection.InsertAsync(customer);
 
-            await connection.QueryAsync<AsyncCustomer>("select * from Customer");
+            await connection.QueryAsync<AsyncCustomer>("select * from AsyncCustomer");
         }
 
         AsyncCustomer CreateCustomer()
@@ -282,7 +282,11 @@ namespace Kuery.Tests
 
             // return the third one...
             var task = conn.QueryAsync<AsyncCustomer>(
-                "select * from customer where id=?", customers[2].Id);
+                "select * from AsyncCustomer where id=$Id",
+                new
+                {
+                    Id = customers[2].Id,
+                });
             task.Wait();
             var loaded = task.Result.ToList();
 
@@ -297,7 +301,7 @@ namespace Kuery.Tests
             // connect...
             using var conn = fixture.OpenNewConnection();
             CreateTable(conn);
-            conn.ExecuteAsync("delete from customer").Wait();
+            conn.ExecuteAsync("delete from AsyncCustomer").Wait();
 
             // insert some...
             var customers = new List<AsyncCustomer>();
@@ -338,8 +342,8 @@ namespace Kuery.Tests
             // do a manual insert...
             var email = Guid.NewGuid().ToString();
             conn.ExecuteAsync(
-                @"insert into customer (firstname, lastname, email)
-                  values (@firstname, @lastname, @email)",
+                @"insert into AsyncCustomer (firstname, lastname, email)
+                  values ($firstname, $lastname, $email)",
                 new
                 {
                     firstname = "foo",
@@ -398,10 +402,10 @@ namespace Kuery.Tests
 
             // check...
             var task = conn.ExecuteScalarAsync<object>(
-                "select name from sqlite_master where type='table' and name='customer'");
+                $"select name from sqlite_master where type='table' and name='{nameof(AsyncCustomer)}'");
             task.Wait();
             object name = task.Result;
-            Assert.NotEqual("Customer", name);
+            Assert.Equal(nameof(AsyncCustomer), name);
         }
 
         [Fact]
@@ -527,7 +531,7 @@ namespace Kuery.Tests
         {
             using var conn = fixture.OpenNewConnection();
             CreateTable(conn);
-            conn.ExecuteAsync("delete from customer").Wait();
+            conn.ExecuteAsync($"delete from {nameof(AsyncCustomer)}").Wait();
 
             // create...
             for (int index = 0; index < 10; index++)
@@ -547,7 +551,7 @@ namespace Kuery.Tests
         {
             using var conn = fixture.OpenNewConnection();
             CreateTable(conn);
-            conn.ExecuteAsync("delete from customer").Wait();
+            conn.ExecuteAsync($"delete from {nameof(AsyncCustomer)}").Wait();
 
             // create...
             for (int index = 0; index < 10; index++)
@@ -556,6 +560,7 @@ namespace Kuery.Tests
             // query...
             var query = conn.Table<AsyncCustomer>().OrderBy(v => v.Email);
             var task = query.ToListAsync();
+            conn.ExecuteAsync($"delete from {nameof(AsyncCustomer)}").Wait();
             task.Wait();
             var items = task.Result;
 
@@ -568,7 +573,7 @@ namespace Kuery.Tests
         {
             using var conn = fixture.OpenNewConnection();
             CreateTable(conn);
-            conn.ExecuteAsync("delete from customer").Wait();
+            conn.ExecuteAsync($"delete from {nameof(AsyncCustomer)}").Wait();
 
             // create...
             for (int index = 0; index < 10; index++)
@@ -589,7 +594,7 @@ namespace Kuery.Tests
         {
             using var conn = fixture.OpenNewConnection();
             CreateTable(conn);
-            conn.ExecuteAsync("delete from customer").Wait();
+            conn.ExecuteAsync($"delete from {nameof(AsyncCustomer)}").Wait();
 
             // create...
             for (int index = 0; index < 10; index++)
@@ -615,7 +620,7 @@ namespace Kuery.Tests
         {
             using var conn = fixture.OpenNewConnection();
             CreateTable(conn);
-            conn.ExecuteAsync("delete from customer").Wait();
+            conn.ExecuteAsync($"delete from {nameof(AsyncCustomer)}").Wait();
 
             // create...
             for (int index = 0; index < 10; index++)
@@ -641,7 +646,7 @@ namespace Kuery.Tests
         {
             using var conn = fixture.OpenNewConnection();
             CreateTable(conn);
-            conn.ExecuteAsync("delete from customer").Wait();
+            conn.ExecuteAsync($"delete from {nameof(AsyncCustomer)}").Wait();
 
             // create...
             for (int index = 0; index < 10; index++)
@@ -667,7 +672,7 @@ namespace Kuery.Tests
         {
             using var conn = fixture.OpenNewConnection();
             CreateTable(conn);
-            conn.ExecuteAsync("delete from customer").Wait();
+            conn.ExecuteAsync($"delete from {nameof(AsyncCustomer)}").Wait();
 
             // create...
             for (int index = 0; index < 10; index++)

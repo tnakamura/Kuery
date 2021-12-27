@@ -25,49 +25,45 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(Product)}') is null
-                        create table {nameof(Product)} (
-                            {nameof(Product.Id)} integer identity(1,1) primary key not null,
-                            {nameof(Product.Name)} nvarchar(50) not null,
-                            {nameof(Product.Price)} decimal not null,
-                            {nameof(Product.TotalSales)} int not null
-                        );";
+                    create table if not exists {nameof(Product)} (
+                        {nameof(Product.Id)} integer primary key autoincrement,
+                        {nameof(Product.Name)} nvarchar(50) not null,
+                        {nameof(Product.Price)} decimal not null,
+                        {nameof(Product.TotalSales)} int not null
+                    );";
                 cmd.ExecuteNonQuery();
             }
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(Order)}') is null
-                        create table {nameof(Order)} (
-                            {nameof(Order.Id)} integer identity(1,1) primary key not null,
-                            {nameof(Order.PlacedTime)} datetime not null
-                        );";
+                    create table if not exists [{nameof(Order)}] (
+                        {nameof(Order.Id)} integer primary key autoincrement,
+                        {nameof(Order.PlacedTime)} datetime not null
+                    );";
                 cmd.ExecuteNonQuery();
             }
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(OrderHistory)}') is null
-                        create table {nameof(OrderHistory)} (
-                            {nameof(OrderHistory.Id)} integer identity(1,1) primary key not null,
-                            {nameof(OrderHistory.OrderId)} int not null,
-                            {nameof(OrderHistory.Time)} datetime not null,
-                            {nameof(OrderHistory.Comment)} nvarchar(50) null
-                        );";
+                    create table if not exists {nameof(OrderHistory)} (
+                        {nameof(OrderHistory.Id)} integer primary key autoincrement,
+                        {nameof(OrderHistory.OrderId)} int not null,
+                        {nameof(OrderHistory.Time)} datetime not null,
+                        {nameof(OrderHistory.Comment)} nvarchar(50) null
+                    );";
                 cmd.ExecuteNonQuery();
             }
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(OrderLine)}') is null
-                        create table {nameof(OrderLine)} (
-                            {nameof(OrderLine.Id)} integer identity(1,1) primary key not null,
-                            {nameof(OrderLine.OrderId)} integer not null,
-                            {nameof(OrderLine.ProductId)} integer not null,
-                            {nameof(OrderLine.Quantity)} integer not null,
-                            {nameof(OrderLine.UnitPrice)} integer not null,
-                            {nameof(OrderLine.Status)} integer not null
-                        );";
+                    create table if not exists {nameof(OrderLine)} (
+                        {nameof(OrderLine.Id)} integer primary key autoincrement,
+                        {nameof(OrderLine.OrderId)} integer not null,
+                        {nameof(OrderLine.ProductId)} integer not null,
+                        {nameof(OrderLine.Quantity)} integer not null,
+                        {nameof(OrderLine.UnitPrice)} integer not null,
+                        {nameof(OrderLine.Status)} integer not null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }
@@ -190,110 +186,6 @@ namespace Kuery.Tests
             var cast = (from p in con.Table<Product>() orderby (int)p.TotalSales descending select p).ToList();
             Assert.Equal(2, cast.Count);
             Assert.Equal("B", cast[0].Name);
-        }
-
-        public class Issue96_A
-        {
-            [AutoIncrement, PrimaryKey]
-            public int ID { get; set; }
-            public string AddressLine { get; set; }
-
-            [Indexed]
-            public int? ClassB { get; set; }
-            [Indexed]
-            public int? ClassC { get; set; }
-        }
-
-        public class Issue96_B
-        {
-            [AutoIncrement, PrimaryKey]
-            public int ID { get; set; }
-            public string CustomerName { get; set; }
-        }
-
-        public class Issue96_C
-        {
-            [AutoIncrement, PrimaryKey]
-            public int ID { get; set; }
-            public string SupplierName { get; set; }
-        }
-
-        [Fact]
-        public void NullabelIntsInQueries()
-        {
-            using var con = fixture.OpenNewConnection();
-            CreateTables(con);
-
-            var id = 42;
-
-            con.Insert(new Issue96_A
-            {
-                ClassB = id,
-            });
-            con.Insert(new Issue96_A
-            {
-                ClassB = null,
-            });
-            con.Insert(new Issue96_A
-            {
-                ClassB = null,
-            });
-            con.Insert(new Issue96_A
-            {
-                ClassB = null,
-            });
-
-
-            Assert.Equal(1, con.Table<Issue96_A>().Where(p => p.ClassB == id).Count());
-            Assert.Equal(3, con.Table<Issue96_A>().Where(p => p.ClassB == null).Count());
-        }
-
-        public class Issue303_A
-        {
-            [PrimaryKey, NotNull]
-            public int Id { get; set; }
-            public string Name { get; set; }
-        }
-
-        public class Issue303_B
-        {
-            [PrimaryKey, NotNull]
-            public int Id { get; set; }
-            public bool Flag { get; set; }
-        }
-
-        [Fact]
-        public void Issue303_WhereNot_A()
-        {
-            using var con = fixture.OpenNewConnection();
-            CreateTables(con);
-
-            con.Insert(new Issue303_A { Id = 1, Name = "aa" });
-            con.Insert(new Issue303_A { Id = 2, Name = null });
-            con.Insert(new Issue303_A { Id = 3, Name = "test" });
-            con.Insert(new Issue303_A { Id = 4, Name = null });
-
-            var r = (from p in con.Table<Issue303_A>() where !(p.Name == null) select p).ToList();
-            Assert.Equal(2, r.Count);
-            Assert.Equal(1, r[0].Id);
-            Assert.Equal(3, r[1].Id);
-        }
-
-        [Fact]
-        public void Issue303_WhereNot_B()
-        {
-            using var db = fixture.OpenNewConnection();
-            CreateTables(db);
-
-            db.Insert(new Issue303_B { Id = 1, Flag = true });
-            db.Insert(new Issue303_B { Id = 2, Flag = false });
-            db.Insert(new Issue303_B { Id = 3, Flag = true });
-            db.Insert(new Issue303_B { Id = 4, Flag = false });
-
-            var r = (from p in db.Table<Issue303_B>() where !p.Flag select p).ToList();
-            Assert.Equal(2, r.Count);
-            Assert.Equal(2, r[0].Id);
-            Assert.Equal(4, r[1].Id);
         }
 
         [Fact]

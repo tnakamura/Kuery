@@ -36,19 +36,17 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(NullableIntClass)}') is not null
-                        drop table {nameof(NullableIntClass)};";
+                    drop table if exists {nameof(NullableIntClass)};";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(NullableIntClass)}') is null
-                        create table {nameof(NullableIntClass)} (
-                            {nameof(NullableIntClass.ID)} integer identity(1,1) primary key not null,
-                            {nameof(NullableIntClass.NullableInt)} integer null
-                        );";
+                    create table if not exists {nameof(NullableIntClass)} (
+                        {nameof(NullableIntClass.ID)} integer primary key autoincrement,
+                        {nameof(NullableIntClass.NullableInt)} integer null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }
@@ -171,19 +169,17 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(StringClass)}') is not null
-                        drop table {nameof(StringClass)};";
+                    drop table if exists {nameof(StringClass)};";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(StringClass)}') is null
-                        create table {nameof(StringClass)} (
-                            {nameof(StringClass.ID)} integer identity(1,1) primary key not null,
-                            {nameof(StringClass.StringData)} nvarchar(250) null
-                        );";
+                    create table if not exists {nameof(StringClass)} (
+                        {nameof(StringClass.ID)} integer primary key autoincrement,
+                        {nameof(StringClass.StringData)} nvarchar(250) null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }
@@ -354,20 +350,18 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(NullableEnumClass)}') is not null
-                        drop table {nameof(NullableEnumClass)};";
+                    drop table if exists {nameof(NullableEnumClass)};";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(NullableEnumClass)}') is null
-                        create table {nameof(NullableEnumClass)} (
-                            {nameof(NullableEnumClass.ID)} integer identity(1,1) primary key not null,
-                            {nameof(NullableEnumClass.NullableIntEnum)} integer null,
-                            {nameof(NullableEnumClass.NullableTextEnum)} nvarchar(250) null
-                        );";
+                    create table if not exists {nameof(NullableEnumClass)} (
+                        {nameof(NullableEnumClass.ID)} integer primary key autoincrement,
+                        {nameof(NullableEnumClass.NullableIntEnum)} integer null,
+                        {nameof(NullableEnumClass.NullableTextEnum)} nvarchar(250) null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }

@@ -132,7 +132,7 @@ namespace Kuery
             {
                 return 0;
             }
-            using (var command = connection.CreateMergeCommand(item, type))
+            using (var command = connection.CreateInsertOrReplaceCommand(item, type))
             {
                 return command.ExecuteNonQuery();
             }
@@ -658,18 +658,18 @@ namespace Kuery
 
             public void SetValue(object obj, object val)
             {
-                if (val != null && ColumnType.GetTypeInfo().IsEnum)
-                {
-                    _prop.SetValue(
-                        obj: obj,
-                        value: Enum.ToObject(ColumnType, val));
-                }
-                else if (val == DBNull.Value)
+                if (val == null || val == DBNull.Value)
                 {
                     _prop.SetValue(
                         obj: obj,
                         value: null,
                         index: null);
+                }
+                else if (ColumnType.GetTypeInfo().IsEnum)
+                {
+                    _prop.SetValue(
+                        obj: obj,
+                        value: Enum.ToObject(ColumnType, val));
                 }
                 else if (_prop.PropertyType == typeof(TimeSpan) &&
                     val is string timeSpanStr &&

@@ -175,95 +175,46 @@ namespace Kuery
             return command;
         }
 
-        internal static DbCommand CreateMergeCommand(this DbConnection connection, object item, Type type)
+        internal static DbCommand CreateInsertOrReplaceCommand(this DbConnection connection, object item, Type type)
         {
             var map = SqlHelper.GetMapping(type);
+            var columns = new StringBuilder();
+            var values = new StringBuilder();
             var command = connection.CreateCommand();
 
-            var sb = new StringBuilder();
-            sb.AppendLine("merge into");
-            sb.AppendLine("  [" + map.TableName + "] as a");
-            sb.AppendLine("using");
-            sb.AppendLine("  (");
-            sb.AppendLine("    select");
-
             for (var i = 0; i < map.InsertOrReplaceColumns.Length; i++)
             {
-                var c = map.InsertOrReplaceColumns[i];
-                sb.Append("      @" + c.Name + " as [" + c.Name + "]");
-                if (i < map.InsertOrReplaceColumns.Length - 1)
+                if (i > 0)
                 {
-                    sb.Append(",");
+                    columns.Append(",");
+                    values.Append(",");
                 }
-                sb.AppendLine();
+
+                var col = map.InsertOrReplaceColumns[i];
+                columns.Append("[" + col.Name + "]");
+
+                var value = col.GetValue(item);
+                if (value is null && col.IsNullable)
+                {
+                    values.Append("NULL");
+                }
+                else
+                {
+                    var parameter = command.CreateParameter();
+                    parameter.ParameterName = connection.GetParameterName(col.Name);
+                    parameter.Value = col.GetValue(item);
+                    command.Parameters.Add(parameter);
+                    values.Append(parameter.ParameterName);
+                }
             }
 
-            sb.AppendLine("  ) as b");
-            sb.AppendLine("on");
-            sb.AppendLine("  (");
-            sb.AppendLine("    a.[" + map.PK.Name + "] = b.[" + map.PK.Name + "]");
-            sb.AppendLine("  )");
-            sb.AppendLine("when matched then");
-            sb.AppendLine("  update set");
-
-            for (var i = 0; i < map.InsertOrReplaceColumns.Length; i++)
-            {
-                var c = map.InsertOrReplaceColumns[i];
-                if (c.IsPK)
-                {
-                    continue;
-                }
-                sb.Append("    [" + c.Name + "] = b.[" + c.Name + "]");
-                if (i < map.InsertOrReplaceColumns.Length - 1)
-                {
-                    sb.Append(",");
-                }
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("when not matched then");
-            sb.AppendLine("  insert");
-            sb.AppendLine("  (");
-
-            for (var i = 0; i < map.InsertOrReplaceColumns.Length; i++)
-            {
-                var c = map.InsertOrReplaceColumns[i];
-                sb.Append("    [" + c.Name + "]");
-                if (i < map.InsertOrReplaceColumns.Length - 1)
-                {
-                    sb.Append(",");
-                }
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("  )");
-            sb.AppendLine("  values");
-            sb.AppendLine("  (");
-
-            for (var i = 0; i < map.InsertOrReplaceColumns.Length; i++)
-            {
-                var c = map.InsertOrReplaceColumns[i];
-                sb.Append("    b.[" + c.Name + "]");
-                if (i < map.InsertOrReplaceColumns.Length - 1)
-                {
-                    sb.Append(",");
-                }
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("  )");
-            sb.AppendLine(";");
-
-            command.CommandText = sb.ToString();
-
-            for (var i = 0; i < map.InsertOrReplaceColumns.Length; i++)
-            {
-                var c = map.InsertOrReplaceColumns[i];
-                var p = command.CreateParameter();
-                p.ParameterName = connection.GetParameterName(c.Name);
-                p.Value = c.GetValue(item);
-                command.Parameters.Add(p);
-            }
+            command.CommandText = "insert or replace into "
+                + map.TableName
+                + " ("
+                + columns.ToString()
+                + ") values ("
+                + values.ToString()
+                + ");";
 
             return command;
         }

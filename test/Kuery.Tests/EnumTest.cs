@@ -71,31 +71,28 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(EnumTestObj)}') is null
-                        create table {nameof(EnumTestObj)} (
-                            {nameof(EnumTestObj.Id)} int primary key not null,
-                            {nameof(EnumTestObj.Value)} int not null
-                        );";
+                    create table if not exists {nameof(EnumTestObj)} (
+                        {nameof(EnumTestObj.Id)} int primary key,
+                        {nameof(EnumTestObj.Value)} int not null
+                    );";
                 cmd.ExecuteNonQuery();
             }
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(StringTestObj)}') is null
-                        create table {nameof(StringTestObj)} (
-                            {nameof(StringTestObj.Id)} int primary key not null,
-                            {nameof(StringTestObj.Value)} nvarchar(50) not null
-                        );";
+                    create table if not exists {nameof(StringTestObj)} (
+                        {nameof(StringTestObj.Id)} int primary key,
+                        {nameof(StringTestObj.Value)} nvarchar(50) not null
+                    );";
                 cmd.ExecuteNonQuery();
             }
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(ByteTestObj)}') is null
-                        create table {nameof(ByteTestObj)} (
-                            {nameof(ByteTestObj.Id)} int primary key not null,
-                            {nameof(ByteTestObj.Value)} tinyint not null
-                        );";
+                    create table if not exists {nameof(ByteTestObj)} (
+                        {nameof(ByteTestObj.Id)} int primary key,
+                        {nameof(ByteTestObj.Value)} tinyint not null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }

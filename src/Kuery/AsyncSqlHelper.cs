@@ -126,7 +126,7 @@ namespace Kuery
             {
                 return Task.FromResult(0);
             }
-            using (var command = connection.CreateMergeCommand(item, type))
+            using (var command = connection.CreateInsertOrReplaceCommand(item, type))
             {
                 return command.ExecuteNonQueryAsync();
             }
@@ -312,13 +312,13 @@ namespace Kuery
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
                 var result = await command.ExecuteScalarAsync();
-                if (result is DBNull)
+                if (result is null || result is DBNull)
                 {
                     return default;
                 }
                 else
                 {
-                    return (T)result;
+                    return (T)Convert.ChangeType(result, typeof(T));
                 }
             }
         }

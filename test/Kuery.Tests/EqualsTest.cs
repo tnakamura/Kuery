@@ -33,12 +33,11 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(TestObjString)}') is null
-                        create table [{nameof(TestObjString)}] (
-                            {nameof(TestObjString.Id)} integer identity(1,1) primary key not null,
-                            {nameof(TestObjString.Data)} nvarchar(50) null,
-                            {nameof(TestObjString.Date)} datetime null
-                        );";
+                    create table [{nameof(TestObjString)}] (
+                        {nameof(TestObjString.Id)} integer primary key autoincrement,
+                        {nameof(TestObjString.Data)} nvarchar(50) null,
+                        {nameof(TestObjString.Date)} datetime null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }
