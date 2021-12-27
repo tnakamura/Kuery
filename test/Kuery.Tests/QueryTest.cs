@@ -23,7 +23,7 @@ namespace Kuery.Tests
             using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
-                connection.Execute("create table G(Value integer not null);");
+                connection.Execute("create table if not exists G(Value integer not null);");
                 connection.Execute(
                     "insert into G(Value) values (@Value);",
                     param: new { Value = 42 });

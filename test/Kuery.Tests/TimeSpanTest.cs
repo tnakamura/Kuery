@@ -29,20 +29,18 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(TimeSpanTestObj)}') is not null
-                        drop table {nameof(TimeSpanTestObj)};";
+                    drop table if exists {nameof(TimeSpanTestObj)};";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(TimeSpanTestObj)}') is null
-                        create table {nameof(TimeSpanTestObj)} (
-                            {nameof(TimeSpanTestObj.Id)} integer identity(1,1) primary key not null,
-                            {nameof(TimeSpanTestObj.Name)} nvarchar(50) null,
-                            {nameof(TimeSpanTestObj.Duration)} time not null
-                        );";
+                    create table if not exists {nameof(TimeSpanTestObj)} (
+                        {nameof(TimeSpanTestObj.Id)} integer primary key autoincrement,
+                        {nameof(TimeSpanTestObj.Name)} text null,
+                        {nameof(TimeSpanTestObj.Duration)} time not null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }

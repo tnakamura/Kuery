@@ -36,7 +36,7 @@ namespace Kuery.Tests
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = @"
-                    create table [TestObj] (
+                    create table if not exists [TestObj] (
                         [Id] nvarchar(50) not null primary key,
                         [Order] integer not null
                     );";

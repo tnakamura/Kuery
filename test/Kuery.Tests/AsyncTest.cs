@@ -38,9 +38,8 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(AsyncCustomer)}') is null
-                        create table {nameof(AsyncCustomer)} (
-                            {nameof(AsyncCustomer.Id)} integer identity(1,1) primary key not null,
+                        create table if not exists {nameof(AsyncCustomer)} (
+                            {nameof(AsyncCustomer.Id)} integer primary key autoincrement,
                             {nameof(AsyncCustomer.FirstName)} nvarchar(64) not null,
                             {nameof(AsyncCustomer.LastName)} nvarchar(64) null,
                             {nameof(AsyncCustomer.Email)} nvarchar(64) null

@@ -27,19 +27,17 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(ScalarTestTable)}') is not null
-                        drop table {nameof(ScalarTestTable)};";
+                    drop table if exists {nameof(ScalarTestTable)};";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(ScalarTestTable)}') is null
-                        create table {nameof(ScalarTestTable)} (
-                            {nameof(ScalarTestTable.Id)} integer identity(1,1) primary key not null,
-                            {nameof(ScalarTestTable.Two)} integer not null
-                        );";
+                    create table if not exists {nameof(ScalarTestTable)} (
+                        {nameof(ScalarTestTable.Id)} integer primary key autoincrement,
+                        {nameof(ScalarTestTable.Two)} integer not null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }

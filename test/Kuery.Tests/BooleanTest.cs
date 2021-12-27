@@ -36,20 +36,18 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-                    if object_id (N'VO') is not null
-                        drop table VO;";
+                    drop table if exists VO;";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-                    if object_id (N'VO') is null
-                        create table VO (
-                            Id integer identity(1,1) primary key not null,
-                            Flag bit not null,
-                            Text nvarchar(64) null
-                        );";
+                    create table if not exists VO (
+                        Id integer primary key autoincrement,
+                        Flag bit not null,
+                        Text text null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }
@@ -72,12 +70,12 @@ namespace Kuery.Tests
             Assert.Equal(
                 4,
                 db.ExecuteScalar<int>(
-                    "SELECT COUNT(*) FROM VO Where Flag = @flag",
+                    "SELECT COUNT(*) FROM VO Where Flag = $flag",
                     new { flag = true }));
             Assert.Equal(
                 6,
                 db.ExecuteScalar<int>(
-                    "SELECT COUNT(*) FROM VO Where Flag = @flag",
+                    "SELECT COUNT(*) FROM VO Where Flag = $flag",
                     new { flag = false }));
         }
     }

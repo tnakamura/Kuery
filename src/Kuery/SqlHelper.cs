@@ -45,74 +45,12 @@ namespace Kuery
             return count;
         }
 
-        private static DbCommand CreateLastInsertRowIdCommand(this DbConnection connection)
-        {
-            var command = connection.CreateCommand();
-            command.CommandText = "select last_insert_rowid();";
-            return command;
-        }
-
         private static long GetLastRowId(this DbConnection connection, DbTransaction transaction = null)
         {
             using (var command = connection.CreateLastInsertRowIdCommand())
             {
                 command.Transaction = transaction;
                 return (long)command.ExecuteScalar();
-            }
-        }
-
-        private static DbCommand CreateInsertCommand(this DbConnection connection, object item, Type type)
-        {
-            var map = GetMapping(type);
-            var columns = new StringBuilder();
-            var values = new StringBuilder();
-            var command = connection.CreateCommand();
-
-            for (var i = 0; i < map.InsertColumns.Length; i++)
-            {
-                if (i > 0)
-                {
-                    columns.Append(",");
-                    values.Append(",");
-                }
-
-                var col = map.InsertColumns[i];
-                columns.Append("[" + col.Name + "]");
-
-                var value = col.GetValue(item);
-                if (value is null && col.IsNullable)
-                {
-                    values.Append("NULL");
-                }
-                else
-                {
-                    var parameter = command.CreateParameter();
-                    parameter.ParameterName = connection.GetParameterName(col.Name);
-                    parameter.Value = col.GetValue(item);
-                    command.Parameters.Add(parameter);
-                    values.Append(parameter.ParameterName);
-                }
-            }
-
-            command.CommandText = "insert into "
-                + map.TableName
-                + " ("
-                + columns.ToString()
-                + ") values ("
-                + values.ToString()
-                + ");";
-
-            return command;
-        }
-
-        private static string GetParameterName(this DbConnection connection, string name)
-        {
-            switch (connection.GetType().FullName)
-            {
-                case "Microsoft.Data.Sqlite.SqliteConnection":
-                    return "$" + name;
-                default:
-                    return "@" + name;
             }
         }
 
@@ -160,55 +98,6 @@ namespace Kuery
             }
         }
 
-        static DbCommand CreateUpdateCommand(this DbConnection connection, object item, Type type)
-        {
-            var mapping = GetMapping(type);
-            if (mapping.PK == null)
-            {
-                throw new NotSupportedException(
-                    $"Cannot update {mapping.TableName}: it has no PK");
-            }
-
-            var sql = new StringBuilder();
-            sql.Append("update " + mapping.TableName);
-            var command = connection.CreateCommand();
-
-            var cols = mapping.Columns.Where(x => x != mapping.PK);
-            var first = true;
-            foreach (var col in cols)
-            {
-                var parameter = command.CreateParameter();
-                parameter.ParameterName = "@" + col.Name;
-                parameter.Value = col.GetValue(item);
-                command.Parameters.Add(parameter);
-
-                if (first)
-                {
-                    sql.Append(" set ");
-                    first = false;
-                }
-                else
-                {
-                    sql.Append(",");
-                }
-                sql.Append(col.Name);
-                sql.Append(" = ");
-                sql.Append(parameter.ParameterName);
-            }
-
-            sql.Append(" where ");
-            sql.Append(mapping.PK.Name);
-            sql.Append(" = @");
-            sql.Append(mapping.PK.Name);
-            var pkParamter = command.CreateParameter();
-            pkParamter.ParameterName = "@" + mapping.PK.Name;
-            pkParamter.Value = mapping.PK.GetValue(item);
-            command.Parameters.Add(pkParamter);
-
-            command.CommandText = sql.ToString();
-            return command;
-        }
-
         public static int UpdateAll(this DbConnection connection, IEnumerable items, DbTransaction transaction = null)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
@@ -247,133 +136,6 @@ namespace Kuery
             {
                 return command.ExecuteNonQuery();
             }
-        }
-
-        static DbCommand CreateMergeCommand(this DbConnection connection, object item, Type type)
-        {
-            var map = GetMapping(type);
-            var command = connection.CreateCommand();
-
-            var sb = new StringBuilder();
-            sb.AppendLine("merge into");
-            sb.AppendLine("  [" + map.TableName + "] as a");
-            sb.AppendLine("using");
-            sb.AppendLine("  (");
-            sb.AppendLine("    select");
-
-            for (var i = 0; i < map.InsertOrReplaceColumns.Length; i++)
-            {
-                var c = map.InsertOrReplaceColumns[i];
-                sb.Append("      @" + c.Name + " as [" + c.Name + "]");
-                if (i < map.InsertOrReplaceColumns.Length - 1)
-                {
-                    sb.Append(",");
-                }
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("  ) as b");
-            sb.AppendLine("on");
-            sb.AppendLine("  (");
-            sb.AppendLine("    a.[" + map.PK.Name + "] = b.[" + map.PK.Name + "]");
-            sb.AppendLine("  )");
-            sb.AppendLine("when matched then");
-            sb.AppendLine("  update set");
-
-            for (var i = 0; i < map.InsertOrReplaceColumns.Length; i++)
-            {
-                var c = map.InsertOrReplaceColumns[i];
-                if (c.IsPK)
-                {
-                    continue;
-                }
-                sb.Append("    [" + c.Name + "] = b.[" + c.Name + "]");
-                if (i < map.InsertOrReplaceColumns.Length - 1)
-                {
-                    sb.Append(",");
-                }
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("when not matched then");
-            sb.AppendLine("  insert");
-            sb.AppendLine("  (");
-
-            for (var i = 0; i < map.InsertOrReplaceColumns.Length; i++)
-            {
-                var c = map.InsertOrReplaceColumns[i];
-                sb.Append("    [" + c.Name + "]");
-                if (i < map.InsertOrReplaceColumns.Length - 1)
-                {
-                    sb.Append(",");
-                }
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("  )");
-            sb.AppendLine("  values");
-            sb.AppendLine("  (");
-
-            for (var i = 0; i < map.InsertOrReplaceColumns.Length; i++)
-            {
-                var c = map.InsertOrReplaceColumns[i];
-                sb.Append("    b.[" + c.Name + "]");
-                if (i < map.InsertOrReplaceColumns.Length - 1)
-                {
-                    sb.Append(",");
-                }
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("  )");
-            sb.AppendLine(";");
-
-            command.CommandText = sb.ToString();
-
-            for (var i = 0; i < map.InsertOrReplaceColumns.Length; i++)
-            {
-                var c = map.InsertOrReplaceColumns[i];
-                var p = command.CreateParameter();
-                p.ParameterName = "@" + c.Name;
-                p.Value = c.GetValue(item);
-                command.Parameters.Add(p);
-            }
-
-            return command;
-        }
-
-        static DbCommand CreateDeleteCommand(this DbConnection connection, object item, Type type)
-        {
-            var map = GetMapping(type);
-            if (map.PK == null)
-            {
-                throw new NotSupportedException(
-                    $"Cannot update {map.TableName}: it has no PK");
-            }
-
-            return connection.CreateDeleteCommand(map.PK.GetValue(item), map);
-        }
-
-        static DbCommand CreateDeleteCommand(this DbConnection connection, object primaryKey, TableMapping map)
-        {
-            var pk = map.PK;
-            if (pk == null)
-            {
-                throw new NotSupportedException(
-                    $"Cannot delete {map.TableName}: it has no PK");
-            }
-
-            var query = $"DELETE FROM [{map.TableName}] where [{pk.Name}] = @pk";
-
-            var command = connection.CreateCommand();
-            command.CommandText = query;
-
-            var pkParameter = command.CreateParameter();
-            pkParameter.ParameterName = "@pk";
-            pkParameter.Value = primaryKey;
-            command.Parameters.Add(pkParameter);
-
-            return command;
         }
 
         public static int Delete<T>(this DbConnection connection, T item)
@@ -450,20 +212,6 @@ namespace Kuery
                 var result = ExecuteQuery<T>(command, mapping);
                 return result.First();
             }
-        }
-
-        static DbCommand CreateGetByPrimaryKeyCommand(this DbConnection connection, TableMapping map, object pk)
-        {
-            var command = connection.CreateCommand();
-            command.CommandText = map.GetByPrimaryKeySql;
-            if (map.PK != null)
-            {
-                var pkParameter = command.CreateParameter();
-                pkParameter.ParameterName = "@" + map.PK.Name;
-                pkParameter.Value = pk;
-                command.Parameters.Add(pkParameter);
-            }
-            return command;
         }
 
         internal static List<T> ExecuteQuery<T>(this DbCommand command, TableMapping map)
@@ -586,48 +334,6 @@ namespace Kuery
             {
                 return ExecuteQueryFirstOrDefault<object>(command, mapping);
             }
-        }
-
-        static DbCommand CreateParameterizedCommand(this DbConnection connection, string sql, object param = null)
-        {
-            var command = connection.CreateCommand();
-            command.CommandText = sql;
-
-            if (param != null)
-            {
-                if (param is IDictionary<string, object> dict)
-                {
-                    foreach (var kvp in dict)
-                    {
-                        var parameter = command.CreateParameter();
-                        parameter.ParameterName = "@" + kvp.Key;
-                        parameter.Value = kvp.Value;
-                        command.Parameters.Add(parameter);
-                    }
-                }
-                else
-                {
-                    var paramType = param.GetType();
-                    var properties = paramType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
-                    foreach (var property in properties)
-                    {
-                        var parameter = command.CreateParameter();
-                        parameter.ParameterName = "@" + property.Name;
-                        parameter.Value = property.GetValue(param);
-                        command.Parameters.Add(parameter);
-                    }
-                    var fields = paramType.GetFields(BindingFlags.Public | BindingFlags.Instance);
-                    foreach (var field in fields)
-                    {
-                        var parameter = command.CreateParameter();
-                        parameter.ParameterName = "@" + field.Name;
-                        parameter.Value = field.GetValue(param);
-                        command.Parameters.Add(parameter);
-                    }
-                }
-            }
-
-            return command;
         }
 
         public static int Execute(this DbConnection connection, string sql, object param = null)
@@ -850,7 +556,7 @@ namespace Kuery
 
             if (PK != null)
             {
-                GetByPrimaryKeySql = $"select * from [{TableName}] where [{PK.Name}] = @{PK.Name}";
+                GetByPrimaryKeySql = $"select * from [{TableName}] where [{PK.Name}] = ${PK.Name}";
             }
             else
             {
@@ -963,6 +669,15 @@ namespace Kuery
                     _prop.SetValue(
                         obj:obj,
                         value: null,
+                        index: null);
+                }
+                else if (_prop.PropertyType == typeof(TimeSpan) &&
+                    val is string s &&
+                    TimeSpan.TryParse(s,out var timespan))
+                {
+                    _prop.SetValue(
+                        obj: obj,
+                        value: timespan,
                         index: null);
                 }
                 else
@@ -1374,7 +1089,7 @@ namespace Kuery
                 for (var i = 0; i < args.Count; i++)
                 {
                     var parameter = command.CreateParameter();
-                    parameter.ParameterName = "@p" + (i + 1).ToString();
+                    parameter.ParameterName = "$p" + (i + 1).ToString();
                     parameter.Value = args[i];
                     command.Parameters.Add(parameter);
                 }
@@ -1415,7 +1130,7 @@ namespace Kuery
                 for (var i = 0; i < args.Count; i++)
                 {
                     var parameter = command.CreateParameter();
-                    parameter.ParameterName = "@p" + (i + 1).ToString();
+                    parameter.ParameterName = "$p" + (i + 1).ToString();
                     parameter.Value = args[i];
                     command.Parameters.Add(parameter);
                 }
@@ -1551,77 +1266,57 @@ namespace Kuery
             }
         }
 
-        DbCommand GenerateCommand(string selectionList)
+        private DbCommand GenerateCommand(string selectionList)
         {
             if (_joinInner != null && _joinOuter != null)
             {
                 throw new NotSupportedException("Joins are not supported.");
             }
-            var cmdText = new StringBuilder();
-            cmdText.Append("select ");
-            if (_limit.HasValue && !(_offset.HasValue && _offset.Value > 0))
-            {
-                cmdText.Append(" top ");
-                cmdText.Append(_limit.Value);
-                cmdText.Append(" ");
-            }
-            cmdText.Append(selectionList);
-            cmdText.Append(" from [");
-            cmdText.Append(Table.TableName);
-            cmdText.Append("]");
+
+            var cmdText = "select " +
+                selectionList +
+                " from \"" +
+                Table.TableName +
+                "\"";
+
             var args = new List<object>();
             if (_where != null)
             {
                 var w = CompileExpr(_where, args);
-                cmdText.Append(" where ");
-                cmdText.Append(w.CommandText);
+                cmdText += " where " + w.CommandText;
             }
-            if (_orderBys != null && _orderBys.Count > 0)
-            {
-                cmdText.Append(" order by ");
-                for (var i = 0; i < _orderBys.Count; i++)
-                {
-                    if (i > 0)
-                    {
-                        cmdText.Append(" , ");
-                    }
-                    var o = _orderBys[i];
-                    cmdText.Append("[");
-                    cmdText.Append(o.ColumnName);
-                    cmdText.Append("]");
-                    if (!o.Ascending)
-                    {
-                        cmdText.Append(" desc ");
-                    }
-                }
-            }
-            if (_offset.HasValue && _offset.Value > 0)
-            {
-                if (_orderBys == null || _orderBys.Count == 0)
-                {
-                    cmdText.Append(" order by [");
-                    cmdText.Append(Table.PK.Name);
-                    cmdText.Append("]");
-                }
 
-                cmdText.Append(" offset ");
-                cmdText.Append(_offset.Value);
-                cmdText.Append(" rows");
-
-                if (_limit.HasValue)
-                {
-                    cmdText.Append(" fetch next ");
-                    cmdText.Append(_limit.Value);
-                    cmdText.Append(" rows only");
-                }
+            if ((_orderBys != null) && (_orderBys.Count > 0))
+            {
+                var t = string.Join(
+                    ", ",
+                    _orderBys
+                        .Select(o => "\"" + o.ColumnName + "\"" + (o.Ascending ? "" : " desc"))
+                        .ToArray());
+                cmdText += " order by " + t;
             }
+
+            if (_limit.HasValue)
+            {
+                cmdText += " limit " + _limit.Value;
+            }
+
+            if (_offset.HasValue)
+            {
+                if (!_limit.HasValue)
+                {
+                    cmdText += " limit -1 ";
+                }
+                cmdText += " offset " + _offset.Value;
+            }
+
             var cmd = Connection.CreateCommand();
             cmd.CommandText = cmdText.ToString();
             for (var i = 0; i < args.Count; i++)
             {
                 var p = cmd.CreateParameter();
                 p.Value = args[i];
-                p.ParameterName = "@p" + (i + 1).ToString();
+                p.ParameterName = "$p" + (i + 1).ToString();
                 cmd.Parameters.Add(p);
             }
             return cmd;
@@ -1647,11 +1342,11 @@ namespace Kuery
                 var rightr = CompileExpr(bin.Right, queryArgs);
 
                 string text;
-                if (leftr.CommandText == ("@p" + queryArgs.Count.ToString()) && leftr.Value == null)
+                if (leftr.CommandText == ("$p" + queryArgs.Count.ToString()) && leftr.Value == null)
                 {
                     text = CompileNullBinaryExpression(bin, rightr);
                 }
-                else if (rightr.CommandText == ("@p" + queryArgs.Count.ToString()) && rightr.Value == null)
+                else if (rightr.CommandText == ("$p" + queryArgs.Count.ToString()) && rightr.Value == null)
                 {
                     text = CompileNullBinaryExpression(bin, leftr);
                 }
@@ -1737,7 +1432,17 @@ namespace Kuery
                     {
                         case StringComparison.Ordinal:
                         case StringComparison.CurrentCulture:
-                            sqlCall = "( substr(" + obj.CommandText + ", length(" + obj.CommandText + ") - " + args[0].Value.ToString().Length + "+1, " + args[0].Value.ToString().Length + ") = " + args[0].CommandText + ")";
+                            sqlCall = "( substr("
+                                + obj.CommandText
+                                + ", length("
+                                + obj.CommandText
+                                + ") - "
+                                + args[0].Value.ToString().Length
+                                + "+1, "
+                                + args[0].Value.ToString().Length
+                                + ") = "
+                                + args[0].CommandText
+                                + ")";
                             break;
                         case StringComparison.OrdinalIgnoreCase:
                         case StringComparison.CurrentCultureIgnoreCase:
@@ -1776,7 +1481,7 @@ namespace Kuery
                 queryArgs.Add(c.Value);
                 return new CompileResult
                 {
-                    CommandText = "@p" + queryArgs.Count.ToString(),
+                    CommandText = "$p" + queryArgs.Count.ToString(),
                     Value = c.Value,
                 };
             }
@@ -1825,7 +1530,7 @@ namespace Kuery
                             throw new NotSupportedException(
                                 "Member access failed to compile expression");
                         }
-                        if (r.CommandText == ("@p" + queryArgs.Count.ToString()))
+                        if (r.CommandText == ("$p" + queryArgs.Count.ToString()))
                         {
                             queryArgs.RemoveAt(queryArgs.Count - 1);
                         }
@@ -1860,7 +1565,7 @@ namespace Kuery
                         {
                             queryArgs.Add(a);
                             sb.Append(head);
-                            sb.Append("@p" + queryArgs.Count.ToString());
+                            sb.Append("$p" + queryArgs.Count.ToString());
                             head = ",";
                         }
                         sb.Append(")");
@@ -1875,7 +1580,7 @@ namespace Kuery
                         queryArgs.Add(val);
                         return new CompileResult
                         {
-                            CommandText = "@p" + queryArgs.Count.ToString(),
+                            CommandText = "$p" + queryArgs.Count.ToString(),
                             Value = val,
                         };
                     }

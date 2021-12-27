@@ -50,11 +50,10 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(ByteArrayClass)}') is null
-                        create table [{nameof(ByteArrayClass)}] (
-                            {nameof(ByteArrayClass.ID)} integer identity(1,1) primary key not null,
-                            {nameof(ByteArrayClass.bytes)} varbinary(max) null
-                        );";
+                    create table if not exists [{nameof(ByteArrayClass)}] (
+                        {nameof(ByteArrayClass.ID)} integer primary key autoincrement,
+                        {nameof(ByteArrayClass.bytes)} blob null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }

@@ -1,14 +1,11 @@
 ﻿using System;
-using System.Transactions;
 using Xunit;
 
 namespace Kuery.Tests
 {
     public class StringQueryTest : IClassFixture<SqliteFixture>, IDisposable
     {
-        readonly SqliteFixture fixture;
-
-        readonly TransactionScope ts;
+        private readonly SqliteFixture fixture;
 
         public StringQueryTest(SqliteFixture fixture)
         {
@@ -20,15 +17,12 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText = @"
-                        if object_id (N'Product') is null
-                            create table Product (
-                                Name nvarchar(100) primary key not null
-                            );";
+                        create table if not exists Product (
+                            Name nvarchar(100) primary key not null
+                        );";
                     command.ExecuteNonQuery();
                 }
             }
-
-            ts = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
 
             using (var connection = fixture.CreateConnection())
             {
@@ -45,7 +39,16 @@ namespace Kuery.Tests
 
         public void Dispose()
         {
-            ts?.Dispose();
+            using (var connection = fixture.CreateConnection())
+            {
+                connection.Open();
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+                        drop table if exists Product";
+                    command.ExecuteNonQuery();
+                }
+            }
         }
 
         public class Product
