@@ -1,122 +1,133 @@
-using System;
-using System.Linq;
-using System.Collections.Generic;
-
-#if NETFX_CORE
-using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
-using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
-using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
-#else
-using NUnit.Framework;
-#endif
+﻿using System;
+using System.Transactions;
+using Xunit;
 
 namespace Kuery.Tests
 {
-	[TestFixture]
-	public class StringQueryTest
-	{
-		TestDb db;
+    public class StringQueryTest : IClassFixture<SqliteFixture>, IDisposable
+    {
+        readonly SqliteFixture fixture;
 
-		[SetUp]
-		public void SetUp ()
-		{
-			db = new TestDb ();
-			db.CreateTable<Product> ();
+        readonly TransactionScope ts;
 
-			var prods = new[] {
-				new Product { Name = "Foo" },
-				new Product { Name = "Bar" },
-				new Product { Name = "Foobar" },
-				new Product { Name = null, Price=100 },
-				new Product { Name = string.Empty,Price=1000 },
-			};
+        public StringQueryTest(SqliteFixture fixture)
+        {
+            this.fixture = fixture;
 
-			db.InsertAll (prods);
-		}
+            using (var connection = fixture.CreateConnection())
+            {
+                connection.Open();
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+                        if object_id (N'Product') is null
+                            create table Product (
+                                Name nvarchar(100) primary key not null
+                            );";
+                    command.ExecuteNonQuery();
+                }
+            }
 
-		[Test]
-		public void StringEquals ()
-		{
-			// C#: x => x.Name == "Foo"
-			var fs = db.Table<Product>().Where(x => x.Name == "Foo").ToList();
-			Assert.AreEqual(1, fs.Count);
+            ts = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled);
 
-#if !NO_VB
-			// VB: Function(x) x.Name = "Foo"
-			var param = System.Linq.Expressions.Expression.Parameter(typeof(Product), "x");
-			var expr = System.Linq.Expressions.Expression.Lambda<Func<Product, bool>>(
-				System.Linq.Expressions.Expression.Equal(
-					System.Linq.Expressions.Expression.Call(
-						typeof(Microsoft.VisualBasic.CompilerServices.Operators).GetMethod("CompareString"),
-						System.Linq.Expressions.Expression.MakeMemberAccess(param, typeof(Product).GetMember("Name").First()),
-						System.Linq.Expressions.Expression.Constant("Foo"),
-						System.Linq.Expressions.Expression.Constant(false)), // Option Compare Binary (false) or Text (true)
-					System.Linq.Expressions.Expression.Constant(0)),
-				param);
-			var bs = db.Table<Product>().Where(expr).ToList();
-			Assert.AreEqual(1, bs.Count);
-#endif
-		}
+            using (var connection = fixture.CreateConnection())
+            {
+                connection.Open();
+                var products = new Product[]
+                {
+                    new Product { Name = "Foo" },
+                    new Product { Name = "Bar" },
+                    new Product { Name = "Foobar" },
+                };
+                connection.InsertAll(products);
+            }
+        }
 
-		[Test]
-		public void StartsWith ()
-		{
-			var fs = db.Table<Product> ().Where (x => x.Name.StartsWith ("F")).ToList ();
-			Assert.AreEqual (2, fs.Count);
+        public void Dispose()
+        {
+            ts?.Dispose();
+        }
 
-			var lfs = db.Table<Product>().Where(x => x.Name.StartsWith("f")).ToList();
-			Assert.AreEqual(0, lfs.Count);
+        public class Product
+        {
+            public string Name { get; set; }
+        }
+
+        [Fact]
+        public void StringEquals()
+        {
+            using (var connection = fixture.CreateConnection())
+            {
+                connection.Open();
+
+                var fs = connection.Table<Product>().Where(x => x.Name == "Foo").ToList();
+                Assert.Single(fs);
+            }
+        }
+
+        [Fact]
+        public void StartsWith()
+        {
+            using (var connection = fixture.CreateConnection())
+            {
+                connection.Open();
+
+                var fs = connection.Table<Product>().Where(x => x.Name.StartsWith("F")).ToList();
+                Assert.Equal(2, fs.Count);
+
+                var lfs = connection.Table<Product>().Where(x => x.Name.StartsWith("f")).ToList();
+                Assert.Empty(lfs);
 
 
-			var lfs2 = db.Table<Product>().Where(x => x.Name.StartsWith("f",StringComparison.OrdinalIgnoreCase)).ToList();
-			Assert.AreEqual(2, lfs2.Count);
+                var lfs2 = connection.Table<Product>().Where(x => x.Name.StartsWith("f", StringComparison.OrdinalIgnoreCase)).ToList();
+                Assert.Equal(2, lfs2.Count);
 
 
-			var bs = db.Table<Product> ().Where (x => x.Name.StartsWith ("B")).ToList ();
-			Assert.AreEqual (1, bs.Count);
-		}
+                var bs = connection.Table<Product>().Where(x => x.Name.StartsWith("B")).ToList();
+                Assert.Single(bs);
+            }
+        }
 
-		[Test]
-		public void EndsWith ()
-		{
-			var fs = db.Table<Product> ().Where (x => x.Name.EndsWith ("ar")).ToList ();
-			Assert.AreEqual (2, fs.Count);
+        [Fact]
+        public void EndsWith()
+        {
+            using (var connection = fixture.CreateConnection())
+            {
+                connection.Open();
 
-			var lfs = db.Table<Product>().Where(x => x.Name.EndsWith("Ar")).ToList();
-			Assert.AreEqual(0, lfs.Count);
+                var fs = connection.Table<Product>().Where(x => x.Name.EndsWith("ar")).ToList();
+                Assert.Equal(2, fs.Count);
 
-			var bs = db.Table<Product> ().Where (x => x.Name.EndsWith ("o")).ToList ();
-			Assert.AreEqual (1, bs.Count);
-		}
+                var lfs = connection.Table<Product>().Where(x => x.Name.EndsWith("Ar")).ToList();
+                Assert.Empty(lfs);
 
-		[Test]
-		public void Contains ()
-		{
-			var fs = db.Table<Product>().Where(x => x.Name.Contains("o")).ToList();
-			Assert.AreEqual(2, fs.Count);
+                var bs = connection.Table<Product>().Where(x => x.Name.EndsWith("o")).ToList();
+                Assert.Single(bs);
+            }
+        }
 
-			var lfs = db.Table<Product> ().Where (x => x.Name.Contains ("O")).ToList ();
-			Assert.AreEqual (0, lfs.Count);
+        [Fact]
+        public void Contains()
+        {
+            using (var connection = fixture.CreateConnection())
+            {
+                connection.Open();
 
-			var lfsu = db.Table<Product>().Where(x => x.Name.ToUpper().Contains("O")).ToList();
-			Assert.AreEqual(2, lfsu.Count);
+                var fs = connection.Table<Product>().Where(x => x.Name.Contains("o")).ToList();
+                Assert.Equal(2, fs.Count);
 
-			var bs = db.Table<Product> ().Where (x => x.Name.Contains ("a")).ToList ();
-			Assert.AreEqual (2, bs.Count);
+                var lfs = connection.Table<Product>().Where(x => x.Name.Contains("O")).ToList();
+                Assert.Empty(lfs);
 
-			var zs = db.Table<Product>().Where(x => x.Name.Contains("z")).ToList();
-			Assert.AreEqual(0, zs.Count);
-		}
-		[Test]
-		public void IsNullOrEmpty ()
-		{
-			var isnullorempty = db.Table<Product>().Where(x => string.IsNullOrEmpty(x.Name)).ToList();
-			Assert.AreEqual (2, isnullorempty.Count);
+                var lfsu = connection.Table<Product>().Where(x => x.Name.ToUpper().Contains("O")).ToList();
+                Assert.Equal(2, lfsu.Count);
 
-			var isnotnullorempty = db.Table<Product>().Where(x => !string.IsNullOrEmpty(x.Name)).ToList();
-			Assert.AreEqual(3, isnotnullorempty.Count);
+                var bs = connection.Table<Product>().Where(x => x.Name.Contains("a")).ToList();
+                Assert.Equal(2, bs.Count);
 
-		}
-	}
+                var zs = connection.Table<Product>().Where(x => x.Name.Contains("z")).ToList();
+                Assert.Empty(zs);
+            }
+        }
+    }
 }

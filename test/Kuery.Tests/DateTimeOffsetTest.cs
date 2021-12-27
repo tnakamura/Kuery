@@ -1,78 +1,83 @@
 using System;
-
-#if NETFX_CORE
-using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
-using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
-using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
-#else
-using NUnit.Framework;
-#endif
+using System.Data.Common;
+using System.Threading.Tasks;
+using Xunit;
 
 namespace Kuery.Tests
 {
-	[TestFixture]
-	public class DateTimeOffsetTest
-	{
-		class TestObj
-		{
-			[PrimaryKey, AutoIncrement]
-			public int Id { get; set; }
+    public class DateTimeOffsetTest : IClassFixture<SqliteFixture>
+    {
+        readonly SqliteFixture fixture;
 
-			public string Name { get; set; }
-			public DateTimeOffset ModifiedTime { get; set; }
-		}
+        public DateTimeOffsetTest(SqliteFixture fixture)
+        {
+            this.fixture = fixture;
+        }
 
+        class DtoTestObj
+        {
+            [PrimaryKey, AutoIncrement]
+            public int Id { get; set; }
 
-		[Test]
-		public void AsTicks ()
-		{
-			var db = new TestDb ();
-			TestDateTimeOffset (db);
-		}
+            public string Name { get; set; }
 
+            public DateTimeOffset ModifiedTime { get; set; }
+        }
 
-		[Test]
-		public void AsyncAsTicks ()
-		{
-			var db = new SQLiteAsyncConnection (TestPath.GetTempFileName ());
-			TestAsyncDateTimeOffset (db);
-		}
+        static void CreateTable(DbConnection connection)
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'{nameof(DtoTestObj)}') is not null
+                        drop table {nameof(DtoTestObj)};";
+                cmd.ExecuteNonQuery();
+            }
 
-		void TestAsyncDateTimeOffset (SQLiteAsyncConnection db)
-		{
-			db.CreateTableAsync<TestObj> ().Wait ();
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'{nameof(DtoTestObj)}') is null
+                        create table {nameof(DtoTestObj)} (
+                            {nameof(DtoTestObj.Id)} integer identity(1,1) primary key not null,
+                            {nameof(DtoTestObj.Name)} nvarchar(50) null,
+                            {nameof(DtoTestObj.ModifiedTime)} datetimeoffset null
+                        );";
+                cmd.ExecuteNonQuery();
+            }
+        }
 
-			TestObj o, o2;
+        [Fact]
+        public async Task TestAsyncDateTimeOffset()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateTable(con);
 
-			//
-			// Ticks
-			//
-			o = new TestObj {
-                ModifiedTime = new DateTimeOffset (2012, 1, 14, 3, 2, 1, TimeSpan.Zero),
-			};
-			db.InsertAsync (o).Wait ();
-			o2 = db.GetAsync<TestObj> (o.Id).Result;
-			Assert.AreEqual (o.ModifiedTime, o2.ModifiedTime);
-		}
+            var o = new DtoTestObj
+            {
+                ModifiedTime = new DateTimeOffset(2012, 1, 14, 3, 2, 1, TimeSpan.Zero),
+            };
+            await con.InsertAsync(o);
 
-		void TestDateTimeOffset (TestDb db)
-		{
-			db.CreateTable<TestObj> ();
+            var o2 = await con.GetAsync<DtoTestObj>(o.Id);
+            Assert.Equal(o.ModifiedTime, o2.ModifiedTime);
+        }
 
-			TestObj o, o2;
+        [Fact]
+        public void TestDateTimeOffset()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateTable(con);
 
-			//
-			// Ticks
-			//
-			o = new TestObj {
-				ModifiedTime = new DateTimeOffset (2012, 1, 14, 3, 2, 1, TimeSpan.Zero),
-			};
-			db.Insert (o);
-			o2 = db.Get<TestObj> (o.Id);
-			Assert.AreEqual (o.ModifiedTime, o2.ModifiedTime);
-		}
+            var o = new DtoTestObj
+            {
+                ModifiedTime = new DateTimeOffset(2012, 1, 14, 3, 2, 1, TimeSpan.Zero),
+            };
+            con.Insert(o);
 
-	}
+            var o2 = con.Get<DtoTestObj>(o.Id);
+            Assert.Equal(o.ModifiedTime, o2.ModifiedTime);
+        }
+    }
 }
 

@@ -1,159 +1,190 @@
 using System;
+using System.Data.Common;
 using System.Collections.Generic;
-
-#if NETFX_CORE
-using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
-using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
-using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
-#else
-using NUnit.Framework;
-#endif
+using Xunit;
 
 namespace Kuery.Tests
 {
-	[TestFixture]
-	public class MappingTest
-	{
-		[Table ("AGoodTableName")]
-		class AFunnyTableName
-		{
-			[PrimaryKey]
-			public int Id { get; set; }
+    public class MappingTest : IClassFixture<SqliteFixture>
+    {
+        readonly SqliteFixture fixture;
 
-			[Column ("AGoodColumnName")]
-			public string AFunnyColumnName { get; set; }
-		}
+        public MappingTest(SqliteFixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
+        [Table("AGoodTableName")]
+        class AFunnyTableName
+        {
+            [PrimaryKey]
+            public int Id { get; set; }
+
+            [Column("AGoodColumnName")]
+            public string AFunnyColumnName { get; set; }
+        }
+
+        [Fact]
+        public void HasGoodNames()
+        {
+            var mapping = SqlHelper.GetMapping<AFunnyTableName>();
+            Assert.Equal("AGoodTableName", mapping.TableName);
+            Assert.Equal("Id", mapping.Columns[0].Name);
+            Assert.Equal("AGoodColumnName", mapping.Columns[1].Name);
+        }
+
+        class OverrideNamesBase
+        {
+            [PrimaryKey, AutoIncrement]
+            public int Id { get; set; }
+
+            public virtual string Name { get; set; }
+
+            public virtual string Value { get; set; }
+        }
+
+        class OverrideNamesClass : OverrideNamesBase
+        {
+            [Column("n")]
+            public override string Name { get; set; }
+
+            [Column("v")]
+            public override string Value { get; set; }
+        }
+
+        static void CreateOverrideNamesClass(DbConnection connection)
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'OverrideNamesClass') is not null
+                        drop table OverrideNamesClass;";
+                cmd.ExecuteNonQuery();
+            }
+
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'OverrideNamesClass') is null
+                        create table OverrideNamesClass (
+                            Id integer identity(1,1) primary key not null,
+                            n nvarchar(50) null,
+                            v nvarchar(50) null
+                        );";
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        [Fact]
+        public void OverrideNames()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateOverrideNamesClass(con);
+
+            var o = new OverrideNamesClass
+            {
+                Name = "Foo",
+                Value = "Bar",
+            };
+            con.Insert(o);
+
+            var oo = con.Table<OverrideNamesClass>().First();
+            Assert.Equal("Foo", oo.Name);
+            Assert.Equal("Bar", oo.Value);
+        }
+
+        [Table("foo")]
+        public class Foo
+        {
+            [Column("baz")]
+            public int Bar { get; set; }
+        }
+
+        static void CreateFooTable(DbConnection connection)
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'foo') is not null
+                        drop table foo;";
+                cmd.ExecuteNonQuery();
+            }
+
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'foo') is null
+                        create table foo (
+                            baz integer primary key not null
+                        );";
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        [Fact]
+        public void WhereAndOrder()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateFooTable(con);
+
+            con.Insert(new Foo { Bar = 42 });
+            con.Insert(new Foo { Bar = 69 });
+
+            var found42 = con.Table<Foo>().Where(f => f.Bar == 42).FirstOrDefault();
+            Assert.NotNull(found42);
+
+            var ordered = new List<Foo>(con.Table<Foo>().OrderByDescending(f => f.Bar));
+            Assert.Equal(2, ordered.Count);
+            Assert.Equal(69, ordered[0].Bar);
+            Assert.Equal(42, ordered[1].Bar);
+        }
 
 
-		[Test]
-		public void HasGoodNames ()
-		{
-			var db = new TestDb ();
+        public class OnlyKeyModel
+        {
+            [PrimaryKey]
+            public string MyModelId { get; set; }
+        }
 
-			db.CreateTable<AFunnyTableName> ();
+        static void CreateOnlyKeyModelTable(DbConnection connection)
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'OnlyKeyModel') is not null
+                        drop table OnlyKeyModel;";
+                cmd.ExecuteNonQuery();
+            }
 
-			var mapping = db.GetMapping<AFunnyTableName> ();
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'OnlyKeyModel') is null
+                        create table OnlyKeyModel (
+                            MyModelId nvarchar(250) primary key not null
+                        );";
+                cmd.ExecuteNonQuery();
+            }
+        }
 
-			Assert.AreEqual ("AGoodTableName", mapping.TableName);
+        [Fact]
+        public void OnlyKey()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateOnlyKeyModelTable(con);
 
-			Assert.AreEqual ("Id", mapping.Columns[0].Name);
-			Assert.AreEqual ("AGoodColumnName", mapping.Columns[1].Name);
-		}
+            con.InsertOrReplace(new OnlyKeyModel { MyModelId = "Foo" });
+            var foo = con.Get<OnlyKeyModel>("Foo");
+            Assert.Equal("Foo", foo.MyModelId);
 
-		class OverrideNamesBase
-		{
-			[PrimaryKey, AutoIncrement]
-			public int Id { get; set; }
+            con.Insert(new OnlyKeyModel { MyModelId = "Bar" });
+            var bar = con.Get<OnlyKeyModel>("Bar");
+            Assert.Equal("Bar", bar.MyModelId);
 
-			public virtual string Name { get; set; }
-			public virtual string Value { get; set; }
-		}
-
-		class OverrideNamesClass : OverrideNamesBase
-		{
-			[Column ("n")]
-			public override string Name { get; set; }
-			[Column ("v")]
-			public override string Value { get; set; }
-		}
-
-		[Test]
-		public void OverrideNames ()
-		{
-			var db = new TestDb ();
-			db.CreateTable<OverrideNamesClass> ();
-
-			var cols = db.GetTableInfo ("OverrideNamesClass");
-			Assert.AreEqual (3, cols.Count);
-			Assert.IsTrue (cols.Exists (x => x.Name == "n"));
-			Assert.IsTrue (cols.Exists (x => x.Name == "v"));
-
-			var o = new OverrideNamesClass {
-				Name = "Foo",
-				Value = "Bar",
-			};
-
-			db.Insert (o);
-
-			var oo = db.Table<OverrideNamesClass> ().First ();
-
-			Assert.AreEqual ("Foo", oo.Name);
-			Assert.AreEqual ("Bar", oo.Value);
-		}
-
-		#region Issue #86
-
-		[Table ("foo")]
-		public class Foo
-		{
-			[Column ("baz")]
-			public int Bar { get; set; }
-		}
-
-		[Test]
-		public void Issue86 ()
-		{
-			var db = new TestDb ();
-			db.CreateTable<Foo> ();
-
-			db.Insert (new Foo { Bar = 42 });
-			db.Insert (new Foo { Bar = 69 });
-
-			var found42 = db.Table<Foo> ().Where (f => f.Bar == 42).FirstOrDefault ();
-			Assert.IsNotNull (found42);
-
-			var ordered = new List<Foo> (db.Table<Foo> ().OrderByDescending (f => f.Bar));
-			Assert.AreEqual (2, ordered.Count);
-			Assert.AreEqual (69, ordered[0].Bar);
-			Assert.AreEqual (42, ordered[1].Bar);
-		}
-
-		#endregion
-
-		#region Issue #572
-
-		public class OnlyKeyModel
-		{
-			[PrimaryKey]
-			public string MyModelId { get; set; }
-		}
-
-		[Test]
-		public void OnlyKey ()
-		{
-			var db = new TestDb ();
-			db.CreateTable<OnlyKeyModel> ();
-
-			db.InsertOrReplace (new OnlyKeyModel { MyModelId = "Foo" });
-			var foo = db.Get<OnlyKeyModel> ("Foo");
-			Assert.AreEqual (foo.MyModelId, "Foo");
-
-			db.Insert (new OnlyKeyModel { MyModelId = "Bar" });
-			var bar = db.Get<OnlyKeyModel> ("Bar");
-			Assert.AreEqual (bar.MyModelId, "Bar");
-
-			db.Update (new OnlyKeyModel { MyModelId = "Foo" });
-			var foo2 = db.Get<OnlyKeyModel> ("Foo");
-			Assert.AreEqual (foo2.MyModelId, "Foo");
-		}
-
-		#endregion
-
-		#region Issue #1007
-
-		[Test]
-		public void TableMapping_MapsValueTypes()
-		{
-			var mapping = new TableMapping(typeof( (int a, string b, double? c) ));
-
-			Assert.AreEqual(3, mapping.Columns.Length);
-			Assert.AreEqual("Item1", mapping.Columns[0].Name);
-			Assert.AreEqual("Item2", mapping.Columns[1].Name);
-			Assert.AreEqual("Item3", mapping.Columns[2].Name);
-		}
-
-		#endregion
-	}
+            con.Update(new OnlyKeyModel { MyModelId = "Foo" });
+            var foo2 = con.Get<OnlyKeyModel>("Foo");
+            Assert.Equal("Foo", foo2.MyModelId);
+        }
+    }
 }
 

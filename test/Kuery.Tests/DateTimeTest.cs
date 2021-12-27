@@ -1,150 +1,137 @@
 using System;
+using System.Data.Common;
 using System.Threading.Tasks;
-
-#if NETFX_CORE
-using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
-using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
-using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
-#else
-using NUnit.Framework;
-#endif
+using Xunit;
 
 namespace Kuery.Tests
 {
-	[TestFixture]
-	public class DateTimeTest
-	{
-		const string DefaultSQLiteDateTimeString = "yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff";
+    public class DateTimeTest : IClassFixture<SqliteFixture>
+    {
+        public SqliteFixture fixture;
 
-		class TestObj
-		{
-			[PrimaryKey, AutoIncrement]
-			public int Id { get; set; }
+        public DateTimeTest(SqliteFixture fixture)
+        {
+            this.fixture = fixture;
+        }
 
-			public string Name { get; set; }
-			public DateTime ModifiedTime { get; set; }
-		}
+        class DateTimeTestObj
+        {
+            [PrimaryKey, AutoIncrement]
+            public int Id { get; set; }
 
+            public DateTime ModifiedTime { get; set; }
+        }
 
-		[Test]
-		public void AsTicks ()
-		{
-			var dateTime = new DateTime (2012, 1, 14, 3, 2, 1, 234);
-			var db = new TestDb (storeDateTimeAsTicks: true);
-			TestDateTime (db, dateTime, dateTime.Ticks.ToString ());
-		}
+        static void CreateTestTable(DbConnection connection)
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'{nameof(DateTimeTestObj)}') is not null
+                        drop table {nameof(DateTimeTestObj)};";
+                cmd.ExecuteNonQuery();
+            }
 
-		[Test]
-		public void AsStrings ()
-		{
-			var dateTime = new DateTime (2012, 1, 14, 3, 2, 1, 234);
-			var db = new TestDb (storeDateTimeAsTicks: false);
-			TestDateTime (db, dateTime, dateTime.ToString (DefaultSQLiteDateTimeString));
-		}
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'{nameof(DateTimeTestObj)}') is null
+                        create table {nameof(DateTimeTestObj)} (
+                            {nameof(DateTimeTestObj.Id)} integer identity(1,1) primary key not null,
+                            {nameof(DateTimeTestObj.ModifiedTime)} datetime not null
+                        );";
+                cmd.ExecuteNonQuery();
+            }
+        }
 
-		[TestCase ("o")]
-		[TestCase ("MMM'-'dd'-'yyyy' 'HH':'mm':'ss'.'fffffff")]
-		public void AsCustomStrings (string format)
-		{
-			var dateTime = new DateTime (2012, 1, 14, 3, 2, 1, 234);
-			var db = new TestDb (CustomDateTimeString (format));
-			TestDateTime (db, dateTime, dateTime.ToString (format, System.Globalization.CultureInfo.InvariantCulture));
-		}
+        [Fact]
+        public async Task TestAsyncDateTime()
+        {
+            using var db = fixture.OpenNewConnection();
+            CreateTestTable(db);
 
-		[Test]
-		public void AsyncAsTicks ()
-		{
-			var dateTime = new DateTime (2012, 1, 14, 3, 2, 1, 234);
-			var db = new SQLiteAsyncConnection (TestPath.GetTempFileName (), true);
-			TestAsyncDateTime (db, dateTime, dateTime.Ticks.ToString ());
-		}
+            //
+            // Ticks
+            //
+            var o = new DateTimeTestObj
+            {
+                ModifiedTime = new DateTime(2012, 1, 14, 3, 2, 1, 234),
+            };
+            await db.InsertAsync(o);
 
-		[Test]
-		public void AsyncAsString ()
-		{
-			var dateTime = new DateTime (2012, 1, 14, 3, 2, 1, 234);
-			var db = new SQLiteAsyncConnection (TestPath.GetTempFileName (), false);
-			TestAsyncDateTime (db, dateTime, dateTime.ToString (DefaultSQLiteDateTimeString));
-		}
+            var o2 = await db.GetAsync<DateTimeTestObj>(o.Id);
+            Assert.Equal(o.ModifiedTime, o2.ModifiedTime);
+        }
 
-		[TestCase ("o")]
-		[TestCase ("MMM'-'dd'-'yyyy' 'HH':'mm':'ss'.'fffffff")]
-		public void AsyncAsCustomStrings (string format)
-		{
-			var dateTime = new DateTime (2012, 1, 14, 3, 2, 1, 234);
-			var db = new SQLiteAsyncConnection (CustomDateTimeString (format));
-			TestAsyncDateTime (db, dateTime, dateTime.ToString (format,System.Globalization.CultureInfo.InvariantCulture));
-		}
+        [Fact]
+        public void TestDateTime()
+        {
+            using var db = fixture.OpenNewConnection();
+            CreateTestTable(db);
 
-		SQLiteConnectionString CustomDateTimeString (string dateTimeFormat) => new SQLiteConnectionString (TestPath.GetTempFileName (), SQLiteOpenFlags.Create | SQLiteOpenFlags.ReadWrite, false, dateTimeStringFormat: dateTimeFormat);
+            DateTimeTestObj o, o2;
 
-		void TestAsyncDateTime (SQLiteAsyncConnection db, DateTime dateTime, string expected)
-		{
-			db.CreateTableAsync<TestObj> ().Wait ();
+            //
+            // Ticks
+            //
+            o = new DateTimeTestObj
+            {
+                ModifiedTime = new DateTime(2012, 1, 14, 3, 2, 1, 234),
+            };
+            db.Insert(o);
+            o2 = db.Get<DateTimeTestObj>(o.Id);
+            Assert.Equal(o.ModifiedTime, o2.ModifiedTime);
+        }
 
-			TestObj o, o2;
+        class NullableDateObj
+        {
+            public DateTime? Time { get; set; }
+        }
 
-			//
-			// Ticks
-			//
-			o = new TestObj {
-				ModifiedTime = dateTime,
-			};
-			db.InsertAsync (o).Wait ();
-			o2 = db.GetAsync<TestObj> (o.Id).Result;
-			Assert.AreEqual (o.ModifiedTime, o2.ModifiedTime);
+        static void CreateNullableTestTable(DbConnection connection)
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'{nameof(NullableDateObj)}') is not null
+                        drop table {nameof(NullableDateObj)};";
+                cmd.ExecuteNonQuery();
+            }
 
-			var stored = db.ExecuteScalarAsync<string> ("SELECT ModifiedTime FROM TestObj;").Result;
-			Assert.AreEqual (expected, stored);
-		}
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'{nameof(NullableDateObj)}') is null
+                        create table {nameof(NullableDateObj)} (
+                            {nameof(NullableDateObj.Time)} datetime null
+                        );";
+                cmd.ExecuteNonQuery();
+            }
+        }
 
-		void TestDateTime (TestDb db, DateTime dateTime, string expected)
-		{
-			db.CreateTable<TestObj> ();
+        [Fact]
+        public async Task LinqNullable()
+        {
+            using var db = fixture.OpenNewConnection();
+            CreateNullableTestTable(db);
 
-			TestObj o, o2;
+            var epochTime = new DateTime(1970, 1, 1);
 
-			//
-			// Ticks
-			//
-			o = new TestObj {
-				ModifiedTime = dateTime,
-			};
-			db.Insert (o);
-			o2 = db.Get<TestObj> (o.Id);
-			Assert.AreEqual (o.ModifiedTime, o2.ModifiedTime);
+            await db.InsertAsync(new NullableDateObj { Time = epochTime });
+            await db.InsertAsync(new NullableDateObj { Time = new DateTime(1980, 7, 23) });
+            await db.InsertAsync(new NullableDateObj { Time = null });
+            await db.InsertAsync(new NullableDateObj { Time = new DateTime(2019, 1, 23) });
 
-			var stored = db.ExecuteScalar<string> ("SELECT ModifiedTime FROM TestObj;");
-			Assert.AreEqual (expected, stored);
-		}
+            var res = await db.Table<NullableDateObj>()
+                .Where(x => x.Time == epochTime)
+                .ToListAsync();
+            Assert.Single(res);
 
-		class NullableDateObj
-		{
-			public DateTime? Time { get; set; }
-		}
-
-		[Test]
-		public async Task LinqNullable ()
-		{
-			foreach (var option in new[] { true, false }) {
-				var db = new SQLiteAsyncConnection (TestPath.GetTempFileName (), option);
-				await db.CreateTableAsync<NullableDateObj> ().ConfigureAwait (false);
-
-				var epochTime = new DateTime (1970, 1, 1);
-
-				await db.InsertAsync (new NullableDateObj { Time = epochTime });
-				await db.InsertAsync (new NullableDateObj { Time = new DateTime (1980, 7, 23) });
-				await db.InsertAsync (new NullableDateObj { Time = null });
-				await db.InsertAsync (new NullableDateObj { Time = new DateTime (2019, 1, 23) });
-
-				var res = await db.Table<NullableDateObj> ().Where (x => x.Time == epochTime).ToListAsync ();
-				Assert.AreEqual (1, res.Count);
-
-				res = await db.Table<NullableDateObj> ().Where (x => x.Time > epochTime).ToListAsync ();
-				Assert.AreEqual (2, res.Count);
-			}
-		}
-	}
+            res = await db.Table<NullableDateObj>()
+                .Where(x => x.Time > epochTime)
+                .ToListAsync();
+            Assert.Equal(2, res.Count);
+        }
+    }
 }
 

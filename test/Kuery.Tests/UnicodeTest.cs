@@ -1,56 +1,86 @@
-using System;
+using System.Data.Common;
 using System.Linq;
-
-#if NETFX_CORE
-using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
-using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
-using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
-#else
-using NUnit.Framework;
-#endif
-
+using Xunit;
 
 namespace Kuery.Tests
 {
-	[TestFixture]
-	public class UnicodeTest
-	{
-		[Test]
-		public void Insert ()
-		{
-			var db = new TestDb ();
-			
-			db.CreateTable<Product> ();
-			
-			string testString = "\u2329\u221E\u232A";
-			
-			db.Insert (new Product {
-				Name = testString,
-			});
-			
-			var p = db.Get<Product> (1);
-			
-			Assert.AreEqual (testString, p.Name);
-		}
-		
-		[Test]
-		public void Query ()
-		{
-			var db = new TestDb ();
-			
-			db.CreateTable<Product> ();
-			
-			string testString = "\u2329\u221E\u232A";
-			
-			db.Insert (new Product {
-				Name = testString,
-			});
-			
-			var ps = (from p in db.Table<Product> () where p.Name == testString select p).ToList ();
-			
-			Assert.AreEqual (1, ps.Count);
-			Assert.AreEqual (testString, ps [0].Name);
-		}
-	}
+    public class UnicodeTest : IClassFixture<SqliteFixture>
+    {
+        readonly SqliteFixture fixture;
+
+        public UnicodeTest(SqliteFixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
+        public class UnicodeTestObj
+        {
+            [PrimaryKey, AutoIncrement]
+            public int Id { get; set; }
+
+            public string Name { get; set; }
+        }
+
+        static void CreateTable(DbConnection connection)
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'{nameof(UnicodeTestObj)}') is not null
+                        drop table {nameof(UnicodeTestObj)};";
+                cmd.ExecuteNonQuery();
+            }
+
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    if object_id (N'{nameof(UnicodeTestObj)}') is null
+                        create table {nameof(UnicodeTestObj)} (
+                            {nameof(UnicodeTestObj.Id)} integer identity(1,1) primary key not null,
+                            {nameof(UnicodeTestObj.Name)} nvarchar(50) null
+                        );";
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        [Fact]
+        public void Insert()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateTable(con);
+
+            string testString = "\u2329\u221E\u232A";
+
+            con.Insert(new UnicodeTestObj
+            {
+                Name = testString,
+            });
+
+            var p = con.Get<UnicodeTestObj>(1);
+
+            Assert.Equal(testString, p.Name);
+        }
+
+        [Fact]
+        public void Query()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateTable(con);
+
+            string testString = "\u2329\u221E\u232A";
+
+            con.Insert(new UnicodeTestObj
+            {
+                Name = testString,
+            });
+
+            var ps = (
+                from p in con.Table<UnicodeTestObj>()
+                where p.Name == testString
+                select p
+            ).ToList();
+            Assert.Single(ps);
+            Assert.Equal(testString, ps[0].Name);
+        }
+    }
 }

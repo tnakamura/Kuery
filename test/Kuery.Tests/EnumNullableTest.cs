@@ -1,23 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿using System.Data.Common;
 using System.Linq;
-using System.Text;
-
-#if NETFX_CORE
-using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
-using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
-using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
-#else
-using NUnit.Framework;
-#endif
+using Xunit;
 
 namespace Kuery.Tests
 {
-    [TestFixture]
-    public class EnumNullableTests
+    public class EnumNullableTest : IClassFixture<SqliteFixture>
     {
+        readonly SqliteFixture fixture;
+
+        public EnumNullableTest(SqliteFixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
         public enum TestEnum
         {
             Value1,
@@ -27,10 +22,11 @@ namespace Kuery.Tests
             Value3
         }
 
-        public class TestObj
+        public class EnumNullableTestObj
         {
             [PrimaryKey]
             public int Id { get; set; }
+
             public TestEnum? Value { get; set; }
 
             public override string ToString()
@@ -40,37 +36,44 @@ namespace Kuery.Tests
 
         }
 
-        public class TestDb : SQLiteConnection
+        void CreateTable(DbConnection connection)
         {
-            public TestDb(String path)
-                : base(path)
+            connection.DropTable(nameof(EnumNullableTestObj));
+
+            using (var cmd = connection.CreateCommand())
             {
-                CreateTable<TestObj>();
+                cmd.CommandText = $@"
+                    if object_id (N'{nameof(EnumNullableTestObj)}') is null
+                        create table {nameof(EnumNullableTestObj)} (
+                            {nameof(EnumNullableTestObj.Id)} int primary key not null,
+                            {nameof(EnumNullableTestObj.Value)} int null
+                        );";
+                cmd.ExecuteNonQuery();
             }
         }
 
-        [Test]
+        [Fact]
         public void ShouldPersistAndReadEnum()
         {
-            var db = new TestDb(TestPath.GetTempFileName());
+            using var con = fixture.OpenNewConnection();
+            CreateTable(con);
 
-            var obj1 = new TestObj() { Id = 1, Value = TestEnum.Value2 };
-            var obj2 = new TestObj() { Id = 2, Value = TestEnum.Value3 };
+            var obj1 = new EnumNullableTestObj() { Id = 1, Value = TestEnum.Value2 };
+            var obj2 = new EnumNullableTestObj() { Id = 2, Value = TestEnum.Value3 };
 
-            var numIn1 = db.Insert(obj1);
-            var numIn2 = db.Insert(obj2);
-            Assert.AreEqual(1, numIn1);
-            Assert.AreEqual(1, numIn2);
+            var numIn1 = con.Insert(obj1);
+            var numIn2 = con.Insert(obj2);
+            Assert.Equal(1, numIn1);
+            Assert.Equal(1, numIn2);
 
-            var result = db.Query<TestObj>("select * from TestObj").ToList();
-            Assert.AreEqual(2, result.Count);
-            Assert.AreEqual(obj1.Value, result[0].Value);
-            Assert.AreEqual(obj2.Value, result[1].Value);
+            var result = con.Query<EnumNullableTestObj>(
+                $"select * from {nameof(EnumNullableTestObj)}").ToList();
+            Assert.Equal(2, result.Count);
+            Assert.Equal(obj1.Value, result[0].Value);
+            Assert.Equal(obj2.Value, result[1].Value);
 
-            Assert.AreEqual(obj1.Id, result[0].Id);
-            Assert.AreEqual(obj2.Id, result[1].Id);
-
-            db.Close();
+            Assert.Equal(obj1.Id, result[0].Id);
+            Assert.Equal(obj2.Id, result[1].Id);
         }
     }
 }

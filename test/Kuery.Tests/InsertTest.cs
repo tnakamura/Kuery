@@ -1,52 +1,53 @@
-
 using System;
-using System.IO;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Kuery;
-
-#if NETFX_CORE
-using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
-using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
-using TearDown = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestCleanupAttribute;
-using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
-#else
-using NUnit.Framework;
-#endif
-
+using System.Data.Common;
 using System.Diagnostics;
+using System.Linq;
+using Microsoft.Data.SqlClient;
+using Xunit;
 
 namespace Kuery.Tests
-{    
-    [TestFixture]
-    public class InsertTest
+{
+    public class InsertTest : IClassFixture<SqliteFixture>, IDisposable
     {
-        private TestDb _db;
+        readonly SqliteFixture fixture;
 
-        public class TestObj
+        readonly DbConnection connection;
+
+        public InsertTest(SqliteFixture fixture)
+        {
+            this.fixture = fixture;
+            connection = fixture.OpenNewConnection();
+            CreateTestTable(connection);
+        }
+
+        public void Dispose()
+        {
+            connection.Close();
+        }
+
+        public class InsertTestObj
         {
             [AutoIncrement, PrimaryKey]
             public int Id { get; set; }
-            public String Text { get; set; }
 
-            public override string ToString ()
-            {
-            	return string.Format("[TestObj: Id={0}, Text={1}]", Id, Text);
-            }
-
-        }
-
-        public class TestObj2
-        {
-            [PrimaryKey]
-            public int Id { get; set; }
-            public String Text { get; set; }
+            public string Text { get; set; }
 
             public override string ToString()
             {
-                return string.Format("[TestObj: Id={0}, Text={1}]", Id, Text);
+                return string.Format("[InsertTestObj: Id={0}, Text={1}]", Id, Text);
+            }
+        }
+
+        public class InsertTestObj2
+        {
+            [PrimaryKey]
+            public int Id { get; set; }
+
+            public string Text { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("[InsertTestObj: Id={0}, Text={1}]", Id, Text);
             }
 
         }
@@ -57,227 +58,214 @@ namespace Kuery.Tests
             public int Id { get; set; }
         }
 
-		public class UniqueObj
-		{
-			[PrimaryKey]
-			public int Id { get; set; }
-		}
-
-        public class TestDb : SQLiteConnection
+        public class UniqueObj
         {
-            public TestDb(String path)
-                : base(path)
+            [PrimaryKey]
+            public int Id { get; set; }
+        }
+
+        void CreateTestTable(DbConnection connection)
+        {
+            connection.DropTable(nameof(InsertTestObj));
+            connection.DropTable(nameof(InsertTestObj2));
+            connection.DropTable(nameof(OneColumnObj));
+            connection.DropTable(nameof(UniqueObj));
+
+            using (var cmd = connection.CreateCommand())
             {
-				CreateTable<TestObj>();
-                CreateTable<TestObj2>();
-                CreateTable<OneColumnObj>();
-				CreateTable<UniqueObj>();
+                cmd.CommandText = $@"
+                    create table if not exists {nameof(InsertTestObj)} (
+                        {nameof(InsertTestObj.Id)} integer primary key autoincrement,
+                        {nameof(InsertTestObj.Text)} text null
+                    );";
+                cmd.ExecuteNonQuery();
+            }
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    create table if not exists {nameof(InsertTestObj2)} (
+                        {nameof(InsertTestObj2.Id)} integer primary key autoincrement,
+                        {nameof(InsertTestObj2.Text)} text null
+                    );";
+                cmd.ExecuteNonQuery();
+            }
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    create table if not exists {nameof(OneColumnObj)} (
+                        {nameof(OneColumnObj.Id)} integer primary key autoincrement
+                    );";
+                cmd.ExecuteNonQuery();
+            }
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    create table if not exists {nameof(UniqueObj)} (
+                        {nameof(UniqueObj.Id)} integer primary key autoincrement
+                    );";
+                cmd.ExecuteNonQuery();
             }
         }
-		
-        [SetUp]
-        public void Setup()
-        {
-            _db = new TestDb(TestPath.GetTempFileName());
-        }
-        [TearDown]
-        public void TearDown()
-        {
-            if (_db != null) _db.Close();
-        }
 
-        [Test]
+        [Fact]
         public void InsertALot()
         {
-			int n = 10000;
-			var q =	from i in Enumerable.Range(1, n)
-					select new TestObj() {
-				Text = "I am"
-			};
-			var objs = q.ToArray();
-			_db.Trace = false;
-			
-			var sw = new Stopwatch();
-			sw.Start();
-			
-			var numIn = _db.InsertAll(objs);
-			
-			sw.Stop();
-			
-			Assert.AreEqual(numIn, n, "Num inserted must = num objects");
-			
-			var inObjs = _db.CreateCommand("select * from TestObj").ExecuteQuery<TestObj>().ToArray();
-			
-			for (var i = 0; i < inObjs.Length; i++) {
-				Assert.AreEqual(i+1, objs[i].Id);
-				Assert.AreEqual(i+1, inObjs[i].Id);
-				Assert.AreEqual("I am", inObjs[i].Text);
-			}
-			
-			var numCount = _db.CreateCommand("select count(*) from TestObj").ExecuteScalar<int>();
-			
-			Assert.AreEqual(numCount, n, "Num counted must = num objects");
+            int n = 100/*00*/;
+            var q = from i in Enumerable.Range(1, n)
+                    select new InsertTestObj()
+                    {
+                        Text = "I am"
+                    };
+            var objs = q.ToArray();
+
+            var sw = new Stopwatch();
+            sw.Start();
+
+            var numIn = connection.InsertAll(objs);
+
+            sw.Stop();
+
+            Assert.Equal(numIn, n);
+
+            var inObjs = connection.Query<InsertTestObj>(
+                $"select * from {nameof(InsertTestObj)}")
+                .ToArray();
+            for (var i = 0; i < inObjs.Length; i++)
+            {
+                Assert.Equal(i + 1, objs[i].Id);
+                Assert.Equal(i + 1, inObjs[i].Id);
+                Assert.Equal("I am", inObjs[i].Text);
+            }
+
+            var numCount = connection.ExecuteScalar<int>(
+                $"select count(*) from {nameof(InsertTestObj)}");
+            Assert.Equal(numCount, n);
         }
 
-		[Test]
-		public void InsertTraces ()
-		{
-			var oldTracer = _db.Tracer;
-			var oldTrace = _db.Trace;
-
-			var traces = new List<string> ();
-			_db.Tracer = traces.Add;
-			_db.Trace = true;
-
-			var obj1 = new TestObj () { Text = "GLaDOS loves tracing!" };
-			var numIn1 = _db.Insert (obj1);
-
-			Assert.AreEqual (1, numIn1);
-			Assert.AreEqual (1, traces.Count);
-
-			_db.Tracer = oldTracer;
-			_db.Trace = oldTrace;
-		}
-
-        [Test]
+        [Fact]
         public void InsertTwoTimes()
         {
-            var obj1 = new TestObj() { Text = "GLaDOS loves testing!" };
-            var obj2 = new TestObj() { Text = "Keep testing, just keep testing" };
+            var obj1 = new InsertTestObj() { Text = "GLaDOS loves testing!" };
+            var obj2 = new InsertTestObj() { Text = "Keep testing, just keep testing" };
 
 
-            var numIn1 = _db.Insert(obj1);
-            var numIn2 = _db.Insert(obj2);
-            Assert.AreEqual(1, numIn1);
-            Assert.AreEqual(1, numIn2);
+            var numIn1 = connection.Insert(obj1);
+            var numIn2 = connection.Insert(obj2);
+            Assert.Equal(1, numIn1);
+            Assert.Equal(1, numIn2);
 
-            var result = _db.Query<TestObj>("select * from TestObj").ToList();
-            Assert.AreEqual(2, result.Count);
-            Assert.AreEqual(obj1.Text, result[0].Text);
-            Assert.AreEqual(obj2.Text, result[1].Text);
+            var result = connection.Query<InsertTestObj>(
+                $"select * from {nameof(InsertTestObj)}").ToList();
+            Assert.Equal(2, result.Count);
+            Assert.Equal(obj1.Text, result[0].Text);
+            Assert.Equal(obj2.Text, result[1].Text);
         }
 
-        [Test]
+        [Fact]
         public void InsertIntoTwoTables()
         {
-            var obj1 = new TestObj() { Text = "GLaDOS loves testing!" };
-            var obj2 = new TestObj2() { Text = "Keep testing, just keep testing" };
+            var obj1 = new InsertTestObj() { Text = "GLaDOS loves testing!" };
+            var obj2 = new InsertTestObj2() { Text = "Keep testing, just keep testing" };
 
-            var numIn1 = _db.Insert(obj1);
-            Assert.AreEqual(1, numIn1);
-            var numIn2 = _db.Insert(obj2);
-            Assert.AreEqual(1, numIn2);
+            var numIn1 = connection.Insert(obj1);
+            Assert.Equal(1, numIn1);
+            var numIn2 = connection.Insert(obj2);
+            Assert.Equal(1, numIn2);
 
-            var result1 = _db.Query<TestObj>("select * from TestObj").ToList();
-            Assert.AreEqual(numIn1, result1.Count);
-            Assert.AreEqual(obj1.Text, result1.First().Text);
+            var result1 = connection.Query<InsertTestObj>(
+                $"select * from {nameof(InsertTestObj)}").ToList();
+            Assert.Equal(numIn1, result1.Count);
+            Assert.Equal(obj1.Text, result1.First().Text);
 
-            var result2 = _db.Query<TestObj>("select * from TestObj2").ToList();
-            Assert.AreEqual(numIn2, result2.Count);
+            var result2 = connection.Query<InsertTestObj2>(
+                $"select * from {nameof(InsertTestObj2)}").ToList();
+            Assert.Equal(numIn2, result2.Count);
         }
 
-        [Test]
-        public void InsertWithExtra()
-        {
-            var obj1 = new TestObj2() { Id=1, Text = "GLaDOS loves testing!" };
-            var obj2 = new TestObj2() { Id=1, Text = "Keep testing, just keep testing" };
-            var obj3 = new TestObj2() { Id=1, Text = "Done testing" };
-
-            _db.Insert(obj1);
-            
-            
-            try {
-                _db.Insert(obj2);
-                Assert.Fail("Expected unique constraint violation");
-            }
-            catch (SQLiteException) {
-            }
-            _db.Insert(obj2, "OR REPLACE");
-
-
-            try {
-                _db.Insert(obj3);
-                Assert.Fail("Expected unique constraint violation");
-            }
-            catch (SQLiteException) {
-            }
-            _db.Insert(obj3, "OR IGNORE");
-
-            var result = _db.Query<TestObj>("select * from TestObj2").ToList();
-            Assert.AreEqual(1, result.Count);
-            Assert.AreEqual(obj2.Text, result.First().Text);
-        }
-
-        [Test]
+        [Fact]
         public void InsertIntoOneColumnAutoIncrementTable()
         {
             var obj = new OneColumnObj();
-            _db.Insert(obj);
+            connection.Insert(obj);
 
-            var result = _db.Get<OneColumnObj>(1);
-            Assert.AreEqual(1, result.Id);
+            var result = connection.Get<OneColumnObj>(1);
+            Assert.Equal(1, result.Id);
         }
 
-		[Test]
-		public void InsertAllSuccessOutsideTransaction()
-		{
-			var testObjects = Enumerable.Range(1, 20).Select(i => new UniqueObj { Id = i }).ToList();
+        [Fact]
+        public void InsertAllSuccessOutsideTransaction()
+        {
+            var testObjects = Enumerable.Range(1, 20).Select(i => new UniqueObj { Id = i }).ToList();
 
-			_db.InsertAll(testObjects);
+            connection.InsertAll(testObjects);
 
-			Assert.AreEqual(testObjects.Count, _db.Table<UniqueObj>().Count());
-		}
+            Assert.Equal(testObjects.Count, connection.Table<UniqueObj>().Count());
+        }
 
-		[Test]
-		public void InsertAllFailureOutsideTransaction()
-		{
-			var testObjects = Enumerable.Range(1, 20).Select(i => new UniqueObj { Id = i }).ToList();
-			testObjects[testObjects.Count - 1].Id = 1; // causes the insert to fail because of duplicate key
+        [Fact]
+        public void InsertAllFailureOutsideTransaction()
+        {
+            var testObjects = Enumerable.Range(1, 20)
+                .Select(i => new UniqueObj { Id = i })
+                .ToList();
+            testObjects[testObjects.Count - 1].Id = 1; // causes the insert to fail because of duplicate key
 
-			ExceptionAssert.Throws<SQLiteException>(() => _db.InsertAll(testObjects));
+            Assert.Throws<SqlException>(() =>
+            {
+                connection.InsertAll(testObjects);
+            });
 
-			Assert.AreEqual(0, _db.Table<UniqueObj>().Count());
-		}
+            Assert.Equal(0, connection.Table<UniqueObj>().Count());
+        }
 
-		[Test]
-		public void InsertAllSuccessInsideTransaction()
-		{
-			var testObjects = Enumerable.Range(1, 20).Select(i => new UniqueObj { Id = i }).ToList();
+        [Fact]
+        public void InsertAllSuccessInsideTransaction()
+        {
+            var testObjects = Enumerable.Range(1, 20).Select(i => new UniqueObj { Id = i }).ToList();
 
-			_db.RunInTransaction(() => {
-				_db.InsertAll(testObjects);
-			});
+            var tx = connection.BeginTransaction();
+            connection.InsertAll(testObjects, tx);
+            tx.Commit();
 
-			Assert.AreEqual(testObjects.Count, _db.Table<UniqueObj>().Count());
-		}
+            Assert.Equal(testObjects.Count, connection.Table<UniqueObj>().Count());
+        }
 
-		[Test]
-		public void InsertAllFailureInsideTransaction()
-		{
-			var testObjects = Enumerable.Range(1, 20).Select(i => new UniqueObj { Id = i }).ToList();
-			testObjects[testObjects.Count - 1].Id = 1; // causes the insert to fail because of duplicate key
+        [Fact]
+        public void InsertAllFailureInsideTransaction()
+        {
+            var testObjects = Enumerable.Range(1, 20)
+                .Select(i => new UniqueObj { Id = i })
+                .ToList();
+            testObjects[testObjects.Count - 1].Id = 1; // causes the insert to fail because of duplicate key
 
-			ExceptionAssert.Throws<SQLiteException>(() => _db.RunInTransaction(() => {
-				_db.InsertAll(testObjects);
-			}));
+            Assert.Throws<SqlException>(() =>
+            {
+                var tx = connection.BeginTransaction();
+                connection.InsertAll(testObjects, tx);
+                tx.Commit();
+            });
 
-			Assert.AreEqual(0, _db.Table<UniqueObj>().Count());
-		}
+            Assert.Equal(0, connection.Table<UniqueObj>().Count());
+        }
 
-		[Test]
-		public void InsertOrReplace ()
-		{
-			_db.Trace = true;
-			_db.InsertAll (from i in Enumerable.Range(1, 20) select new TestObj { Text = "#" + i });
+        [Fact]
+        public void InsertOrReplace()
+        {
+            connection.InsertAll(
+                from i in Enumerable.Range(1, 20)
+                select new InsertTestObj
+                {
+                    Text = "#" + i,
+                });
 
-			Assert.AreEqual (20, _db.Table<TestObj> ().Count ());
+            Assert.Equal(20, connection.Table<InsertTestObj>().Count());
 
-			var t = new TestObj { Id = 5, Text = "Foo", };
-			_db.InsertOrReplace (t);
+            var t = new InsertTestObj { Id = 5, Text = "Foo", };
+            connection.InsertOrReplace(t);
 
-			var r = (from x in _db.Table<TestObj> () orderby x.Id select x).ToList ();
-			Assert.AreEqual (20, r.Count);
-			Assert.AreEqual ("Foo", r[4].Text);
-		}
+            var r = (from x in connection.Table<InsertTestObj>() orderby x.Id select x).ToList();
+            Assert.Equal(20, r.Count);
+            Assert.Equal("Foo", r[4].Text);
+        }
     }
 }

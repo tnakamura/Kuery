@@ -1,157 +1,158 @@
 using System;
+using System.Data.Common;
 using System.Linq;
-
-#if NETFX_CORE
-using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
-using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
-using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
-using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
-#else
-using NUnit.Framework;
-#endif
+using Xunit;
 
 namespace Kuery.Tests
 {
-	[TestFixture]
-	public class DeleteTest
-	{
-		class TestTable
-		{
-			[PrimaryKey, AutoIncrement]
-			public int Id { get; set; }
-			public int Datum { get; set; }
-			public string Test { get; set;}
-		}
+    public class DeleteTest : IClassFixture<SqliteFixture>
+    {
+        readonly SqliteFixture fixture;
 
-		const int Count = 100;
+        public DeleteTest(SqliteFixture fixture)
+        {
+            this.fixture = fixture;
+        }
 
-		SQLiteConnection CreateDb ()
-		{
-			var db = new TestDb ();
-			db.CreateTable<TestTable> ();
-			var items = from i in Enumerable.Range (0, Count)
-			            select new TestTable { Datum = 1000+i, Test = "Hello World" };
-			db.InsertAll (items);
-			Assert.AreEqual (Count, db.Table<TestTable> ().Count ());
-			return db;
-		}
+        class TestTable
+        {
+            [PrimaryKey, AutoIncrement]
+            public int Id { get; set; }
+            public int Datum { get; set; }
+            public string Test { get; set; }
+        }
 
-		[Test]
-		public void DeleteEntityOne ()
-		{
-			var db = CreateDb ();
+        const int Count = 100;
 
-			var r = db.Delete (db.Get<TestTable> (1));
+        DbConnection CreateDb()
+        {
+            var connection = fixture.OpenNewConnection();
 
-			Assert.AreEqual (1, r);
-			Assert.AreEqual (Count - 1, db.Table<TestTable> ().Count ());
-		}
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    if object_id (N'TestTable') is not null
+                        drop table TestTable;";
+                cmd.ExecuteNonQuery();
+            }
 
-		[Test]
-		public void DeletePKOne ()
-		{
-			var db = CreateDb ();
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    if object_id (N'TestTable') is null
+                        create table TestTable (
+                            Id integer identity(1,1) primary key not null,
+                            Datum integer null,
+                            Test nvarchar(64) null
+                        );";
+                cmd.ExecuteNonQuery();
+            }
 
-			var r = db.Delete<TestTable> (1);
+            var items = from i in Enumerable.Range(0, Count)
+                        select new TestTable { Datum = 1000 + i, Test = "Hello World" };
+            connection.InsertAll(items);
+            return connection;
+        }
 
-			Assert.AreEqual (1, r);
-			Assert.AreEqual (Count - 1, db.Table<TestTable> ().Count ());
-		}
+        [Fact]
+        public void DeleteEntityOne()
+        {
+            using var db = CreateDb();
 
-		[Test]
-		public void DeletePKNone ()
-		{
-			var db = CreateDb ();
+            var r = db.Delete(db.Get<TestTable>(1));
 
-			var r = db.Delete<TestTable> (348597);
+            Assert.Equal(1, r);
+            Assert.Equal(Count - 1, db.Table<TestTable>().Count());
+        }
 
-			Assert.AreEqual (0, r);
-			Assert.AreEqual (Count, db.Table<TestTable> ().Count ());
-		}
+        [Fact]
+        public void DeletePKOne()
+        {
+            using var db = CreateDb();
 
-		[Test]
-		public void DeleteAll ()
-		{
-			var db = CreateDb ();
+            var r = db.Delete<TestTable>(1);
 
-			var r = db.DeleteAll<TestTable> ();
+            Assert.Equal(1, r);
+            Assert.Equal(Count - 1, db.Table<TestTable>().Count());
+        }
 
-			Assert.AreEqual (Count, r);
-			Assert.AreEqual (0, db.Table<TestTable> ().Count ());
-		}
+        [Fact]
+        public void DeletePKNone()
+        {
+            using var db = CreateDb();
 
-		[Test]
-		public void DeleteWithPredicate()
-		{
-			var db = CreateDb();
+            var r = db.Delete<TestTable>(348597);
 
-			var r = db.Table<TestTable>().Delete (p => p.Test == "Hello World");
+            Assert.Equal(0, r);
+            Assert.Equal(Count, db.Table<TestTable>().Count());
+        }
 
-			Assert.AreEqual (Count, r);
-			Assert.AreEqual (0, db.Table<TestTable> ().Count ());
-		}
+        [Fact]
+        public void DeleteWithPredicate()
+        {
+            using var db = CreateDb();
 
-		[Test]
-		public void DeleteWithPredicateHalf()
-		{
-			var db = CreateDb();
-			db.Insert(new TestTable() { Datum = 1, Test = "Hello World 2" });
+            var r = db.Table<TestTable>().Delete(p => p.Test == "Hello World");
 
-			var r = db.Table<TestTable>().Delete (p => p.Test == "Hello World");
+            Assert.Equal(Count, r);
+            Assert.Equal(0, db.Table<TestTable>().Count());
+        }
 
-			Assert.AreEqual (Count, r);
-			Assert.AreEqual (1, db.Table<TestTable> ().Count ());
-		}
+        [Fact]
+        public void DeleteWithPredicateHalf()
+        {
+            using var db = CreateDb();
+            db.Insert(new TestTable() { Datum = 1, Test = "Hello World 2" });
 
-		[Test]
-		public void DeleteWithWherePredicate ()
-		{
-			var db = CreateDb ();
+            var r = db.Table<TestTable>().Delete(p => p.Test == "Hello World");
 
-			var r = db.Table<TestTable> ().Where (p => p.Test == "Hello World").Delete ();
+            Assert.Equal(Count, r);
+            Assert.Equal(1, db.Table<TestTable>().Count());
+        }
 
-			Assert.AreEqual (Count, r);
-			Assert.AreEqual (0, db.Table<TestTable> ().Count ());
-		}
+        [Fact]
+        public void DeleteWithWherePredicate()
+        {
+            using var db = CreateDb();
 
-		[Test]
-		public void DeleteWithoutPredicate ()
-		{
-			var db = CreateDb ();
+            var r = db.Table<TestTable>().Where(p => p.Test == "Hello World").Delete();
 
-			try {
-				var r = db.Table<TestTable> ().Delete ();
-				Assert.Fail ();
-			}
-			catch (InvalidOperationException) {
-			}
-		}
+            Assert.Equal(Count, r);
+            Assert.Equal(0, db.Table<TestTable>().Count());
+        }
 
-		[Test]
-		public void DeleteWithTake ()
-		{
-			var db = CreateDb ();
+        [Fact]
+        public void DeleteWithoutPredicate()
+        {
+            using var db = CreateDb();
 
-			try {
-				var r = db.Table<TestTable> ().Where (p => p.Test == "Hello World").Take (2).Delete ();
-				Assert.Fail ();
-			}
-			catch (InvalidOperationException) {
-			}
-		}
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                var r = db.Table<TestTable>().Delete();
+            });
+        }
 
-		[Test]
-		public void DeleteWithSkip ()
-		{
-			var db = CreateDb ();
+        [Fact]
+        public void DeleteWithTake()
+        {
+            using var db = CreateDb();
 
-			try {
-				var r = db.Table<TestTable> ().Where (p => p.Test == "Hello World").Skip (2).Delete ();
-				Assert.Fail ();
-			}
-			catch (InvalidOperationException) {
-			}
-		}
-	}
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                var r = db.Table<TestTable>().Where(p => p.Test == "Hello World").Take(2).Delete();
+            });
+        }
+
+        [Fact]
+        public void DeleteWithSkip()
+        {
+            var db = CreateDb();
+
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                var r = db.Table<TestTable>().Where(p => p.Test == "Hello World").Skip(2).Delete();
+            });
+        }
+    }
 }
 
