@@ -349,7 +349,7 @@ namespace Kuery
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
                 var result = command.ExecuteScalar();
-                if (result is DBNull)
+                if (result is null || result is DBNull)
                 {
                     return default;
                 }
@@ -661,23 +661,32 @@ namespace Kuery
                 if (val != null && ColumnType.GetTypeInfo().IsEnum)
                 {
                     _prop.SetValue(
-                        obj:obj,
+                        obj: obj,
                         value: Enum.ToObject(ColumnType, val));
                 }
                 else if (val == DBNull.Value)
                 {
                     _prop.SetValue(
-                        obj:obj,
+                        obj: obj,
                         value: null,
                         index: null);
                 }
                 else if (_prop.PropertyType == typeof(TimeSpan) &&
-                    val is string s &&
-                    TimeSpan.TryParse(s,out var timespan))
+                    val is string timeSpanStr &&
+                    TimeSpan.TryParse(timeSpanStr, out var timespan))
                 {
                     _prop.SetValue(
                         obj: obj,
                         value: timespan,
+                        index: null);
+                }
+                else if (_prop.PropertyType == typeof(Guid) &&
+                    val is string guidStr &&
+                    Guid.TryParse(guidStr, out var guid))
+                {
+                    _prop.SetValue(
+                        obj: obj,
+                        value: guid,
                         index: null);
                 }
                 else
@@ -1615,14 +1624,20 @@ namespace Kuery
             switch (expression.NodeType)
             {
                 case ExpressionType.Equal:
-                    return "(" + parameter.CommandText + " is ?)";
+                    if (parameter.Value == null)
+                        return "(" + parameter.CommandText + " is null)";
+                    else
+                        return "(" + parameter.CommandText + " is $" + parameter.CommandText.TrimStart('[').TrimEnd(']') + ")";
                 case ExpressionType.NotEqual:
-                    return "(" + parameter.CommandText + " is not ?)";
+                    if (parameter.Value == null)
+                        return "(" + parameter.CommandText + " is not null)";
+                    else
+                        return "(" + parameter.CommandText + " is not $"+ parameter.CommandText.TrimStart('[').TrimEnd(']') + ")";
                 case ExpressionType.GreaterThan:
                 case ExpressionType.GreaterThanOrEqual:
                 case ExpressionType.LessThan:
                 case ExpressionType.LessThanOrEqual:
-                    return "(" + parameter.CommandText + " < ?)";
+                    return "(" + parameter.CommandText + " < $"+ parameter.CommandText.TrimStart('[').TrimEnd(']') + ")";
                 default:
                     throw new NotSupportedException(
                         $"Cannot compile Null-BinaryExpression with type {expression.NodeType}");
@@ -1676,7 +1691,7 @@ namespace Kuery
         {
             using (var command = GenerateCommand("count(*)"))
             {
-                return (int)await command.ExecuteScalarAsync();
+                return (int)(long)await command.ExecuteScalarAsync();
             }
         }
 

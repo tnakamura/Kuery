@@ -22,24 +22,22 @@ namespace Kuery.Tests
             public string Text { get; set; }
         }
 
-        static void CreateTable(DbConnection connection)
+        private static void CreateTable(DbConnection connection)
         {
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(GuidTestObj)}') is not null
-                        drop table {nameof(GuidTestObj)};";
+                    drop table if exists {nameof(GuidTestObj)};";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(GuidTestObj)}') is null
-                        create table {nameof(GuidTestObj)} (
-                            {nameof(GuidTestObj.Id)} uniqueidentifier primary key not null,
-                            {nameof(GuidTestObj.Text)} nvarchar(64) null
-                        );";
+                    create table if not exists {nameof(GuidTestObj)} (
+                        {nameof(GuidTestObj.Id)} uniqueidentifier primary key,
+                        {nameof(GuidTestObj.Text)} nvarchar(64) null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }

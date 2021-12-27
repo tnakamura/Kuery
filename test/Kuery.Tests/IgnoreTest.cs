@@ -45,11 +45,10 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(IgnoreTestObj)}') is null
-                        create table [{nameof(IgnoreTestObj)}] (
-                            {nameof(IgnoreTestObj.Id)} integer identity(1,1) primary key not null,
-                            {nameof(IgnoreTestObj.Text)} nvarchar(50) null
-                        );";
+                    create table if not exists {nameof(IgnoreTestObj)} (
+                        {nameof(IgnoreTestObj.Id)} integer primary key autoincrement,
+                        {nameof(IgnoreTestObj.Text)} nvarchar(50) null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }
@@ -123,10 +122,9 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(IgnoreInheritTableClass)}') is null
-                        create table [{nameof(IgnoreInheritTableClass)}] (
-                            {nameof(IgnoreInheritTableClass.Name)} nvarchar(50) null
-                        );";
+                    create table if not exists [{nameof(IgnoreInheritTableClass)}] (
+                        {nameof(IgnoreInheritTableClass.Name)} nvarchar(50) null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }
@@ -171,11 +169,10 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(RedefinedClass)}') is null
-                        create table [{nameof(RedefinedClass)}] (
-                            {nameof(RedefinedClass.Name)} nvarchar(50) null,
-                            {nameof(RedefinedClass.Value)} nvarchar(50) null
-                        );";
+                    create table if not exists [{nameof(RedefinedClass)}] (
+                        {nameof(RedefinedClass.Name)} nvarchar(50) null,
+                        {nameof(RedefinedClass.Value)} nvarchar(50) null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }

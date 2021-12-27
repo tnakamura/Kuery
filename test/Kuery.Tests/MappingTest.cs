@@ -57,20 +57,18 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'OverrideNamesClass') is not null
-                        drop table OverrideNamesClass;";
+                    drop table if exists OverrideNamesClass;";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'OverrideNamesClass') is null
-                        create table OverrideNamesClass (
-                            Id integer identity(1,1) primary key not null,
-                            n nvarchar(50) null,
-                            v nvarchar(50) null
-                        );";
+                    create table if not exists OverrideNamesClass (
+                        Id integer primary key autoincrement,
+                        n nvarchar(50) null,
+                        v nvarchar(50) null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }
@@ -105,18 +103,16 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'foo') is not null
-                        drop table foo;";
+                    drop table if exists foo;";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'foo') is null
-                        create table foo (
-                            baz integer primary key not null
-                        );";
+                    create table if not exists foo (
+                        baz integer primary key not null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }
@@ -151,18 +147,16 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'OnlyKeyModel') is not null
-                        drop table OnlyKeyModel;";
+                    drop table if exists OnlyKeyModel;";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'OnlyKeyModel') is null
-                        create table OnlyKeyModel (
-                            MyModelId nvarchar(250) primary key not null
-                        );";
+                    create table if not exists OnlyKeyModel (
+                        MyModelId nvarchar(250) primary key
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }

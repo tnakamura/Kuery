@@ -75,7 +75,7 @@ namespace Kuery.Tests
             var db = CreateDb();
 
             var r = db.ExecuteScalar<int>(
-                $"SELECT TOP 1 Two FROM {nameof(ScalarTestTable)} WHERE Id = 1");
+                $"SELECT Two FROM {nameof(ScalarTestTable)} WHERE Id = 1 LIMIT 1");
 
             Assert.Equal(2, r);
         }
@@ -86,7 +86,7 @@ namespace Kuery.Tests
             var db = CreateDb();
 
             var r = db.ExecuteScalar<int?>(
-                $"SELECT TOP 1 Two FROM {nameof(ScalarTestTable)} WHERE Id = 1");
+                $"SELECT Two FROM {nameof(ScalarTestTable)} WHERE Id = 1 LIMIT 1");
 
             Assert.True(r.HasValue);
             Assert.Equal(2, r);
@@ -109,7 +109,7 @@ namespace Kuery.Tests
             var db = CreateDb();
 
             var r = db.ExecuteScalar<int?>(
-                $"SELECT TOP 1 null AS Unknown FROM {nameof(ScalarTestTable)} WHERE Id = 1");
+                $"SELECT null AS Unknown FROM {nameof(ScalarTestTable)} WHERE Id = 1 LIMIT 1");
 
             Assert.False(r.HasValue);
         }

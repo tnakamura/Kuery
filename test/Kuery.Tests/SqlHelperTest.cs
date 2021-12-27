@@ -34,8 +34,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (2, N'2', N'Google')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (2, '2', 'Google')";
                     command.ExecuteNonQuery();
                 }
 
@@ -57,8 +57,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (3, N'3', N'Apple')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (3, '3', 'Apple')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -80,8 +80,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (4, N'4', N'Facebook')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (4, '4', 'Facebook')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -100,8 +100,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (5, N'5', N'Twitter')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (5, '5', 'Twitter')";
                     command.ExecuteNonQuery();
                 }
 
@@ -120,8 +120,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'Microsoft')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'Microsoft')";
                     command.ExecuteNonQuery();
                 }
 
@@ -140,8 +140,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (6, N'6', N'Amazon')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (6, '6', 'Amazon')";
                     command.ExecuteNonQuery();
                 }
 
@@ -186,8 +186,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (8, N'8', N'Spotify')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (8, '8', 'Spotify')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -218,8 +218,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (9, N'9', N'GitHub')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (9, '9', 'GitHub')";
                     command.ExecuteNonQuery();
                 }
 
@@ -242,8 +242,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (10, N'10', N'Netflix')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (10, '10', 'Netflix')";
                     command.ExecuteNonQuery();
                 }
 
@@ -291,8 +291,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (12, N'12', N'SONY')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (12, '12', 'SONY')";
                     command.ExecuteNonQuery();
                 }
 
@@ -323,8 +323,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (13, N'13', N'NINTENDO')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (13, '13', 'NINTENDO')";
                     command.ExecuteNonQuery();
                 }
 
@@ -349,8 +349,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (14, N'14', N'SEGA')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (14, '14', 'SEGA')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -375,8 +375,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (15, N'15', N'Soundcloud')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (15, '15', 'Soundcloud')";
                     command.ExecuteNonQuery();
                 }
 
@@ -398,8 +398,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (16, N'16', N'Cloudflare')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (16, '16', 'Cloudflare')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -421,8 +421,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (17, N'17', N'Alphabet')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (17, '17', 'Alphabet')";
                     command.ExecuteNonQuery();
                 }
 
@@ -441,8 +441,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (18, N'18', N'NIKE')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (18, '18', 'NIKE')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -461,8 +461,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (19, N'19', N'SpaceX')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (19, '19', 'SpaceX')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -481,8 +481,8 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (20, N'20', N'NASA')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (20, '20', 'NASA')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -503,9 +503,9 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (21, N'22', N'freee')
-                               , (22, N'21', N'Moneyforward')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (21, '22', 'freee')
+                               , (22, '21', 'Moneyforward')";
                     command.ExecuteNonQuery();
                 }
 
@@ -528,10 +528,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     command.ExecuteNonQuery();
                 }
 
@@ -555,9 +555,9 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (21, N'22', N'freee')
-                               , (22, N'21', N'Moneyforward')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (21, '22', 'freee')
+                               , (22, '21', 'Moneyforward')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -580,10 +580,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -607,10 +607,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     command.ExecuteNonQuery();
                 }
 
@@ -632,10 +632,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -657,10 +657,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     command.ExecuteNonQuery();
                 }
 
@@ -683,10 +683,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -709,10 +709,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     command.ExecuteNonQuery();
                 }
 
@@ -735,10 +735,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -761,10 +761,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -784,10 +784,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -807,10 +807,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -830,10 +830,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -853,10 +853,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     command.ExecuteNonQuery();
                 }
 
@@ -876,10 +876,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     command.ExecuteNonQuery();
                 }
 
@@ -899,10 +899,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     command.ExecuteNonQuery();
                 }
 
@@ -922,10 +922,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     command.ExecuteNonQuery();
                 }
 
@@ -945,10 +945,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     command.ExecuteNonQuery();
                 }
 
@@ -968,10 +968,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -991,10 +991,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'23', N'OBC')
-                               , (24, N'24', N'PCA')
-                               , (25, N'25', N'弥生')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '23', 'OBC')
+                               , (24, '24', 'PCA')
+                               , (25, '25', '弥生')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1020,10 +1020,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'111', N'ccc')
-                               , (24, N'111', N'aaa')
-                               , (25, N'111', N'bbb')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '111', 'ccc')
+                               , (24, '111', 'aaa')
+                               , (25, '111', 'bbb')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1047,10 +1047,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'111', N'ccc')
-                               , (24, N'111', N'aaa')
-                               , (25, N'111', N'bbb')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '111', 'ccc')
+                               , (24, '111', 'aaa')
+                               , (25, '111', 'bbb')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1074,10 +1074,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'111', N'ccc')
-                               , (24, N'111', N'aaa')
-                               , (25, N'111', N'bbb')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '111', 'ccc')
+                               , (24, '111', 'aaa')
+                               , (25, '111', 'bbb')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1101,10 +1101,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (23, N'111', N'ccc')
-                               , (24, N'111', N'aaa')
-                               , (25, N'111', N'bbb')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (23, '111', 'ccc')
+                               , (24, '111', 'aaa')
+                               , (25, '111', 'bbb')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1128,10 +1128,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1152,10 +1152,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1176,10 +1176,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1200,10 +1200,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1224,10 +1224,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1248,10 +1248,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1272,10 +1272,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1296,10 +1296,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1320,10 +1320,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1342,10 +1342,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1476,10 +1476,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1514,10 +1514,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1552,10 +1552,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1581,10 +1581,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1610,10 +1610,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1639,10 +1639,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1668,10 +1668,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1695,10 +1695,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1719,10 +1719,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1744,10 +1744,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1775,10 +1775,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1803,10 +1803,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -1832,10 +1832,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1860,10 +1860,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1884,10 +1884,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1909,10 +1909,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1941,10 +1941,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1968,10 +1968,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -1994,7 +1994,7 @@ namespace Kuery.Tests
                 connection.Open();
 
                 var result = connection.Execute(
-                    @"INSERT customers (id, code, name)
+                    @"INSERT INTO customers (id, code, name)
                       VALUES (@id, @code, @name)",
                     new
                     {
@@ -2015,7 +2015,7 @@ namespace Kuery.Tests
                 await connection.OpenAsync();
 
                 var result = await connection.ExecuteAsync(
-                    @"INSERT customers (id, code, name)
+                    @"INSERT INTO customers (id, code, name)
                       VALUES (@id, @code, @name)",
                     new
                     {
@@ -2038,10 +2038,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -2066,10 +2066,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -2098,10 +2098,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -2127,10 +2127,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
@@ -2160,10 +2160,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     command.ExecuteNonQuery();
                 }
 
@@ -2187,10 +2187,10 @@ namespace Kuery.Tests
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"INSERT customers (id, code, name)
-                          VALUES (1, N'1', N'aaa')
-                               , (2, N'2', N'bbb')
-                               , (3, N'3', N'ccc')";
+                        @"INSERT INTO customers (id, code, name)
+                          VALUES (1, '1', 'aaa')
+                               , (2, '2', 'bbb')
+                               , (3, '3', 'ccc')";
                     await command.ExecuteNonQueryAsync();
                 }
 
