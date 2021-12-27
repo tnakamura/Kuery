@@ -1,82 +1,95 @@
 ﻿using System;
-using System.Data.Common;
 using System.Threading.Tasks;
-using Xunit;
+
+#if NETFX_CORE
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
+#else
+using NUnit.Framework;
+#endif
 
 namespace Kuery.Tests
 {
-    public class TimeSpanTest : IClassFixture<SqliteFixture>
-    {
-        readonly SqliteFixture fixture;
+	[TestFixture]
+	public class TimeSpanTest
+	{
+		class TestObj
+		{
+			[PrimaryKey, AutoIncrement]
+			public int Id { get; set; }
 
-        public TimeSpanTest(SqliteFixture fixture)
-        {
-            this.fixture = fixture;
-        }
+			public string Name { get; set; }
+			public TimeSpan Duration { get; set; }
+		}
 
-        class TimeSpanTestObj
-        {
-            [PrimaryKey, AutoIncrement]
-            public int Id { get; set; }
+		[Test]
+		public void AsTicks ()
+		{
+			var db = new TestDb (TimeSpanAsTicks (true));
+			var span = new TimeSpan (42, 12, 33, 20, 501);
+			TestTimeSpan (db, span, span.Ticks.ToString ());
+		}
 
-            public string Name { get; set; }
+		[Test]
+		public void AsStrings ()
+		{
+			var db = new TestDb (TimeSpanAsTicks (false));
+			var span = new TimeSpan (42, 12, 33, 20, 501);
+			TestTimeSpan (db, span, span.ToString ());
+		}
 
-            public TimeSpan Duration { get; set; }
-        }
+		[Test]
+		public void AsyncAsTicks ()
+		{
+			var db = new SQLiteAsyncConnection (TimeSpanAsTicks (true));
+			var span = new TimeSpan (42, 12, 33, 20, 501);
+			TestAsyncTimeSpan (db, span, span.Ticks.ToString ());
+		}
 
-        static void CreateTestTable(DbConnection connection)
-        {
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    if object_id (N'{nameof(TimeSpanTestObj)}') is not null
-                        drop table {nameof(TimeSpanTestObj)};";
-                cmd.ExecuteNonQuery();
-            }
+		[Test]
+		public void AsyncAsStrings ()
+		{
+			var db = new SQLiteAsyncConnection (TimeSpanAsTicks (false));
+			var span = new TimeSpan (42, 12, 33, 20, 501);
+			TestAsyncTimeSpan (db, span, span.ToString ());
+		}
 
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    if object_id (N'{nameof(TimeSpanTestObj)}') is null
-                        create table {nameof(TimeSpanTestObj)} (
-                            {nameof(TimeSpanTestObj.Id)} integer identity(1,1) primary key not null,
-                            {nameof(TimeSpanTestObj.Name)} nvarchar(50) null,
-                            {nameof(TimeSpanTestObj.Duration)} time not null
-                        );";
-                cmd.ExecuteNonQuery();
-            }
-        }
+		SQLiteConnectionString TimeSpanAsTicks (bool asTicks = true) => new SQLiteConnectionString (TestPath.GetTempFileName (), SQLiteOpenFlags.Create | SQLiteOpenFlags.ReadWrite, true, storeTimeSpanAsTicks: asTicks);
 
-        [Fact]
-        public async Task TestAsyncTimeSpan()
-        {
-            using var db = fixture.OpenNewConnection();
-            CreateTestTable(db);
+		void TestAsyncTimeSpan (SQLiteAsyncConnection db, TimeSpan duration, string expected)
+		{
+			db.CreateTableAsync<TestObj> ().Wait ();
 
-            var o = new TimeSpanTestObj
-            {
-                Duration = new TimeSpan(12, 33, 20),
-            };
-            await db.InsertAsync(o);
+			TestObj o, o2;
 
-            var o2 = await db.GetAsync<TimeSpanTestObj>(o.Id);
-            Assert.Equal(o.Duration, o2.Duration);
-        }
+			o = new TestObj {
+				Duration = duration,
+			};
+			db.InsertAsync (o).Wait ();
+			o2 = db.GetAsync<TestObj> (o.Id).Result;
+			Assert.AreEqual (o.Duration, o2.Duration);
 
-        [Fact]
-        public void TestTimeSpan()
-        {
-            using var db = fixture.OpenNewConnection();
-            CreateTestTable(db);
+			var stored = db.ExecuteScalarAsync<string> ("SELECT Duration FROM TestObj;").Result;
+			Assert.AreEqual (expected, stored);
+		}
 
-            var o = new TimeSpanTestObj
-            {
-                Duration = new TimeSpan(12, 33, 20),
-            };
-            db.Insert(o);
+		void TestTimeSpan (TestDb db, TimeSpan duration, string expected)
+		{
+			db.CreateTable<TestObj> ();
 
-            var o2 = db.Get<TimeSpanTestObj>(o.Id);
-            Assert.Equal(o.Duration, o2.Duration);
-        }
-    }
+			TestObj o, o2;
+
+			o = new TestObj {
+				Duration = duration,
+			};
+			db.Insert (o);
+			o2 = db.Get<TestObj> (o.Id);
+			Assert.AreEqual (o.Duration, o2.Duration);
+
+			var stored = db.ExecuteScalar<string> ("SELECT Duration FROM TestObj;");
+			Assert.AreEqual (expected, stored);
+		}
+	}
 }

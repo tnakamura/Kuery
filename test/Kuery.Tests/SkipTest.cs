@@ -1,73 +1,75 @@
-﻿using System;
+using System;
+using System.IO;
+using System.Collections.Generic;
 using System.Linq;
-using Xunit;
+using System.Text;
+using Kuery;
+
+#if NETFX_CORE
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
+#else
+using NUnit.Framework;
+#endif
+
+using System.Diagnostics;
 
 namespace Kuery.Tests
-{
-    public class SkipTest : IClassFixture<SqliteFixture>
+{    
+    [TestFixture]
+    public class SkipTest
     {
-        readonly SqliteFixture fixture;
-
-        public SkipTest(SqliteFixture fixture)
-        {
-            this.fixture = fixture;
-        }
-
         public class TestObj
         {
-            [PrimaryKey]
-            public string Id { get; set; }
+            [AutoIncrement, PrimaryKey]
+            public int Id { get; set; }
+			public int Order { get; set; }
 
-            public int Order { get; set; }
-
-            public override string ToString()
+            public override string ToString ()
             {
-                return string.Format("[TestObj: Id={0}, Order={1}]", Id, Order);
+            	return string.Format("[TestObj: Id={0}, Order={1}]", Id, Order);
             }
 
         }
-
-        [Fact]
+        public class TestDb : SQLiteConnection
+        {
+            public TestDb(String path)
+                : base(path)
+            {
+				CreateTable<TestObj>();
+            }
+        }
+		
+        [Test]
         public void Skip()
         {
-            using var connection = fixture.CreateConnection();
-            connection.Open();
-
-            using (var command = connection.CreateCommand())
-            {
-                command.CommandText = @"
-                    create table [TestObj] (
-                        [Id] nvarchar(50) not null primary key,
-                        [Order] integer not null
-                    );";
-                command.ExecuteNonQuery();
-            }
-
-            var n = 100;
-            var cq = from i in Enumerable.Range(1, n)
-                     select new TestObj()
-                     {
-                         Id = Guid.NewGuid().ToString(),
-                         Order = i
-                     };
-            var objs = cq.ToArray();
-
-            var numIn = connection.InsertAll(objs);
-            Assert.Equal(numIn, n);
-
-            var q = from o in connection.Table<TestObj>()
-                    orderby o.Order
-                    select o;
-
-            var qs1 = q.Skip(1);
-            var s1 = qs1.ToList();
-            Assert.Equal(n - 1, s1.Count);
-            Assert.Equal(2, s1[0].Order);
-
-            var qs5 = q.Skip(5);
-            var s5 = qs5.ToList();
-            Assert.Equal(n - 5, s5.Count);
-            Assert.Equal(6, s5[0].Order);
+			var n = 100;
+			
+			var cq =	from i in Enumerable.Range(1, n)
+					select new TestObj() {
+				Order = i
+			};
+			var objs = cq.ToArray();
+			var db = new TestDb(TestPath.GetTempFileName());
+						
+			var numIn = db.InsertAll(objs);			
+			Assert.AreEqual(numIn, n, "Num inserted must = num objects");
+			
+			var q = from o in db.Table<TestObj>()
+					orderby o.Order
+					select o;
+			
+			var qs1 = q.Skip(1);			
+			var s1 = qs1.ToList();
+			Assert.AreEqual(n - 1, s1.Count);
+			Assert.AreEqual(2, s1[0].Order);
+			
+			var qs5 = q.Skip(5);			
+			var s5 = qs5.ToList();
+			Assert.AreEqual(n - 5, s5.Count);
+			Assert.AreEqual(6, s5[0].Order);
         }
     }
 }

@@ -3,201 +3,178 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Xunit;
-using System.Data.Common;
+using Kuery;
+
+#if NETFX_CORE
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
+#else
+using NUnit.Framework;
+#endif
+
 
 namespace Kuery.Tests
 {
-    public class ByteArrayTest : IClassFixture<SqliteFixture>
-    {
-        readonly SqliteFixture fixture;
+	[TestFixture]
+	public class ByteArrayTest
+	{
+		public class ByteArrayClass
+		{
+			[PrimaryKey, AutoIncrement]
+			public int ID { get; set; }
 
-        public ByteArrayTest(SqliteFixture fixture)
-        {
-            this.fixture = fixture;
-        }
+			public byte[] bytes { get; set; }
 
-        public class ByteArrayClass
-        {
-            [PrimaryKey, AutoIncrement]
-            public int ID { get; set; }
+			public void AssertEquals(ByteArrayClass other)
+			{
+				Assert.AreEqual(other.ID, ID);
+				if (other.bytes == null || bytes == null) {
+					Assert.IsNull (other.bytes);
+					Assert.IsNull (bytes);
+				}
+				else {
+					Assert.AreEqual(other.bytes.Length, bytes.Length);
+					for (var i = 0; i < bytes.Length; i++) {
+						Assert.AreEqual(other.bytes[i], bytes[i]);
+					}
+				}
+			}
+		}
 
-            public byte[] bytes { get; set; }
-
-            public void AssertEquals(ByteArrayClass other)
-            {
-                Assert.Equal(other.ID, ID);
-                if (other.bytes == null || bytes == null)
-                {
-                    Assert.Null(other.bytes);
-                    Assert.Null(bytes);
-                }
-                else
-                {
-                    Assert.Equal(other.bytes.Length, bytes.Length);
-                    for (var i = 0; i < bytes.Length; i++)
-                    {
-                        Assert.Equal(other.bytes[i], bytes[i]);
-                    }
-                }
-            }
-        }
-
-        void CreateTestTable(DbConnection connection)
-        {
-            connection.DropTable(nameof(ByteArrayClass));
-
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    if object_id (N'{nameof(ByteArrayClass)}') is null
-                        create table [{nameof(ByteArrayClass)}] (
-                            {nameof(ByteArrayClass.ID)} integer identity(1,1) primary key not null,
-                            {nameof(ByteArrayClass.bytes)} varbinary(max) null
-                        );";
-                cmd.ExecuteNonQuery();
-            }
-        }
-
-        [Fact]
-        public void ByteArrays()
-        {
-            var byteArrays = new ByteArrayClass[]
-            {
-                new ByteArrayClass() { bytes = new byte[] { 1, 2, 3, 4, 250, 252, 253, 254, 255 } }, //Range check
+		[Test]
+		[Description("Create objects with various byte arrays and check they can be stored and retrieved correctly")]
+		public void ByteArrays()
+		{
+			//Byte Arrays for comparisson
+			ByteArrayClass[] byteArrays = new ByteArrayClass[] {
+				new ByteArrayClass() { bytes = new byte[] { 1, 2, 3, 4, 250, 252, 253, 254, 255 } }, //Range check
 				new ByteArrayClass() { bytes = new byte[] { 0 } }, //null bytes need to be handled correctly
 				new ByteArrayClass() { bytes = new byte[] { 0, 0 } },
-                new ByteArrayClass() { bytes = new byte[] { 0, 1, 0 } },
-                new ByteArrayClass() { bytes = new byte[] { 1, 0, 1 } },
-                new ByteArrayClass() { bytes = new byte[] { } }, //Empty byte array should stay empty (and not become null)
+				new ByteArrayClass() { bytes = new byte[] { 0, 1, 0 } },
+				new ByteArrayClass() { bytes = new byte[] { 1, 0, 1 } },
+				new ByteArrayClass() { bytes = new byte[] { } }, //Empty byte array should stay empty (and not become null)
 				new ByteArrayClass() { bytes = null } //Null should be supported
 			};
 
-            using var con = fixture.OpenNewConnection();
-            CreateTestTable(con);
+			SQLiteConnection database = new SQLiteConnection(TestPath.GetTempFileName());
+			database.CreateTable<ByteArrayClass>();
 
-            //Insert all of the ByteArrayClass
-            foreach (ByteArrayClass b in byteArrays)
-            {
-                con.Insert(b);
-            }
+			//Insert all of the ByteArrayClass
+			foreach (ByteArrayClass b in byteArrays)
+				database.Insert(b);
 
-            //Get them back out
-            ByteArrayClass[] fetchedByteArrays = con.Table<ByteArrayClass>()
-                .OrderBy(x => x.ID).ToArray();
+			//Get them back out
+			ByteArrayClass[] fetchedByteArrays = database.Table<ByteArrayClass>().OrderBy(x => x.ID).ToArray();
 
-            Assert.Equal(fetchedByteArrays.Length, byteArrays.Length);
-            //Check they are the same
-            for (int i = 0; i < byteArrays.Length; i++)
-            {
-                byteArrays[i].AssertEquals(fetchedByteArrays[i]);
-            }
-        }
+			Assert.AreEqual(fetchedByteArrays.Length, byteArrays.Length);
+			//Check they are the same
+			for (int i = 0; i < byteArrays.Length; i++)
+			{
+				byteArrays[i].AssertEquals(fetchedByteArrays[i]);
+			}
+		}
 
-        [Fact]
+        [Test]
+        [Description("Uses a byte array to find a record")]
         public void ByteArrayWhere()
         {
             //Byte Arrays for comparisson
-            var byteArrays = new ByteArrayClass[] {
-                new ByteArrayClass() { bytes = new byte[] { 1, 2, 3, 4, 250, 252, 253, 254, 255 } }, //Range check
+            ByteArrayClass[] byteArrays = new ByteArrayClass[] {
+				new ByteArrayClass() { bytes = new byte[] { 1, 2, 3, 4, 250, 252, 253, 254, 255 } }, //Range check
 				new ByteArrayClass() { bytes = new byte[] { 0 } }, //null bytes need to be handled correctly
 				new ByteArrayClass() { bytes = new byte[] { 0, 0 } },
-                new ByteArrayClass() { bytes = new byte[] { 0, 1, 0 } },
-                new ByteArrayClass() { bytes = new byte[] { 1, 0, 1 } },
-                new ByteArrayClass() { bytes = new byte[] { } }, //Empty byte array should stay empty (and not become null)
+				new ByteArrayClass() { bytes = new byte[] { 0, 1, 0 } },
+				new ByteArrayClass() { bytes = new byte[] { 1, 0, 1 } },
+				new ByteArrayClass() { bytes = new byte[] { } }, //Empty byte array should stay empty (and not become null)
 				new ByteArrayClass() { bytes = null } //Null should be supported
 			};
 
-            using var con = fixture.OpenNewConnection();
-            CreateTestTable(con);
+            SQLiteConnection database = new SQLiteConnection(TestPath.GetTempFileName());
+            database.CreateTable<ByteArrayClass>();
 
-            var criterion = new byte[] { 1, 0, 1 };
+            byte[] criterion = new byte[] { 1, 0, 1 };
 
             //Insert all of the ByteArrayClass
-            var id = 0;
-            foreach (var b in byteArrays)
+            int id = 0;
+            foreach (ByteArrayClass b in byteArrays)
             {
-                con.Insert(b);
+                database.Insert(b);
                 if (b.bytes != null && criterion.SequenceEqual<byte>(b.bytes))
-                {
                     id = b.ID;
-                }
             }
-            Assert.NotEqual(0, id);
+            Assert.AreNotEqual(0, id, "An ID wasn't set");
 
             //Get it back out
-            ByteArrayClass fetchedByteArray = con.Table<ByteArrayClass>().Where(x => x.bytes == criterion).First();
-            Assert.NotNull(fetchedByteArray);
+            ByteArrayClass fetchedByteArray = database.Table<ByteArrayClass>().Where(x => x.bytes == criterion).First();
+            Assert.IsNotNull(fetchedByteArray);
             //Check they are the same
-            Assert.Equal(id, fetchedByteArray.ID);
+            Assert.AreEqual(id, fetchedByteArray.ID);
         }
 
-        [Fact]
+        [Test]
+        [Description("Uses a null byte array to find a record")]
         public void ByteArrayWhereNull()
         {
             //Byte Arrays for comparisson
-            var byteArrays = new ByteArrayClass[]
-            {
-                new ByteArrayClass() { bytes = new byte[] { 1, 2, 3, 4, 250, 252, 253, 254, 255 } }, //Range check
+            ByteArrayClass[] byteArrays = new ByteArrayClass[] {
+				new ByteArrayClass() { bytes = new byte[] { 1, 2, 3, 4, 250, 252, 253, 254, 255 } }, //Range check
 				new ByteArrayClass() { bytes = new byte[] { 0 } }, //null bytes need to be handled correctly
 				new ByteArrayClass() { bytes = new byte[] { 0, 0 } },
-                new ByteArrayClass() { bytes = new byte[] { 0, 1, 0 } },
-                new ByteArrayClass() { bytes = new byte[] { 1, 0, 1 } },
-                new ByteArrayClass() { bytes = new byte[] { } }, //Empty byte array should stay empty (and not become null)
+				new ByteArrayClass() { bytes = new byte[] { 0, 1, 0 } },
+				new ByteArrayClass() { bytes = new byte[] { 1, 0, 1 } },
+				new ByteArrayClass() { bytes = new byte[] { } }, //Empty byte array should stay empty (and not become null)
 				new ByteArrayClass() { bytes = null } //Null should be supported
 			};
 
-            using var con = fixture.OpenNewConnection();
-            CreateTestTable(con);
+            SQLiteConnection database = new SQLiteConnection(TestPath.GetTempFileName());
+            database.CreateTable<ByteArrayClass>();
 
             byte[] criterion = null;
 
             //Insert all of the ByteArrayClass
-            var id = 0;
-            foreach (var b in byteArrays)
+            int id = 0;
+            foreach (ByteArrayClass b in byteArrays)
             {
-                con.Insert(b);
+                database.Insert(b);
                 if (b.bytes == null)
-                {
                     id = b.ID;
-                }
             }
-            Assert.NotEqual(0, id);
+            Assert.AreNotEqual(0, id, "An ID wasn't set");
 
             //Get it back out
-            var fetchedByteArray = con.Table<ByteArrayClass>()
-                .Where(x => x.bytes == criterion).First();
+            ByteArrayClass fetchedByteArray = database.Table<ByteArrayClass>().Where(x => x.bytes == criterion).First();
 
-            Assert.NotNull(fetchedByteArray);
+            Assert.IsNotNull(fetchedByteArray);
             //Check they are the same
-            Assert.Equal(id, fetchedByteArray.ID);
+            Assert.AreEqual(id, fetchedByteArray.ID);
         }
 
-        [Fact]
-        public void LargeByteArray()
-        {
-            const int byteArraySize = 1024 * 1024;
-            var bytes = new byte[byteArraySize];
-            for (int i = 0; i < byteArraySize; i++)
-            {
-                bytes[i] = (byte)(i % 256);
-            }
+		[Test]
+		[Description("Create A large byte array and check it can be stored and retrieved correctly")]
+		public void LargeByteArray()
+		{
+			const int byteArraySize = 1024 * 1024;
+			byte[] bytes = new byte[byteArraySize];
+			for (int i = 0; i < byteArraySize; i++)
+				bytes[i] = (byte)(i % 256);
 
-            var byteArray = new ByteArrayClass() { bytes = bytes };
+			ByteArrayClass byteArray = new ByteArrayClass() { bytes = bytes };
 
-            using var con = fixture.OpenNewConnection();
-            CreateTestTable(con);
+			SQLiteConnection database = new SQLiteConnection(TestPath.GetTempFileName());
+			database.CreateTable<ByteArrayClass>();
 
-            //Insert the ByteArrayClass
-            con.Insert(byteArray);
+			//Insert the ByteArrayClass
+			database.Insert(byteArray);
 
-            //Get it back out
-            var fetchedByteArrays = con.Table<ByteArrayClass>().ToArray();
+			//Get it back out
+			ByteArrayClass[] fetchedByteArrays = database.Table<ByteArrayClass>().ToArray();
 
-            Assert.Single(fetchedByteArrays);
+			Assert.AreEqual(fetchedByteArrays.Length, 1);
 
-            //Check they are the same
-            byteArray.AssertEquals(fetchedByteArrays[0]);
-        }
-    }
+			//Check they are the same
+			byteArray.AssertEquals(fetchedByteArrays[0]);
+		}
+	}
 }

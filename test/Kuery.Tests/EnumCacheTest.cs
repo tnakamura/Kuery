@@ -1,9 +1,21 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using Xunit;
+using System.Text;
+
+#if NETFX_CORE
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
+#else
+using NUnit.Framework;
+#endif
 
 namespace Kuery.Tests
 {
+    [TestFixture]
     public class EnumCacheTests
     {
         [StoreAsText]
@@ -34,97 +46,98 @@ namespace Kuery.Tests
             Value3
         }
 
-        public enum TestEnumWithRepeats
+		public enum TestEnumWithRepeats
+		{
+			Value1 = 1,
+
+			Value2 = 2,
+
+			Value2Again = 2,
+
+			Value3 = 3,
+		}
+
+		[StoreAsText]
+		public enum TestEnumWithRepeatsAsText
+		{
+			Value1 = 1,
+
+			Value2 = 2,
+
+			Value2Again = 2,
+
+			Value3 = 3,
+		}
+
+		public class TestClassThusNotEnum
         {
-            Value1 = 1,
 
-            Value2 = 2,
-
-            Value2Again = 2,
-
-            Value3 = 3,
         }
 
-        [StoreAsText]
-        public enum TestEnumWithRepeatsAsText
-        {
-            Value1 = 1,
-
-            Value2 = 2,
-
-            Value2Again = 2,
-
-            Value3 = 3,
-        }
-
-        public class TestClassThusNotEnum
-        {
-        }
-
-        [Fact]
+        [Test]
         public void ShouldReturnTrueForEnumStoreAsText()
         {
             var info = EnumCache.GetInfo<TestEnumStoreAsText>();
 
-            Assert.True(info.IsEnum);
-            Assert.True(info.StoreAsText);
-            Assert.NotNull(info.EnumValues);
+            Assert.IsTrue(info.IsEnum);
+            Assert.IsTrue(info.StoreAsText);
+            Assert.IsNotNull(info.EnumValues);
 
             var values = Enum.GetValues(typeof(TestEnumStoreAsText)).Cast<object>().ToList();
 
             for (int i = 0; i < values.Count; i++)
             {
-                Assert.Equal(values[i].ToString(), info.EnumValues[i]);
+                Assert.AreEqual(values[i].ToString(), info.EnumValues[i]);
             }
         }
 
-        [Fact]
+        [Test]
         public void ShouldReturnTrueForEnumStoreAsInt()
         {
             var info = EnumCache.GetInfo<TestEnumStoreAsInt>();
 
-            Assert.True(info.IsEnum);
-            Assert.False(info.StoreAsText);
-            Assert.Null(info.EnumValues);
+            Assert.IsTrue(info.IsEnum);
+            Assert.IsFalse(info.StoreAsText);
+            Assert.IsNull(info.EnumValues);
         }
 
-        [Fact]
+        [Test]
         public void ShouldReturnTrueForByteEnumStoreAsInt()
         {
             var info = EnumCache.GetInfo<TestByteEnumStoreAsInt>();
 
-            Assert.True(info.IsEnum);
-            Assert.False(info.StoreAsText);
+            Assert.IsTrue(info.IsEnum);
+            Assert.IsFalse(info.StoreAsText);
         }
 
-        [Fact]
+        [Test]
         public void ShouldReturnFalseForClass()
         {
             var info = EnumCache.GetInfo<TestClassThusNotEnum>();
 
-            Assert.False(info.IsEnum);
-            Assert.False(info.StoreAsText);
-            Assert.Null(info.EnumValues);
+            Assert.IsFalse(info.IsEnum);
+            Assert.IsFalse(info.StoreAsText);
+            Assert.IsNull(info.EnumValues);
         }
 
-        [Fact]
-        public void EnumsWithRepeatedValues()
-        {
-            var info = EnumCache.GetInfo<TestEnumWithRepeats>();
+		[Test]
+		public void Issue598_EnumsWithRepeatedValues ()
+		{
+			var info = EnumCache.GetInfo<TestEnumWithRepeats> ();
 
-            Assert.True(info.IsEnum);
-            Assert.False(info.StoreAsText);
-            Assert.Null(info.EnumValues);
-        }
+			Assert.IsTrue (info.IsEnum);
+			Assert.IsFalse (info.StoreAsText);
+			Assert.IsNull (info.EnumValues);
+		}
 
-        [Fact]
-        public void EnumsWithRepeatedValuesAsText()
-        {
-            var info = EnumCache.GetInfo<TestEnumWithRepeatsAsText>();
+		[Test]
+		public void Issue598_EnumsWithRepeatedValuesAsText ()
+		{
+			var info = EnumCache.GetInfo<TestEnumWithRepeatsAsText> ();
 
-            Assert.True(info.IsEnum);
-            Assert.True(info.StoreAsText);
-            Assert.NotNull(info.EnumValues);
-        }
-    }
+			Assert.IsTrue (info.IsEnum);
+			Assert.IsTrue (info.StoreAsText);
+			Assert.IsNotNull (info.EnumValues);
+		}
+	}
 }

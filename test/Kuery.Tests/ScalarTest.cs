@@ -1,120 +1,97 @@
 using System;
-using System.Data.Common;
 using System.Linq;
-using Xunit;
+
+#if NETFX_CORE
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
+#else
+using NUnit.Framework;
+#endif
 
 namespace Kuery.Tests
 {
-    public class ScalarTest : IClassFixture<SqliteFixture>
-    {
-        readonly SqliteFixture fixture;
+	[TestFixture]
+	public class ScalarTest
+	{
+		class TestTable
+		{
+			[PrimaryKey, AutoIncrement]
+			public int Id { get; set; }
+			public int Two { get; set; }
+		}
 
-        public ScalarTest(SqliteFixture fixture)
-        {
-            this.fixture = fixture;
-        }
+		const int Count = 100;
 
-        class ScalarTestTable
-        {
-            [PrimaryKey, AutoIncrement]
-            public int Id { get; set; }
+		SQLiteConnection CreateDb ()
+		{
+			var db = new TestDb ();
+			db.CreateTable<TestTable> ();
+			var items = from i in Enumerable.Range (0, Count)
+						select new TestTable { Two = 2 };
+			db.InsertAll (items);
+			Assert.AreEqual (Count, db.Table<TestTable> ().Count ());
+			return db;
+		}
 
-            public int Two { get; set; }
-        }
 
-        static void CreateTable(DbConnection connection)
-        {
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    if object_id (N'{nameof(ScalarTestTable)}') is not null
-                        drop table {nameof(ScalarTestTable)};";
-                cmd.ExecuteNonQuery();
-            }
+		[Test]
+		public void Int32 ()
+		{
+			var db = CreateDb ();
 
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    if object_id (N'{nameof(ScalarTestTable)}') is null
-                        create table {nameof(ScalarTestTable)} (
-                            {nameof(ScalarTestTable.Id)} integer identity(1,1) primary key not null,
-                            {nameof(ScalarTestTable.Two)} integer not null
-                        );";
-                cmd.ExecuteNonQuery();
-            }
-        }
+			var r = db.ExecuteScalar<int> ("SELECT SUM(Two) FROM TestTable");
 
-        const int Count = 100;
+			Assert.AreEqual (Count * 2, r);
 
-        DbConnection CreateDb()
-        {
-            var con = fixture.OpenNewConnection();
-            CreateTable(con);
+			db.DeleteAll<TestTable> ();
 
-            var items = from i in Enumerable.Range(0, Count)
-                        select new ScalarTestTable
-                        {
-                            Two = 2,
-                        };
-            con.InsertAll(items);
-            return con;
-        }
+			var r1 = db.ExecuteScalar<int> ("SELECT SUM(Two) FROM TestTable");
 
-        [Fact]
-        public void Int32()
-        {
-            var db = CreateDb();
+			Assert.AreEqual (0, r1);
+		}
 
-            var r = db.ExecuteScalar<int>(
-                $"SELECT SUM(Two) FROM {nameof(ScalarTestTable)}");
+		[Test]
+		public void SelectSingleRowValue ()
+		{
+			var db = CreateDb ();
 
-            Assert.Equal(Count * 2, r);
-        }
+			var r = db.ExecuteScalar<int> ("SELECT Two FROM TestTable WHERE Id = 1 LIMIT 1");
 
-        [Fact]
-        public void SelectSingleRowValue()
-        {
-            var db = CreateDb();
+			Assert.AreEqual (2, r);
+		}
 
-            var r = db.ExecuteScalar<int>(
-                $"SELECT TOP 1 Two FROM {nameof(ScalarTestTable)} WHERE Id = 1");
+		[Test]
+		public void SelectNullableSingleRowValue ()
+		{
+			var db = CreateDb ();
 
-            Assert.Equal(2, r);
-        }
+			var r = db.ExecuteScalar<int?> ("SELECT Two FROM TestTable WHERE Id = 1 LIMIT 1");
 
-        [Fact]
-        public void SelectNullableSingleRowValue()
-        {
-            var db = CreateDb();
+			Assert.AreEqual (true, r.HasValue);
+			Assert.AreEqual (2, r);
+		}
 
-            var r = db.ExecuteScalar<int?>(
-                $"SELECT TOP 1 Two FROM {nameof(ScalarTestTable)} WHERE Id = 1");
+		[Test]
+		public void SelectNoRowValue ()
+		{
+			var db = CreateDb ();
 
-            Assert.True(r.HasValue);
-            Assert.Equal(2, r);
-        }
+			var r = db.ExecuteScalar<int?> ("SELECT Two FROM TestTable WHERE Id = 999");
 
-        [Fact]
-        public void SelectNoRowValue()
-        {
-            var db = CreateDb();
+			Assert.AreEqual (false, r.HasValue);
+		}
 
-            var r = db.ExecuteScalar<int?>(
-                $"SELECT Two FROM {nameof(ScalarTestTable)} WHERE Id = 999");
+		[Test]
+		public void SelectNullRowValue ()
+		{
+			var db = CreateDb ();
 
-            Assert.False(r.HasValue);
-        }
+			var r = db.ExecuteScalar<int?> ("SELECT null AS Unknown FROM TestTable WHERE Id = 1 LIMIT 1");
 
-        [Fact]
-        public void SelectNullRowValue()
-        {
-            var db = CreateDb();
-
-            var r = db.ExecuteScalar<int?>(
-                $"SELECT TOP 1 null AS Unknown FROM {nameof(ScalarTestTable)} WHERE Id = 1");
-
-            Assert.False(r.HasValue);
-        }
-    }
+			Assert.AreEqual (false, r.HasValue);
+		}
+	}
 }
 

@@ -1,22 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Text;
-using Xunit;
+
+#if NETFX_CORE
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
+#else
+using NUnit.Framework;
+#endif
 
 namespace Kuery.Tests
 {
-    public class EnumTest : IClassFixture<SqliteFixture>
+    [TestFixture]
+    public class EnumTests
     {
-        readonly SqliteFixture fixture;
-
-        public EnumTest(SqliteFixture fixture)
-        {
-            this.fixture = fixture;
-        }
-
         public enum TestEnum
         {
             Value1,
@@ -26,17 +27,17 @@ namespace Kuery.Tests
             Value3
         }
 
-        [StoreAsText]
-        public enum StringTestEnum
-        {
-            Value1,
+		[StoreAsText]
+		public enum StringTestEnum
+		{
+			Value1,
 
-            Value2,
+			Value2,
 
-            Value3
-        }
+			Value3
+		}
 
-        public class EnumTestObj
+		public class TestObj
         {
             [PrimaryKey]
             public int Id { get; set; }
@@ -49,152 +50,121 @@ namespace Kuery.Tests
 
         }
 
-        public class StringTestObj
+		public class StringTestObj
+		{
+			[PrimaryKey]
+			public int Id { get; set; }
+			public StringTestEnum Value { get; set; }
+
+			public override string ToString ()
+			{
+				return string.Format("[StringTestObj: Id={0}, Value={1}]", Id, Value);
+			}
+
+		}
+
+        public class TestDb : SQLiteConnection
         {
-            [PrimaryKey]
-            public int Id { get; set; }
-            public StringTestEnum Value { get; set; }
-
-            public override string ToString()
+            public TestDb(String path)
+                : base(path)
             {
-                return string.Format("[StringTestObj: Id={0}, Value={1}]", Id, Value);
-            }
-
-        }
-
-        void CreateTestTable(DbConnection connection)
-        {
-            connection.DropTable(nameof(EnumTestObj));
-            connection.DropTable(nameof(StringTestObj));
-            connection.DropTable(nameof(ByteTestObj));
-
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    if object_id (N'{nameof(EnumTestObj)}') is null
-                        create table {nameof(EnumTestObj)} (
-                            {nameof(EnumTestObj.Id)} int primary key not null,
-                            {nameof(EnumTestObj.Value)} int not null
-                        );";
-                cmd.ExecuteNonQuery();
-            }
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    if object_id (N'{nameof(StringTestObj)}') is null
-                        create table {nameof(StringTestObj)} (
-                            {nameof(StringTestObj.Id)} int primary key not null,
-                            {nameof(StringTestObj.Value)} nvarchar(50) not null
-                        );";
-                cmd.ExecuteNonQuery();
-            }
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    if object_id (N'{nameof(ByteTestObj)}') is null
-                        create table {nameof(ByteTestObj)} (
-                            {nameof(ByteTestObj.Id)} int primary key not null,
-                            {nameof(ByteTestObj.Value)} tinyint not null
-                        );";
-                cmd.ExecuteNonQuery();
+                CreateTable<TestObj>();
+				CreateTable<StringTestObj>();
+				CreateTable<ByteTestObj> ();
             }
         }
 
-        [Fact]
+        [Test]
         public void ShouldPersistAndReadEnum()
         {
-            using var con = fixture.OpenNewConnection();
-            CreateTestTable(con);
+            var db = new TestDb(TestPath.GetTempFileName());
 
-            var obj1 = new EnumTestObj() { Id = 1, Value = TestEnum.Value2 };
-            var obj2 = new EnumTestObj() { Id = 2, Value = TestEnum.Value3 };
+            var obj1 = new TestObj() { Id = 1, Value = TestEnum.Value2 };
+            var obj2 = new TestObj() { Id = 2, Value = TestEnum.Value3 };
 
-            var numIn1 = con.Insert(obj1);
-            var numIn2 = con.Insert(obj2);
-            Assert.Equal(1, numIn1);
-            Assert.Equal(1, numIn2);
+            var numIn1 = db.Insert(obj1);
+            var numIn2 = db.Insert(obj2);
+            Assert.AreEqual(1, numIn1);
+            Assert.AreEqual(1, numIn2);
 
-            var result = con.Query<EnumTestObj>(
-                $"select * from {nameof(EnumTestObj)}")
-                .ToList();
-            Assert.Equal(2, result.Count);
-            Assert.Equal(obj1.Value, result[0].Value);
-            Assert.Equal(obj2.Value, result[1].Value);
+            var result = db.Query<TestObj>("select * from TestObj").ToList();
+            Assert.AreEqual(2, result.Count);
+            Assert.AreEqual(obj1.Value, result[0].Value);
+            Assert.AreEqual(obj2.Value, result[1].Value);
 
-            Assert.Equal(obj1.Id, result[0].Id);
-            Assert.Equal(obj2.Id, result[1].Id);
+            Assert.AreEqual(obj1.Id, result[0].Id);
+            Assert.AreEqual(obj2.Id, result[1].Id);
+
+            db.Close();
         }
 
-        [Fact]
-        public void ShouldPersistAndReadStringEnum()
-        {
-            using var con = fixture.OpenNewConnection();
-            CreateTestTable(con);
+		[Test]
+		public void ShouldPersistAndReadStringEnum ()
+		{
+			var db = new TestDb(TestPath.GetTempFileName());
 
-            var obj1 = new StringTestObj() { Id = 1, Value = StringTestEnum.Value2 };
-            var obj2 = new StringTestObj() { Id = 2, Value = StringTestEnum.Value3 };
+			var obj1 = new StringTestObj() { Id = 1, Value = StringTestEnum.Value2 };
+			var obj2 = new StringTestObj() { Id = 2, Value = StringTestEnum.Value3 };
 
-            var numIn1 = con.Insert(obj1);
-            var numIn2 = con.Insert(obj2);
-            Assert.Equal(1, numIn1);
-            Assert.Equal(1, numIn2);
+			var numIn1 = db.Insert(obj1);
+			var numIn2 = db.Insert(obj2);
+			Assert.AreEqual(1, numIn1);
+			Assert.AreEqual(1, numIn2);
 
-            var result = con.Query<StringTestObj>(
-                $"select * from {nameof(StringTestObj)}")
-                .ToList();
-            Assert.Equal(2, result.Count);
-            Assert.Equal(obj1.Value, result[0].Value);
-            Assert.Equal(obj2.Value, result[1].Value);
+			var result = db.Query<StringTestObj>("select * from StringTestObj").ToList();
+			Assert.AreEqual(2, result.Count);
+			Assert.AreEqual(obj1.Value, result[0].Value);
+			Assert.AreEqual(obj2.Value, result[1].Value);
 
-            Assert.Equal(obj1.Id, result[0].Id);
-            Assert.Equal(obj2.Id, result[1].Id);
-        }
+			Assert.AreEqual(obj1.Id, result[0].Id);
+			Assert.AreEqual(obj2.Id, result[1].Id);
 
-        public enum ByteTestEnum : byte
-        {
-            Value1 = 1,
+			db.Close();
+		}
 
-            Value2 = 2,
+		public enum ByteTestEnum : byte
+		{
+			Value1 = 1,
 
-            Value3 = 3
-        }
+			Value2 = 2,
 
-        public class ByteTestObj
-        {
-            [PrimaryKey]
-            public int Id { get; set; }
+			Value3 = 3
+		}
 
-            public ByteTestEnum Value { get; set; }
+		public class ByteTestObj
+		{
+			[PrimaryKey]
+			public int Id { get; set; }
+			public ByteTestEnum Value { get; set; }
 
-            public override string ToString()
-            {
-                return string.Format("[ByteTestObj: Id={0}, Value={1}]", Id, Value);
-            }
-        }
+			public override string ToString ()
+			{
+				return string.Format ("[ByteTestObj: Id={0}, Value={1}]", Id, Value);
+			}
+		}
 
-        [Fact]
-        public void ShouldPersistAndReadByteEnum()
-        {
-            using var con = fixture.OpenNewConnection();
-            CreateTestTable(con);
+		[Test]
+		public void Issue33_ShouldPersistAndReadByteEnum ()
+		{
+			var db = new TestDb (TestPath.GetTempFileName ());
 
-            var obj1 = new ByteTestObj() { Id = 1, Value = ByteTestEnum.Value2 };
-            var obj2 = new ByteTestObj() { Id = 2, Value = ByteTestEnum.Value3 };
+			var obj1 = new ByteTestObj () { Id = 1, Value = ByteTestEnum.Value2 };
+			var obj2 = new ByteTestObj () { Id = 2, Value = ByteTestEnum.Value3 };
 
-            var numIn1 = con.Insert(obj1);
-            var numIn2 = con.Insert(obj2);
-            Assert.Equal(1, numIn1);
-            Assert.Equal(1, numIn2);
+			var numIn1 = db.Insert (obj1);
+			var numIn2 = db.Insert (obj2);
+			Assert.AreEqual (1, numIn1);
+			Assert.AreEqual (1, numIn2);
 
-            var result = con.Query<ByteTestObj>(
-                $"select * from {nameof(ByteTestObj)} order by Id")
-                .ToList();
-            Assert.Equal(2, result.Count);
-            Assert.Equal(obj1.Value, result[0].Value);
-            Assert.Equal(obj2.Value, result[1].Value);
+			var result = db.Query<ByteTestObj> ("select * from ByteTestObj order by Id").ToList ();
+			Assert.AreEqual (2, result.Count);
+			Assert.AreEqual (obj1.Value, result[0].Value);
+			Assert.AreEqual (obj2.Value, result[1].Value);
 
-            Assert.Equal(obj1.Id, result[0].Id);
-            Assert.Equal(obj2.Id, result[1].Id);
-        }
-    }
+			Assert.AreEqual (obj1.Id, result[0].Id);
+			Assert.AreEqual (obj2.Id, result[1].Id);
+
+			db.Close ();
+		}
+	}
 }

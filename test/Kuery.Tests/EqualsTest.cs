@@ -1,19 +1,19 @@
 ﻿using System;
-using System.Data.Common;
 using System.Linq;
-using Xunit;
+#if NETFX_CORE
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
+#else
+using NUnit.Framework;
+#endif
 
 namespace Kuery.Tests
 {
-    public class EqualsTest : IClassFixture<SqliteFixture>
+    [TestFixture]
+    class EqualsTest
     {
-        readonly SqliteFixture fixture;
-
-        public EqualsTest(SqliteFixture fixture)
-        {
-            this.fixture = fixture;
-        }
-
         public abstract class TestObjBase<T>
         {
             [AutoIncrement, PrimaryKey]
@@ -26,49 +26,40 @@ namespace Kuery.Tests
 
         public class TestObjString : TestObjBase<string> { }
 
-        void CreateTestTable(DbConnection connection)
+        public class TestDb : SQLiteConnection
         {
-            connection.DropTable(nameof(TestObjString));
-
-            using (var cmd = connection.CreateCommand())
+            public TestDb(String path)
+                : base(path)
             {
-                cmd.CommandText = $@"
-                    if object_id (N'{nameof(TestObjString)}') is null
-                        create table [{nameof(TestObjString)}] (
-                            {nameof(TestObjString.Id)} integer identity(1,1) primary key not null,
-                            {nameof(TestObjString.Data)} nvarchar(50) null,
-                            {nameof(TestObjString.Date)} datetime null
-                        );";
-                cmd.ExecuteNonQuery();
+                CreateTable<TestObjString>();
             }
         }
 
-        [Fact]
+        [Test]
         public void CanCompareAnyField()
         {
             var n = 20;
-            var cq = from i in Enumerable.Range(1, n)
-                     select new TestObjString
-                     {
-                         Data = Convert.ToString(i),
-                         Date = new DateTime(2013, 1, i)
-                     };
-            using var db = fixture.OpenNewConnection();
-            CreateTestTable(db);
+            var cq =from i in Enumerable.Range(1, n)
+					select new TestObjString {
+				Data = Convert.ToString(i),
+                Date = new DateTime(2013, 1, i)
+			};
+
+            var db = new TestDb(TestPath.GetTempFileName());
             db.InsertAll(cq);
 
             var results = db.Table<TestObjString>().Where(o => o.Data.Equals("10"));
-            Assert.Equal(1, results.Count());
-            Assert.Equal("10", results.FirstOrDefault().Data);
+            Assert.AreEqual(results.Count(), 1);
+            Assert.AreEqual(results.FirstOrDefault().Data, "10");
 
             results = db.Table<TestObjString>().Where(o => o.Id.Equals(10));
-            Assert.Equal(1, results.Count());
-            Assert.Equal("10", results.FirstOrDefault().Data);
+            Assert.AreEqual(results.Count(), 1);
+            Assert.AreEqual(results.FirstOrDefault().Data, "10");
 
             var date = new DateTime(2013, 1, 10);
             results = db.Table<TestObjString>().Where(o => o.Date.Equals(date));
-            Assert.Equal(1, results.Count());
-            Assert.Equal("10", results.FirstOrDefault().Data);
+            Assert.AreEqual(results.Count(), 1);
+            Assert.AreEqual(results.FirstOrDefault().Data, "10");
         }
     }
 }

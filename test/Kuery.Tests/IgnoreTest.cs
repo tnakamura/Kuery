@@ -1,205 +1,197 @@
-﻿using System.Collections.Generic;
-using System.Data.Common;
-using Xunit;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using Kuery;
+
+#if NETFX_CORE
+using Microsoft.VisualStudio.TestPlatform.UnitTestFramework;
+using SetUp = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestInitializeAttribute;
+using TearDown = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestCleanupAttribute;
+using TestFixture = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestClassAttribute;
+using Test = Microsoft.VisualStudio.TestPlatform.UnitTestFramework.TestMethodAttribute;
+#else
+using NUnit.Framework;
+#endif
 
 namespace Kuery.Tests
-{
-    public class IgnoreTest : IClassFixture<SqliteFixture>
-    {
-        readonly SqliteFixture fixture;
+{    
+	[TestFixture]
+	public class IgnoreTest
+	{
+		public class TestObj
+		{
+			[AutoIncrement, PrimaryKey]
+			public int Id { get; set; }
 
-        public IgnoreTest(SqliteFixture fixture)
-        {
-            this.fixture = fixture;
-        }
+			public string Text { get; set; }
 
-        public class IgnoreTestObj
-        {
-            [AutoIncrement, PrimaryKey]
-            public int Id { get; set; }
+			[Kuery.Ignore]
+			public Dictionary<int, string> Edibles
+			{ 
+				get { return this._edibles; }
+				set { this._edibles = value; }
+			} protected Dictionary<int, string> _edibles = new Dictionary<int, string>();
 
-            public string Text { get; set; }
+			[Kuery.Ignore]
+			public string IgnoredText { get; set; }
 
-            [Kuery.Ignore]
-            public Dictionary<int, string> Edibles
-            {
-                get { return this._edibles; }
-                set { this._edibles = value; }
-            }
+			public override string ToString ()
+			{
+				return string.Format("[TestObj: Id={0}]", Id);
+			}
+		}
 
-            protected Dictionary<int, string> _edibles = new Dictionary<int, string>();
+		[Test]
+		public void MappingIgnoreColumn ()
+		{
+			var db = new TestDb ();
+			var m = db.GetMapping<TestObj> ();
 
-            [Kuery.Ignore]
-            public string IgnoredText { get; set; }
+			Assert.AreEqual (2, m.Columns.Length);
+		}
 
-            public override string ToString()
-            {
-                return string.Format("[TestObj: Id={0}]", Id);
-            }
-        }
+		[Test]
+		public void CreateTableSucceeds ()
+		{
+			var db = new TestDb ();
+			db.CreateTable<TestObj> ();
+		}
 
-        void CreateIgnoreTestObjTable(DbConnection connection)
-        {
-            connection.DropTable(nameof(IgnoreTestObj));
+		[Test]
+		public void InsertSucceeds ()
+		{
+			var db = new TestDb ();
+			db.CreateTable<TestObj> ();
 
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    if object_id (N'{nameof(IgnoreTestObj)}') is null
-                        create table [{nameof(IgnoreTestObj)}] (
-                            {nameof(IgnoreTestObj.Id)} integer identity(1,1) primary key not null,
-                            {nameof(IgnoreTestObj.Text)} nvarchar(50) null
-                        );";
-                cmd.ExecuteNonQuery();
-            }
-        }
+			var o = new TestObj {
+				Text = "Hello",
+				IgnoredText = "World",
+			};
 
-        [Fact]
-        public void MappingIgnoreColumn()
-        {
-            var m = SqlHelper.GetMapping<IgnoreTestObj>();
+			db.Insert (o);
 
-            Assert.Equal(2, m.Columns.Length);
-        }
+			Assert.AreEqual (1, o.Id);
+		}
 
-        [Fact]
-        public void InsertSucceeds()
-        {
-            using var con = fixture.OpenNewConnection();
-            CreateIgnoreTestObjTable(con);
+		[Test]
+		public void GetDoesntHaveIgnores ()
+		{
+			var db = new TestDb ();
+			db.CreateTable<TestObj> ();
 
-            var o = new IgnoreTestObj
-            {
-                Text = "Hello",
-                IgnoredText = "World",
-            };
+			var o = new TestObj {
+				Text = "Hello",
+				IgnoredText = "World",
+			};
 
-            con.Insert(o);
+			db.Insert (o);
 
-            Assert.Equal(1, o.Id);
-        }
+			var oo = db.Get<TestObj> (o.Id);
 
-        [Fact]
-        public void GetDoesntHaveIgnores()
-        {
-            using var con = fixture.OpenNewConnection();
-            CreateIgnoreTestObjTable(con);
+			Assert.AreEqual ("Hello", oo.Text);
+			Assert.AreEqual (null, oo.IgnoredText);
+		}
 
-            var o = new IgnoreTestObj
-            {
-                Text = "Hello",
-                IgnoredText = "World",
-            };
+		public class BaseClass
+		{
+			[Ignore]
+			public string ToIgnore {
+				get;
+				set;
+			}
+		}
 
-            con.Insert(o);
+		public class TableClass : BaseClass
+		{
+			public string Name { get; set; }
+		}
 
-            var oo = con.Table<IgnoreTestObj>()
-                .Where(x => x.Text == "Hello")
-                .First();
+		[Test]
+		public void BaseIgnores ()
+		{
+			var db = new TestDb ();
+			db.CreateTable<TableClass> ();
 
-            Assert.Equal("Hello", oo.Text);
-            Assert.Null(oo.IgnoredText);
-        }
+			var o = new TableClass {
+				ToIgnore = "Hello",
+				Name = "World",
+			};
 
-        public class BaseClass
-        {
-            [Ignore]
-            public string ToIgnore
-            {
-                get;
-                set;
-            }
-        }
+			db.Insert (o);
 
-        public class IgnoreInheritTableClass : BaseClass
-        {
-            public string Name { get; set; }
-        }
+			var oo = db.Table<TableClass> ().First ();
 
-        void CreateIgnoreInheritTableClassTable(DbConnection connection)
-        {
-            connection.DropTable(nameof(IgnoreInheritTableClass));
+			Assert.AreEqual (null, oo.ToIgnore);
+			Assert.AreEqual ("World", oo.Name);
+		}
 
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    if object_id (N'{nameof(IgnoreInheritTableClass)}') is null
-                        create table [{nameof(IgnoreInheritTableClass)}] (
-                            {nameof(IgnoreInheritTableClass.Name)} nvarchar(50) null
-                        );";
-                cmd.ExecuteNonQuery();
-            }
-        }
+		public class RedefinedBaseClass
+		{
+			public string Name { get; set; }
+			public List<string> Values { get; set; }
+		}
 
-        [Fact]
-        public void BaseIgnores()
-        {
-            using var con = fixture.OpenNewConnection();
-            CreateIgnoreInheritTableClassTable(con);
+		public class RedefinedClass : RedefinedBaseClass
+		{
+			[Ignore]
+			public new List<string> Values { get; set; }
+			public string Value { get; set; }
+		}
 
-            var o = new IgnoreInheritTableClass
-            {
-                ToIgnore = "Hello",
-                Name = "World",
-            };
+		[Test]
+		public void RedefinedIgnores ()
+		{
+			var db = new TestDb ();
+			db.CreateTable<RedefinedClass> ();
 
-            con.Insert(o);
+			var o = new RedefinedClass {
+				Name = "Foo",
+				Value = "Bar",
+				Values = new List<string> { "hello", "world" },
+			};
 
-            var oo = con.Table<IgnoreInheritTableClass>().First();
+			db.Insert (o);
 
-            Assert.Null(oo.ToIgnore);
-            Assert.Equal("World", oo.Name);
-        }
+			var oo = db.Table<RedefinedClass> ().First ();
 
-        public class RedefinedBaseClass
-        {
-            public string Name { get; set; }
-            public List<string> Values { get; set; }
-        }
+			Assert.AreEqual ("Foo", oo.Name);
+			Assert.AreEqual ("Bar", oo.Value);
+			Assert.AreEqual (null, oo.Values);
+		}
 
-        public class RedefinedClass : RedefinedBaseClass
-        {
-            [Ignore]
-            public new List<string> Values { get; set; }
-            public string Value { get; set; }
-        }
+		[AttributeUsage (AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
+		class DerivedIgnoreAttribute : IgnoreAttribute
+		{
+		}
 
-        void CreateRedefinedClassTable(DbConnection connection)
-        {
-            connection.DropTable(nameof(RedefinedClass));
+		class DerivedIgnoreClass
+		{
+			[PrimaryKey, AutoIncrement]
+			public int Id { get; set; }
 
-            using (var cmd = connection.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    if object_id (N'{nameof(RedefinedClass)}') is null
-                        create table [{nameof(RedefinedClass)}] (
-                            {nameof(RedefinedClass.Name)} nvarchar(50) null,
-                            {nameof(RedefinedClass.Value)} nvarchar(50) null
-                        );";
-                cmd.ExecuteNonQuery();
-            }
-        }
+			public string NotIgnored { get; set; }
 
-        [Fact]
-        public void RedefinedIgnores()
-        {
-            using var con = fixture.OpenNewConnection();
-            CreateRedefinedClassTable(con);
+			[DerivedIgnore]
+			public string Ignored { get; set; }
+		}
 
-            var o = new RedefinedClass
-            {
-                Name = "Foo",
-                Value = "Bar",
-                Values = new List<string> { "hello", "world" },
-            };
+		[Test]
+		public void DerivedIgnore ()
+		{
+			var db = new TestDb ();
+			db.CreateTable<DerivedIgnoreClass> ();
 
-            con.Insert(o);
+			var o = new DerivedIgnoreClass {
+				Ignored = "Hello",
+				NotIgnored = "World",
+			};
 
-            var oo = con.Table<RedefinedClass>().First();
+			db.Insert (o);
 
-            Assert.Equal("Foo", oo.Name);
-            Assert.Equal("Bar", oo.Value);
-            Assert.Null(oo.Values);
-        }
-    }
+			var oo = db.Table<DerivedIgnoreClass> ().First ();
+
+			Assert.AreEqual (null, oo.Ignored);
+			Assert.AreEqual ("World", oo.NotIgnored);
+		}
+	}
 }
