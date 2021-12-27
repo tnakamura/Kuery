@@ -4,9 +4,6 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Kuery
@@ -14,17 +11,37 @@ namespace Kuery
     public static partial class SqlHelper
     {
 
-        public static Task<int> InsertAsync<T>(this DbConnection connection, T item) =>
-            connection.InsertAsync(item, typeof(T));
+        public static Task<int> InsertAsync<T>(this DbConnection connection, T item, DbTransaction transaction = null) =>
+            connection.InsertAsync(item, typeof(T), transaction);
 
-        public static Task<int> InsertAsync(this DbConnection connection, object item, Type type)
+        public static async Task<int> InsertAsync(this DbConnection connection, object item, Type type, DbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
 
+            int count;
             using (var command = connection.CreateInsertCommand(item, type))
             {
-                return command.ExecuteNonQueryAsync();
+                command.Transaction = transaction;
+                count = await command.ExecuteNonQueryAsync();
+            }
+
+            var map = GetMapping(type);
+            if (map.HasAutoIncPK)
+            {
+                var id = await connection.GetLastRowIdAsync();
+                map.SetAutoIncPk(item, id);
+            }
+
+            return count;
+        }
+
+        private static async Task<long> GetLastRowIdAsync(this DbConnection connection, DbTransaction transaction = null)
+        {
+            using (var command = connection.CreateLastInsertRowIdCommand())
+            {
+                command.Transaction = transaction;
+                return (long)await command.ExecuteScalarAsync();
             }
         }
 
@@ -35,14 +52,7 @@ namespace Kuery
             var result = 0;
             foreach (var item in items)
             {
-                using (var command = connection.CreateInsertCommand(item, Orm.GetType(item)))
-                {
-                    if (transaction != null)
-                    {
-                        command.Transaction = transaction;
-                    }
-                    result += await command.ExecuteNonQueryAsync();
-                }
+                result += await connection.InsertAsync(item, Orm.GetType(item), transaction);
             }
             return result;
         }
@@ -54,14 +64,7 @@ namespace Kuery
             var result = 0;
             foreach (var item in items)
             {
-                using (var command = connection.CreateInsertCommand(item, type))
-                {
-                    if (transaction != null)
-                    {
-                        command.Transaction = transaction;
-                    }
-                    result += await command.ExecuteNonQueryAsync();
-                }
+                result += await connection.InsertAsync(item, type, transaction);
             }
             return result;
         }

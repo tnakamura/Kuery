@@ -20,21 +20,48 @@ namespace Kuery
             return new TableQuery<T>(connection, new TableMapping(typeof(T)));
         }
 
-        public static int Insert<T>(this DbConnection connection, T item) =>
-            connection.Insert(item, typeof(T));
+        public static int Insert<T>(this DbConnection connection, T item, DbTransaction transaction = null) =>
+            connection.Insert(item, typeof(T), transaction);
 
-        public static int Insert(this DbConnection connection, object item, Type type)
+        public static int Insert(this DbConnection connection, object item, Type type, DbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
 
+            int count;
             using (var command = connection.CreateInsertCommand(item, type))
             {
-                return command.ExecuteNonQuery();
+                command.Transaction = transaction;
+                count = command.ExecuteNonQuery();
+            }
+
+            var map = GetMapping(type);
+            if (map.HasAutoIncPK)
+            {
+                var id = connection.GetLastRowId(transaction);
+                map.SetAutoIncPk(item, id);
+            }
+
+            return count;
+        }
+
+        private static DbCommand CreateLastInsertRowIdCommand(this DbConnection connection)
+        {
+            var command = connection.CreateCommand();
+            command.CommandText = "select last_insert_rowid();";
+            return command;
+        }
+
+        private static long GetLastRowId(this DbConnection connection, DbTransaction transaction = null)
+        {
+            using (var command = connection.CreateLastInsertRowIdCommand())
+            {
+                command.Transaction = transaction;
+                return (long)command.ExecuteScalar();
             }
         }
 
-        static DbCommand CreateInsertCommand(this DbConnection connection, object item, Type type)
+        private static DbCommand CreateInsertCommand(this DbConnection connection, object item, Type type)
         {
             var map = GetMapping(type);
             var columns = new StringBuilder();
@@ -60,10 +87,10 @@ namespace Kuery
                 else
                 {
                     var parameter = command.CreateParameter();
-                    parameter.ParameterName = "@" + col.Name;
+                    parameter.ParameterName = connection.GetParameterName(col.Name);
                     parameter.Value = col.GetValue(item);
                     command.Parameters.Add(parameter);
-                    values.Append("@" + col.Name);
+                    values.Append(parameter.ParameterName);
                 }
             }
 
@@ -78,6 +105,17 @@ namespace Kuery
             return command;
         }
 
+        private static string GetParameterName(this DbConnection connection, string name)
+        {
+            switch (connection.GetType().FullName)
+            {
+                case "Microsoft.Data.Sqlite.SqliteConnection":
+                    return "$" + name;
+                default:
+                    return "@" + name;
+            }
+        }
+
         public static int InsertAll(this DbConnection connection, IEnumerable items, DbTransaction transaction = null)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
@@ -85,14 +123,7 @@ namespace Kuery
             var result = 0;
             foreach (var item in items)
             {
-                using (var command = connection.CreateInsertCommand(item, Orm.GetType(item)))
-                {
-                    if (transaction != null)
-                    {
-                        command.Transaction = transaction;
-                    }
-                    result += command.ExecuteNonQuery();
-                }
+                result += connection.Insert(item, Orm.GetType(item), transaction);
             }
             return result;
         }
@@ -105,14 +136,7 @@ namespace Kuery
             var result = 0;
             foreach (var item in items)
             {
-                using (var command = connection.CreateInsertCommand(item, type))
-                {
-                    if (transaction != null)
-                    {
-                        command.Transaction = transaction;
-                    }
-                    result += command.ExecuteNonQuery();
-                }
+                result += connection.Insert(item, type, transaction);
             }
             return result;
         }
@@ -625,7 +649,7 @@ namespace Kuery
                 }
                 else
                 {
-                    return (T)result;
+                    return (T)Convert.ChangeType(result, typeof(T));
                 }
             }
         }
@@ -930,15 +954,23 @@ namespace Kuery
             {
                 if (val != null && ColumnType.GetTypeInfo().IsEnum)
                 {
-                    _prop.SetValue(obj, Enum.ToObject(ColumnType, val));
+                    _prop.SetValue(
+                        obj:obj,
+                        value: Enum.ToObject(ColumnType, val));
                 }
                 else if (val == DBNull.Value)
                 {
-                    _prop.SetValue(obj, null, null);
+                    _prop.SetValue(
+                        obj:obj,
+                        value: null,
+                        index: null);
                 }
                 else
                 {
-                    _prop.SetValue(obj, val, null);
+                    _prop.SetValue(
+                        obj: obj,
+                        value: Convert.ChangeType(val, _prop.PropertyType),
+                        index: null);
                 }
             }
 
@@ -1926,7 +1958,7 @@ namespace Kuery
         {
             using (var command = GenerateCommand("count(*)"))
             {
-                return (int)command.ExecuteScalar();
+                return (int)(long)command.ExecuteScalar();
             }
         }
 
