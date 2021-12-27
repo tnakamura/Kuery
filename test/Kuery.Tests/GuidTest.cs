@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Kuery.Tests
 {
-    public class GuidTest : IClassFixture<SqliteFixture>
+    public class GuidTest : IClassFixture<SqliteFixture>, IDisposable
     {
         readonly SqliteFixture fixture;
 
@@ -14,15 +14,24 @@ namespace Kuery.Tests
             this.fixture = fixture;
         }
 
+        public void Dispose()
+        {
+            using (var connection = fixture.OpenNewConnection())
+            {
+                DropTable(connection);
+            }
+        }
+
         public class GuidTestObj
         {
             [PrimaryKey]
+            [AutoIncrement]
             public Guid Id { get; set; }
 
             public string Text { get; set; }
         }
 
-        private static void CreateTable(DbConnection connection)
+        private static void DropTable(DbConnection connection)
         {
             using (var cmd = connection.CreateCommand())
             {
@@ -30,6 +39,11 @@ namespace Kuery.Tests
                     drop table if exists {nameof(GuidTestObj)};";
                 cmd.ExecuteNonQuery();
             }
+        }
+
+        private static void CreateTable(DbConnection connection)
+        {
+            DropTable(connection);
 
             using (var cmd = connection.CreateCommand())
             {

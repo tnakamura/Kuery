@@ -19,6 +19,14 @@ namespace Kuery
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
 
+            var map = GetMapping(type);
+            if (map.PK != null &&
+                map.PK.IsAutoGuid &&
+                (Guid)map.PK.GetValue(item)==Guid.Empty)
+            {
+                map.PK.SetValue(item, Guid.NewGuid());
+            }
+
             int count;
             using (var command = connection.CreateInsertCommand(item, type))
             {
@@ -26,7 +34,6 @@ namespace Kuery
                 count = await command.ExecuteNonQueryAsync();
             }
 
-            var map = GetMapping(type);
             if (map.HasAutoIncPK)
             {
                 var id = await connection.GetLastRowIdAsync();

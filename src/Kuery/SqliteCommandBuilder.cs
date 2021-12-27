@@ -65,7 +65,14 @@ namespace Kuery
                     {
                         var parameter = command.CreateParameter();
                         parameter.ParameterName = connection.GetParameterName(col.Name);
-                        parameter.Value = col.GetValue(item);
+                        if (col.ColumnType.IsEnum && col.StoreAsText)
+                        {
+                            parameter.Value = value.ToString();
+                        }
+                        else
+                        {
+                            parameter.Value = value;
+                        }
                         command.Parameters.Add(parameter);
                         values.Append(parameter.ParameterName);
                     }
@@ -96,7 +103,12 @@ namespace Kuery
             sql.Append("update " + mapping.TableName);
             var command = connection.CreateCommand();
 
-            var cols = mapping.Columns.Where(x => x != mapping.PK);
+            var cols = mapping.Columns.Where(x => x != mapping.PK).ToList();
+            if (cols.Count == 0)
+            {
+                cols = mapping.Columns.ToList();
+            }
+
             var first = true;
             foreach (var col in cols)
             {
@@ -118,15 +130,20 @@ namespace Kuery
                 sql.Append(" = ");
                 sql.Append(parameter.ParameterName);
             }
+
             sql.Append(" where ");
             sql.Append(mapping.PK.Name);
             sql.Append(" = ");
             sql.Append(connection.GetParameterName(mapping.PK.Name));
 
-            var pkParamter = command.CreateParameter();
-            pkParamter.ParameterName = connection.GetParameterName(mapping.PK.Name);
-            pkParamter.Value = mapping.PK.GetValue(item);
-            command.Parameters.Add(pkParamter);
+            var pkParameterName = connection.GetParameterName(mapping.PK.Name);
+            if (!command.Parameters.Contains(pkParameterName))
+            {
+                var pkParamter = command.CreateParameter();
+                pkParamter.ParameterName = pkParameterName;
+                pkParamter.Value = mapping.PK.GetValue(item);
+                command.Parameters.Add(pkParamter);
+            }
 
             command.CommandText = sql.ToString();
             return command;

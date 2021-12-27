@@ -28,6 +28,14 @@ namespace Kuery
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
 
+            var map = GetMapping(type);
+            if (map.PK != null &&
+                map.PK.IsAutoGuid &&
+                (Guid)map.PK.GetValue(item)==Guid.Empty)
+            {
+                map.PK.SetValue(item, Guid.NewGuid());
+            }
+
             int count;
             using (var command = connection.CreateInsertCommand(item, type))
             {
@@ -35,7 +43,6 @@ namespace Kuery
                 count = command.ExecuteNonQuery();
             }
 
-            var map = GetMapping(type);
             if (map.HasAutoIncPK)
             {
                 var id = connection.GetLastRowId(transaction);
@@ -357,10 +364,12 @@ namespace Kuery
                 {
                     return default;
                 }
-                else
+                var clrType = typeof(T);
+                if (clrType.IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(Nullable<>))
                 {
-                    return (T)Convert.ChangeType(result, typeof(T));
+                    clrType = typeof(T).GetGenericArguments()[0];
                 }
+                return (T)Convert.ChangeType(result, clrType);
             }
         }
     }
@@ -654,7 +663,7 @@ namespace Kuery
                 IsNullable = !(IsPK || Orm.IsMarkedNotNull(prop));
                 MaxStringLength = Orm.MaxStringLength(prop);
 
-                StoreAsText = prop.PropertyType
+                StoreAsText = ColumnType
                     .GetTypeInfo()
                     .CustomAttributes
                     .Any(x => x.AttributeType == typeof(StoreAsTextAttribute));
@@ -671,11 +680,22 @@ namespace Kuery
                 }
                 else if (ColumnType.GetTypeInfo().IsEnum)
                 {
-                    _prop.SetValue(
-                        obj: obj,
-                        value: Enum.ToObject(ColumnType, val));
+                    if (val is string enumStr && StoreAsText)
+                    {
+                        _prop.SetValue(
+                            obj: obj,
+                            value: Enum.Parse(ColumnType, enumStr),
+                            index: null);
+                    }
+                    else
+                    {
+                        _prop.SetValue(
+                            obj: obj,
+                            value: Enum.ToObject(ColumnType, val),
+                            index: null);
+                    }
                 }
-                else if (_prop.PropertyType == typeof(TimeSpan) &&
+                else if ((_prop.PropertyType == typeof(TimeSpan) || _prop.PropertyType == typeof(TimeSpan?)) &&
                     val is string timeSpanStr &&
                     TimeSpan.TryParse(timeSpanStr, out var timespan))
                 {
@@ -702,13 +722,21 @@ namespace Kuery
                         value: dateTimeOffset,
                         index: null);
                 }
-                else if (_prop.PropertyType == typeof(Guid) &&
+                else if ((_prop.PropertyType == typeof(Guid) || _prop.PropertyType == typeof(Guid?)) &&
                     val is string guidStr &&
                     Guid.TryParse(guidStr, out var guid))
                 {
                     _prop.SetValue(
                         obj: obj,
                         value: guid,
+                        index: null);
+                }
+                else if (_prop.PropertyType.IsGenericType && _prop.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>))
+                {
+                    var clrType = _prop.PropertyType.GetGenericArguments()[0];
+                    _prop.SetValue(
+                        obj: obj,
+                        value: Convert.ChangeType(val, clrType),
                         index: null);
                 }
                 else

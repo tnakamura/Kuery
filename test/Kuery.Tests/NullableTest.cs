@@ -101,19 +101,17 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(NullableFloatClass)}') is not null
-                        drop table {nameof(NullableFloatClass)};";
+                    drop table if exists {nameof(NullableFloatClass)};";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(NullableFloatClass)}') is null
-                        create table {nameof(NullableFloatClass)} (
-                            {nameof(NullableFloatClass.ID)} integer identity(1,1) primary key not null,
-                            {nameof(NullableFloatClass.NullableFloat)} float null
-                        );";
+                    create table if not exists {nameof(NullableFloatClass)} (
+                        {nameof(NullableFloatClass.ID)} integer primary key autoincrement,
+                        {nameof(NullableFloatClass.NullableFloat)} float null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }
@@ -211,7 +209,7 @@ namespace Kuery.Tests
         public void WhereNotNull()
         {
             using var con = fixture.OpenNewConnection();
-            CreateStringClassTable(con);
+            CreateNullableIntClassTable(con);
 
             var withNull = new NullableIntClass() { NullableInt = null };
             var with0 = new NullableIntClass() { NullableInt = 0 };
@@ -236,7 +234,7 @@ namespace Kuery.Tests
         public void WhereNull()
         {
             using var con = fixture.OpenNewConnection();
-            CreateStringClassTable(con);
+            CreateNullableIntClassTable(con);
 
             var withNull = new NullableIntClass() { NullableInt = null };
             var with0 = new NullableIntClass() { NullableInt = 0 };
