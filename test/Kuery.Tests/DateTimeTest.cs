@@ -27,19 +27,17 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(DateTimeTestObj)}') is not null
-                        drop table {nameof(DateTimeTestObj)};";
+                    drop table if exists {nameof(DateTimeTestObj)};";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(DateTimeTestObj)}') is null
-                        create table {nameof(DateTimeTestObj)} (
-                            {nameof(DateTimeTestObj.Id)} integer identity(1,1) primary key not null,
-                            {nameof(DateTimeTestObj.ModifiedTime)} datetime not null
-                        );";
+                    create table if not exists {nameof(DateTimeTestObj)} (
+                        {nameof(DateTimeTestObj.Id)} integer primary key autoincrement,
+                        {nameof(DateTimeTestObj.ModifiedTime)} datetime not null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }
@@ -93,18 +91,16 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(NullableDateObj)}') is not null
-                        drop table {nameof(NullableDateObj)};";
+                    drop table if exists {nameof(NullableDateObj)};";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(NullableDateObj)}') is null
-                        create table {nameof(NullableDateObj)} (
-                            {nameof(NullableDateObj.Time)} datetime null
-                        );";
+                    create table if not exists {nameof(NullableDateObj)} (
+                        {nameof(NullableDateObj.Time)} datetime null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }

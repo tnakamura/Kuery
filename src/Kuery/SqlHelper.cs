@@ -680,6 +680,24 @@ namespace Kuery
                         value: timespan,
                         index: null);
                 }
+                else if ((_prop.PropertyType == typeof(DateTime) || _prop.PropertyType == typeof(DateTime?)) &&
+                    val is string dateTimeStr &&
+                    DateTime.TryParse(dateTimeStr, out var dateTime))
+                {
+                    _prop.SetValue(
+                        obj: obj,
+                        value: dateTime,
+                        index: null);
+                }
+                else if ((_prop.PropertyType == typeof(DateTimeOffset) || _prop.PropertyType == typeof(DateTimeOffset?)) &&
+                    val is string dateTimeOffsetStr &&
+                    DateTimeOffset.TryParse(dateTimeOffsetStr, out var dateTimeOffset))
+                {
+                    _prop.SetValue(
+                        obj: obj,
+                        value: dateTimeOffset,
+                        index: null);
+                }
                 else if (_prop.PropertyType == typeof(Guid) &&
                     val is string guidStr &&
                     Guid.TryParse(guidStr, out var guid))
@@ -1632,12 +1650,12 @@ namespace Kuery
                     if (parameter.Value == null)
                         return "(" + parameter.CommandText + " is not null)";
                     else
-                        return "(" + parameter.CommandText + " is not $"+ parameter.CommandText.TrimStart('[').TrimEnd(']') + ")";
+                        return "(" + parameter.CommandText + " is not $" + parameter.CommandText.TrimStart('[').TrimEnd(']') + ")";
                 case ExpressionType.GreaterThan:
                 case ExpressionType.GreaterThanOrEqual:
                 case ExpressionType.LessThan:
                 case ExpressionType.LessThanOrEqual:
-                    return "(" + parameter.CommandText + " < $"+ parameter.CommandText.TrimStart('[').TrimEnd(']') + ")";
+                    return "(" + parameter.CommandText + " < $" + parameter.CommandText.TrimStart('[').TrimEnd(']') + ")";
                 default:
                     throw new NotSupportedException(
                         $"Cannot compile Null-BinaryExpression with type {expression.NodeType}");

@@ -31,20 +31,18 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-                    if object_id (N'TestTable') is not null
-                        drop table TestTable;";
+                    drop table if exists TestTable;";
                 cmd.ExecuteNonQuery();
             }
 
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
-                    if object_id (N'TestTable') is null
-                        create table TestTable (
-                            Id integer identity(1,1) primary key not null,
-                            Datum integer null,
-                            Test nvarchar(64) null
-                        );";
+                    create table if not exists TestTable (
+                        Id integer primary key autoincrement,
+                        Datum integer null,
+                        Test nvarchar(64) null
+                    );";
                 cmd.ExecuteNonQuery();
             }
 

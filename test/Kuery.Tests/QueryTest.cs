@@ -25,7 +25,7 @@ namespace Kuery.Tests
                 connection.Open();
                 connection.Execute("create table if not exists G(Value integer not null);");
                 connection.Execute(
-                    "insert into G(Value) values (@Value);",
+                    "insert into G(Value) values ($Value);",
                     param: new { Value = 42 });
 
                 var r = connection.Query<GenericObject>("select * from G");
