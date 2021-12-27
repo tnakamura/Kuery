@@ -37,39 +37,48 @@ namespace Kuery
             var values = new StringBuilder();
             var command = connection.CreateCommand();
 
-            for (var i = 0; i < map.InsertColumns.Length; i++)
+            if (map.InsertColumns.Length == 0 && map.Columns.Length > 0 && map.HasAutoIncPK)
             {
-                if (i > 0)
-                {
-                    columns.Append(",");
-                    values.Append(",");
-                }
-
-                var col = map.InsertColumns[i];
-                columns.Append("[" + col.Name + "]");
-
-                var value = col.GetValue(item);
-                if (value is null && col.IsNullable)
-                {
-                    values.Append("NULL");
-                }
-                else
-                {
-                    var parameter = command.CreateParameter();
-                    parameter.ParameterName = connection.GetParameterName(col.Name);
-                    parameter.Value = col.GetValue(item);
-                    command.Parameters.Add(parameter);
-                    values.Append(parameter.ParameterName);
-                }
+                command.CommandText = "insert into "
+                    + map.TableName
+                    + " default values";
             }
+            else
+            {
+                for (var i = 0; i < map.InsertColumns.Length; i++)
+                {
+                    if (i > 0)
+                    {
+                        columns.Append(",");
+                        values.Append(",");
+                    }
 
-            command.CommandText = "insert into "
-                + map.TableName
-                + " ("
-                + columns.ToString()
-                + ") values ("
-                + values.ToString()
-                + ");";
+                    var col = map.InsertColumns[i];
+                    columns.Append("[" + col.Name + "]");
+
+                    var value = col.GetValue(item);
+                    if (value is null && col.IsNullable)
+                    {
+                        values.Append("NULL");
+                    }
+                    else
+                    {
+                        var parameter = command.CreateParameter();
+                        parameter.ParameterName = connection.GetParameterName(col.Name);
+                        parameter.Value = col.GetValue(item);
+                        command.Parameters.Add(parameter);
+                        values.Append(parameter.ParameterName);
+                    }
+                }
+
+                command.CommandText = "insert into "
+                    + map.TableName
+                    + " ("
+                    + columns.ToString()
+                    + ") values ("
+                    + values.ToString()
+                    + ");";
+            }
 
             return command;
         }
@@ -182,39 +191,48 @@ namespace Kuery
             var values = new StringBuilder();
             var command = connection.CreateCommand();
 
-            for (var i = 0; i < map.InsertOrReplaceColumns.Length; i++)
+            if (map.InsertOrReplaceColumns.Length == 0 && map.Columns.Length > 0 && map.HasAutoIncPK)
             {
-                if (i > 0)
-                {
-                    columns.Append(",");
-                    values.Append(",");
-                }
-
-                var col = map.InsertOrReplaceColumns[i];
-                columns.Append("[" + col.Name + "]");
-
-                var value = col.GetValue(item);
-                if (value is null && col.IsNullable)
-                {
-                    values.Append("NULL");
-                }
-                else
-                {
-                    var parameter = command.CreateParameter();
-                    parameter.ParameterName = connection.GetParameterName(col.Name);
-                    parameter.Value = col.GetValue(item);
-                    command.Parameters.Add(parameter);
-                    values.Append(parameter.ParameterName);
-                }
+                command.CommandText = "insert or replace into "
+                    + map.TableName
+                    + " default values";
             }
+            else
+            {
+                for (var i = 0; i < map.InsertOrReplaceColumns.Length; i++)
+                {
+                    if (i > 0)
+                    {
+                        columns.Append(",");
+                        values.Append(",");
+                    }
 
-            command.CommandText = "insert or replace into "
-                + map.TableName
-                + " ("
-                + columns.ToString()
-                + ") values ("
-                + values.ToString()
-                + ");";
+                    var col = map.InsertOrReplaceColumns[i];
+                    columns.Append("[" + col.Name + "]");
+
+                    var value = col.GetValue(item);
+                    if (value is null && col.IsNullable)
+                    {
+                        values.Append("NULL");
+                    }
+                    else
+                    {
+                        var parameter = command.CreateParameter();
+                        parameter.ParameterName = connection.GetParameterName(col.Name);
+                        parameter.Value = col.GetValue(item);
+                        command.Parameters.Add(parameter);
+                        values.Append(parameter.ParameterName);
+                    }
+                }
+
+                command.CommandText = "insert or replace into "
+                    + map.TableName
+                    + " ("
+                    + columns.ToString()
+                    + ") values ("
+                    + values.ToString()
+                    + ");";
+            }
 
             return command;
         }

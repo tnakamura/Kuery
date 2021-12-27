@@ -43,11 +43,10 @@ namespace Kuery.Tests
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    if object_id (N'{nameof(EnumNullableTestObj)}') is null
-                        create table {nameof(EnumNullableTestObj)} (
-                            {nameof(EnumNullableTestObj.Id)} int primary key not null,
-                            {nameof(EnumNullableTestObj.Value)} int null
-                        );";
+                    create table {nameof(EnumNullableTestObj)} (
+                        {nameof(EnumNullableTestObj.Id)} int primary key,
+                        {nameof(EnumNullableTestObj.Value)} int null
+                    );";
                 cmd.ExecuteNonQuery();
             }
         }

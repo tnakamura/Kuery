@@ -220,41 +220,6 @@ namespace Kuery.Tests
             Assert.Equal(15m, r);
         }
 
-        interface IEntity
-        {
-            int Id { get; set; }
-            string Value { get; set; }
-        }
-
-        class Entity : IEntity
-        {
-            [AutoIncrement, PrimaryKey]
-            public int Id { get; set; }
-            public string Value { get; set; }
-        }
-
-        static T GetEntity<T>(DbConnection db, int id)
-            where T : IEntity, new()
-        {
-            return db.Table<T>().FirstOrDefault(x => x.Id == id);
-        }
-
-        [Fact]
-        public void CastedParameters()
-        {
-            using var con = fixture.OpenNewConnection();
-            CreateTables(con);
-
-            con.Insert(new Entity
-            {
-                Value = "Foo",
-            });
-
-            var r = GetEntity<Entity>(con, 1);
-
-            Assert.Equal("Foo", r.Value);
-        }
-
         [Fact]
         public void ReplaceWith2Args()
         {

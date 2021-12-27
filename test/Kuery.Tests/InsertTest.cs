@@ -2,7 +2,7 @@ using System;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
-using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Kuery.Tests
@@ -22,7 +22,8 @@ namespace Kuery.Tests
 
         public void Dispose()
         {
-            connection.Close();
+            DropTestTables(connection);
+            connection?.Close();
         }
 
         public class InsertTestObj
@@ -64,12 +65,17 @@ namespace Kuery.Tests
             public int Id { get; set; }
         }
 
-        void CreateTestTable(DbConnection connection)
+        private void DropTestTables(DbConnection connection)
         {
             connection.DropTable(nameof(InsertTestObj));
             connection.DropTable(nameof(InsertTestObj2));
             connection.DropTable(nameof(OneColumnObj));
             connection.DropTable(nameof(UniqueObj));
+        }
+
+        private void CreateTestTable(DbConnection connection)
+        {
+            DropTestTables(connection);
 
             using (var cmd = connection.CreateCommand())
             {
@@ -210,12 +216,14 @@ namespace Kuery.Tests
                 .ToList();
             testObjects[testObjects.Count - 1].Id = 1; // causes the insert to fail because of duplicate key
 
-            Assert.Throws<SqlException>(() =>
+            Assert.Throws<SqliteException>(() =>
             {
                 connection.InsertAll(testObjects);
             });
 
-            Assert.Equal(0, connection.Table<UniqueObj>().Count());
+            Assert.Equal(
+                testObjects.Count-1,
+                connection.Table<UniqueObj>().Count());
         }
 
         [Fact]
@@ -238,11 +246,19 @@ namespace Kuery.Tests
                 .ToList();
             testObjects[testObjects.Count - 1].Id = 1; // causes the insert to fail because of duplicate key
 
-            Assert.Throws<SqlException>(() =>
+            Assert.Throws<SqliteException>(() =>
             {
                 var tx = connection.BeginTransaction();
-                connection.InsertAll(testObjects, tx);
-                tx.Commit();
+                try
+                {
+                    connection.InsertAll(testObjects, tx);
+                    tx.Commit();
+                }
+                catch
+                {
+                    tx.Rollback();
+                    throw;
+                }
             });
 
             Assert.Equal(0, connection.Table<UniqueObj>().Count());
