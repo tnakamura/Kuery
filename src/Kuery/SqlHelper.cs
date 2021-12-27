@@ -80,20 +80,21 @@ namespace Kuery
         }
 
 
-        public static int Update<T>(this DbConnection connection, T item)
+        public static int Update<T>(this DbConnection connection, T item, DbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
 
-            return connection.Update(item, typeof(T));
+            return connection.Update(item, typeof(T), transaction);
         }
 
-        public static int Update(this DbConnection connection, object item, Type type)
+        public static int Update(this DbConnection connection, object item, Type type, DbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
 
             using (var command = connection.CreateUpdateCommand(item, type))
             {
+                command.Transaction = transaction;
                 return command.ExecuteNonQuery();
             }
         }
@@ -117,16 +118,16 @@ namespace Kuery
             return result;
         }
 
-        public static int InsertOrReplace(this DbConnection connection, object item)
+        public static int InsertOrReplace(this DbConnection connection, object item, DbTransaction transaction = null)
         {
             if (item == null)
             {
                 return 0;
             }
-            return connection.InsertOrReplace(item, Orm.GetType(item));
+            return connection.InsertOrReplace(item, Orm.GetType(item), transaction);
         }
 
-        public static int InsertOrReplace(this DbConnection connection, object item, Type type)
+        public static int InsertOrReplace(this DbConnection connection, object item, Type type, DbTransaction transaction = null)
         {
             if (item == null)
             {
@@ -134,31 +135,34 @@ namespace Kuery
             }
             using (var command = connection.CreateInsertOrReplaceCommand(item, type))
             {
+                command.Transaction = transaction;
                 return command.ExecuteNonQuery();
             }
         }
 
-        public static int Delete<T>(this DbConnection connection, T item)
+        public static int Delete<T>(this DbConnection connection, T item, DbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
 
             using (var command = connection.CreateDeleteCommand(item, typeof(T)))
             {
+                command.Transaction = transaction;
                 return command.ExecuteNonQuery();
             }
         }
 
-        public static int Delete<T>(this DbConnection connection, object primaryKey)
+        public static int Delete<T>(this DbConnection connection, object primaryKey, DbTransaction transaction = null)
         {
-            return Delete(connection, primaryKey, GetMapping<T>());
+            return Delete(connection, primaryKey, GetMapping<T>(), transaction);
         }
 
-        public static int Delete(this DbConnection connection, object primaryKey, TableMapping map)
+        public static int Delete(this DbConnection connection, object primaryKey, TableMapping map, DbTransaction transaction = null)
         {
             if (map == null) throw new ArgumentNullException(nameof(map));
 
             using (var command = connection.CreateDeleteCommand(primaryKey, map))
             {
+                command.Transaction = transaction;
                 return command.ExecuteNonQuery();
             }
         }

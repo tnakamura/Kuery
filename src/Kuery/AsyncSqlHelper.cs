@@ -69,20 +69,21 @@ namespace Kuery
             return result;
         }
 
-        public static Task<int> UpdateAsync<T>(this DbConnection connection, T item)
+        public static Task<int> UpdateAsync<T>(this DbConnection connection, T item, DbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
 
-            return connection.UpdateAsync(item, typeof(T));
+            return connection.UpdateAsync(item, typeof(T), transaction);
         }
 
-        public static Task<int> UpdateAsync(this DbConnection connection, object item, Type type)
+        public static Task<int> UpdateAsync(this DbConnection connection, object item, Type type, DbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
 
             using (var command = connection.CreateUpdateCommand(item, type))
             {
+                command.Transaction = transaction;
                 return command.ExecuteNonQueryAsync();
             }
         }
@@ -107,16 +108,16 @@ namespace Kuery
         }
 
 
-        public static Task<int> InsertOrReplaceAsync(this DbConnection connection, object item)
+        public static Task<int> InsertOrReplaceAsync(this DbConnection connection, object item, DbTransaction transaction = null)
         {
             if (item == null)
             {
                 return Task.FromResult(0);
             }
-            return connection.InsertOrReplaceAsync(item, Orm.GetType(item));
+            return connection.InsertOrReplaceAsync(item, Orm.GetType(item), transaction);
         }
 
-        public static Task<int> InsertOrReplaceAsync(this DbConnection connection, object item, Type type)
+        public static Task<int> InsertOrReplaceAsync(this DbConnection connection, object item, Type type, DbTransaction transaction = null)
         {
             if (type == null)
             {
@@ -128,31 +129,34 @@ namespace Kuery
             }
             using (var command = connection.CreateInsertOrReplaceCommand(item, type))
             {
+                command.Transaction = transaction;
                 return command.ExecuteNonQueryAsync();
             }
         }
 
-        public static Task<int> DeleteAsync<T>(this DbConnection connection, T item)
+        public static Task<int> DeleteAsync<T>(this DbConnection connection, T item, DbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
 
             using (var command = connection.CreateDeleteCommand(item, typeof(T)))
             {
+                command.Transaction = transaction;
                 return command.ExecuteNonQueryAsync();
             }
         }
 
-        public static Task<int> DeleteAsync<T>(this DbConnection connection, object primaryKey)
+        public static Task<int> DeleteAsync<T>(this DbConnection connection, object primaryKey, DbTransaction transaction = null)
         {
-            return DeleteAsync(connection, primaryKey, GetMapping<T>());
+            return DeleteAsync(connection, primaryKey, GetMapping<T>(), transaction);
         }
 
-        public static Task<int> DeleteAsync(this DbConnection connection, object primaryKey, TableMapping map)
+        public static Task<int> DeleteAsync(this DbConnection connection, object primaryKey, TableMapping map, DbTransaction transaction = null)
         {
             if (map == null) throw new ArgumentNullException(nameof(map));
 
             using (var command = connection.CreateDeleteCommand(primaryKey, map))
             {
+                command.Transaction = transaction;
                 return command.ExecuteNonQueryAsync();
             }
         }
