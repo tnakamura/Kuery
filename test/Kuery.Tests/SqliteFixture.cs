@@ -59,6 +59,8 @@ namespace Kuery.Tests
                 AppContext.BaseDirectory,
                 $"{dbName}.sqlite3");
 
+            DeleteDataSource();
+
             using (var connection = CreateConnection())
             {
                 connection.Open();
@@ -76,6 +78,11 @@ namespace Kuery.Tests
         }
 
         public void Dispose()
+        {
+            DeleteDataSource();
+        }
+
+        private void DeleteDataSource()
         {
             try
             {

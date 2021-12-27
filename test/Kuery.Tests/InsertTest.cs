@@ -110,7 +110,7 @@ namespace Kuery.Tests
         [Fact]
         public void InsertALot()
         {
-            int n = 10000;
+            int n = 100/*00*/;
             var q = from i in Enumerable.Range(1, n)
                     select new InsertTestObj()
                     {
