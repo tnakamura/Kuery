@@ -1,9 +1,10 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Kuery;
 
 namespace KueryBenchmark
 {
-    public class Update : BenchmarkBase
+    public class UpdateAsync : BenchmarkBase
     {
         private Todo _sqlitePclNetTodo;
 
@@ -21,7 +22,9 @@ namespace KueryBenchmark
                 CreatedAt = DateTimeOffset.Now,
                 UpdatedAt = DateTimeOffset.Now,
             };
-            SQLiteNetPclConnection.Insert(_sqlitePclNetTodo);
+            SQLiteNetPclAsyncConnection.InsertAsync(_sqlitePclNetTodo)
+                .GetAwaiter()
+                .GetResult();
             _sqlitePclNetTodo.Name = "Hoge";
             _sqlitePclNetTodo.Description = "Fuga";
             _sqlitePclNetTodo.IsDone = true;
@@ -44,11 +47,11 @@ namespace KueryBenchmark
         }
 
         [BenchmarkDotNet.Attributes.Benchmark]
-        public int SQLiteNetPCL() =>
-            SQLiteNetPclConnection.Update(_sqlitePclNetTodo);
+        public Task<int> SQLiteNetPCL() =>
+            SQLiteNetPclAsyncConnection.UpdateAsync(_sqlitePclNetTodo);
 
         [BenchmarkDotNet.Attributes.Benchmark]
-        public int Kuery() =>
-            KueryConnection.Update(_kueryTodo);
+        public Task<int> Kuery() =>
+            KueryConnection.UpdateAsync(_kueryTodo);
     }
 }

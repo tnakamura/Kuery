@@ -86,6 +86,8 @@ namespace KueryBenchmark
     {
         protected SQLite.SQLiteConnection SQLiteNetPclConnection { get; private set; }
 
+        protected SQLite.SQLiteAsyncConnection SQLiteNetPclAsyncConnection { get; private set; }
+
         protected Microsoft.Data.Sqlite.SqliteConnection KueryConnection { get; private set; }
 
         [BenchmarkDotNet.Attributes.GlobalSetup]
@@ -96,6 +98,12 @@ namespace KueryBenchmark
                     Path.Combine(
                         AppContext.BaseDirectory,
                         "sqlite-net-pcl.sqlite3")));
+
+            SQLiteNetPclAsyncConnection = new SQLite.SQLiteAsyncConnection(
+                new SQLite.SQLiteConnectionString(
+                    Path.Combine(
+                        AppContext.BaseDirectory,
+                        "sqlite-net-pcl.async.sqlite3")));
 
             KueryConnection = new Microsoft.Data.Sqlite.SqliteConnection(
                 new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
@@ -118,6 +126,9 @@ namespace KueryBenchmark
         {
             SQLiteNetPclConnection.CreateTable<Todo>();
 
+            SQLiteNetPclAsyncConnection.CreateTableAsync<Todo>()
+                .GetAwaiter().GetResult();
+
             KueryConnection.CreateTodoTable();
         }
 
@@ -125,6 +136,9 @@ namespace KueryBenchmark
         public virtual void IterationCleanup()
         {
             SQLiteNetPclConnection.DropTable<Todo>();
+
+            SQLiteNetPclAsyncConnection.DropTableAsync<Todo>()
+                .GetAwaiter().GetResult();
 
             KueryConnection.DropTodoTable();
         }

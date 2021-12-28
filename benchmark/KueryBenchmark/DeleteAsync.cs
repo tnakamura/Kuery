@@ -1,9 +1,10 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Kuery;
 
 namespace KueryBenchmark
 {
-    public class Update : BenchmarkBase
+    public class DeleteAsync : BenchmarkBase
     {
         private Todo _sqlitePclNetTodo;
 
@@ -21,11 +22,9 @@ namespace KueryBenchmark
                 CreatedAt = DateTimeOffset.Now,
                 UpdatedAt = DateTimeOffset.Now,
             };
-            SQLiteNetPclConnection.Insert(_sqlitePclNetTodo);
-            _sqlitePclNetTodo.Name = "Hoge";
-            _sqlitePclNetTodo.Description = "Fuga";
-            _sqlitePclNetTodo.IsDone = true;
-            _sqlitePclNetTodo.UpdatedAt = DateTimeOffset.Now;
+            SQLiteNetPclAsyncConnection.InsertAsync(_sqlitePclNetTodo)
+                .GetAwaiter()
+                .GetResult();
 
             _kueryTodo = new Todo
 
@@ -37,18 +36,14 @@ namespace KueryBenchmark
                 UpdatedAt = DateTimeOffset.Now,
             };
             KueryConnection.Insert(_kueryTodo);
-            _kueryTodo.Name = "Hoge";
-            _kueryTodo.Description = "Fuga";
-            _kueryTodo.IsDone = true;
-            _kueryTodo.UpdatedAt = DateTimeOffset.Now;
         }
 
         [BenchmarkDotNet.Attributes.Benchmark]
-        public int SQLiteNetPCL() =>
-            SQLiteNetPclConnection.Update(_sqlitePclNetTodo);
+        public Task<int> SQLiteNetPCL() =>
+            SQLiteNetPclAsyncConnection.DeleteAsync(_sqlitePclNetTodo);
 
         [BenchmarkDotNet.Attributes.Benchmark]
-        public int Kuery() =>
-            KueryConnection.Update(_kueryTodo);
+        public Task<int> Kuery() =>
+            KueryConnection.DeleteAsync(_kueryTodo);
     }
 }
