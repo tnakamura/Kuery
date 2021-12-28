@@ -67,10 +67,10 @@ namespace Kuery.Tests
 
         private void DropTestTables(DbConnection connection)
         {
-            connection.DropTable<InsertTestObj>();
-            connection.DropTable<InsertTestObj2>();
-            connection.DropTable<OneColumnObj>();
-            connection.DropTable<UniqueObj>();
+            connection.DropTable(nameof(InsertTestObj));
+            connection.DropTable(nameof(InsertTestObj2));
+            connection.DropTable(nameof(OneColumnObj));
+            connection.DropTable(nameof(UniqueObj));
         }
 
         private void CreateTestTable(DbConnection connection)

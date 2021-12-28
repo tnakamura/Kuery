@@ -372,19 +372,6 @@ namespace Kuery
                 return (T)Convert.ChangeType(result, clrType);
             }
         }
-
-        public static int DropTable<T>(this DbConnection connection)
-        {
-            return connection.DropTable(GetMapping<T>());
-        }
-
-        public static int DropTable(this DbConnection connection, TableMapping map)
-        {
-            using (var command = connection.CreateDropTableCommand(map))
-            {
-                return command.ExecuteNonQuery();
-            }
-        }
     }
 
     [AttributeUsage(AttributeTargets.Class)]

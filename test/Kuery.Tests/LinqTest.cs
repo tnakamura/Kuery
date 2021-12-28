@@ -17,10 +17,10 @@ namespace Kuery.Tests
 
         void CreateTables(DbConnection connection)
         {
-            connection.DropTable<Product>();
-            connection.DropTable<Order>();
-            connection.DropTable<OrderLine>();
-            connection.DropTable<OrderHistory>();
+            connection.DropTable(nameof(Product));
+            connection.DropTable(nameof(Order));
+            connection.DropTable(nameof(OrderLine));
+            connection.DropTable(nameof(OrderHistory));
 
             using (var cmd = connection.CreateCommand())
             {

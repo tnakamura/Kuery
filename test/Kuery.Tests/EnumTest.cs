@@ -64,9 +64,9 @@ namespace Kuery.Tests
 
         void CreateTestTable(DbConnection connection)
         {
-            connection.DropTable<EnumTestObj>();
-            connection.DropTable<StringTestObj>();
-            connection.DropTable<ByteTestObj>();
+            connection.DropTable(nameof(EnumTestObj));
+            connection.DropTable(nameof(StringTestObj));
+            connection.DropTable(nameof(ByteTestObj));
 
             using (var cmd = connection.CreateCommand())
             {

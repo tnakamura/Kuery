@@ -295,12 +295,5 @@ namespace Kuery
 
             return command;
         }
-
-        internal static DbCommand CreateDropTableCommand(this DbConnection connection, TableMapping map)
-        {
-            var command = connection.CreateCommand();
-            command.CommandText = $"drop table if exists [{map.TableName}]";
-            return command;
-        }
     }
 }

@@ -28,7 +28,7 @@ namespace Kuery.Tests
 
         void CreateTestTable(DbConnection connection)
         {
-            connection.DropTable<TestObjString>();
+            connection.DropTable(nameof(TestObjString));
 
             using (var cmd = connection.CreateCommand())
             {

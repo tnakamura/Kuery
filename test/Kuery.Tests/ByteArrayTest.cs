@@ -45,7 +45,7 @@ namespace Kuery.Tests
 
         void CreateTestTable(DbConnection connection)
         {
-            connection.DropTable<ByteArrayClass>();
+            connection.DropTable(nameof(ByteArrayClass));
 
             using (var cmd = connection.CreateCommand())
             {

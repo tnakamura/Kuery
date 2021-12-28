@@ -38,7 +38,7 @@ namespace Kuery.Tests
 
         void CreateTable(DbConnection connection)
         {
-            connection.DropTable<EnumNullableTestObj>();
+            connection.DropTable(nameof(EnumNullableTestObj));
 
             using (var cmd = connection.CreateCommand())
             {
