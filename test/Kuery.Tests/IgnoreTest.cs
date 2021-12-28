@@ -40,7 +40,7 @@ namespace Kuery.Tests
 
         void CreateIgnoreTestObjTable(DbConnection connection)
         {
-            connection.DropTable(nameof(IgnoreTestObj));
+            connection.DropTable<IgnoreTestObj>();
 
             using (var cmd = connection.CreateCommand())
             {
@@ -117,7 +117,7 @@ namespace Kuery.Tests
 
         void CreateIgnoreInheritTableClassTable(DbConnection connection)
         {
-            connection.DropTable(nameof(IgnoreInheritTableClass));
+            connection.DropTable<IgnoreInheritTableClass>();
 
             using (var cmd = connection.CreateCommand())
             {
@@ -164,7 +164,7 @@ namespace Kuery.Tests
 
         void CreateRedefinedClassTable(DbConnection connection)
         {
-            connection.DropTable(nameof(RedefinedClass));
+            connection.DropTable<RedefinedClass>();
 
             using (var cmd = connection.CreateCommand())
             {

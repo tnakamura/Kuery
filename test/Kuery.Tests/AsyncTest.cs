@@ -33,7 +33,7 @@ namespace Kuery.Tests
 
         void CreateTable(DbConnection connection)
         {
-            connection.DropTable(nameof(AsyncCustomer));
+            connection.DropTable<AsyncCustomer>();
 
             using (var cmd = connection.CreateCommand())
             {
