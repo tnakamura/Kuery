@@ -490,7 +490,7 @@ namespace Kuery
 
         public bool WithoutRowId { get; private set; }
 
-        public Column[] Columns { get; private set; }
+        public IReadOnlyList<Column> Columns { get; private set; }
 
         public Column PK { get; private set; }
 
@@ -498,7 +498,7 @@ namespace Kuery
 
         public CreateFlags CreateFlags { get; private set; }
 
-        readonly Column _autoPk;
+        private readonly Column _autoPk;
 
         public TableMapping(Type type, CreateFlags createFlags = CreateFlags.None)
         {
@@ -602,7 +602,7 @@ namespace Kuery
 
         public sealed class Column
         {
-            readonly PropertyInfo _prop;
+            private readonly PropertyInfo _prop;
 
             public string Name { get; private set; }
 
@@ -755,7 +755,7 @@ namespace Kuery
         }
     }
 
-    class EnumCacheInfo
+    sealed class EnumCacheInfo
     {
         public EnumCacheInfo(Type type)
         {
@@ -787,7 +787,7 @@ namespace Kuery
 
     static class EnumCache
     {
-        static readonly Dictionary<Type, EnumCacheInfo> Cache = new Dictionary<Type, EnumCacheInfo>();
+        private static readonly Dictionary<Type, EnumCacheInfo> Cache = new Dictionary<Type, EnumCacheInfo>();
 
         public static EnumCacheInfo GetInfo<T>()
         {
@@ -808,7 +808,7 @@ namespace Kuery
         }
     }
 
-    public static class Orm
+    static class Orm
     {
         public const int DefaultMaxStringLength = 140;
         public const string ImplicitPkName = "Id";
@@ -1036,7 +1036,7 @@ namespace Kuery
         }
     }
 
-    public class TableQuery<T> : BaseTableQuery, IEnumerable<T>
+    public sealed class TableQuery<T> : BaseTableQuery, IEnumerable<T>
     {
         public DbConnection Connection { get; private set; }
 

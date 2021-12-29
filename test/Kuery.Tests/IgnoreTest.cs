@@ -58,7 +58,7 @@ namespace Kuery.Tests
         {
             var m = SqlHelper.GetMapping<IgnoreTestObj>();
 
-            Assert.Equal(2, m.Columns.Length);
+            Assert.Equal(2, m.Columns.Count);
         }
 
         [Fact]

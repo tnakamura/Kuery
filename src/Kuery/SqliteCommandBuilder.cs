@@ -37,7 +37,7 @@ namespace Kuery
             var values = new StringBuilder();
             var command = connection.CreateCommand();
 
-            if (map.InsertColumns.Length == 0 && map.Columns.Length > 0 && map.HasAutoIncPK)
+            if (map.InsertColumns.Length == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
             {
                 command.CommandText = "insert into "
                     + map.TableName
@@ -208,7 +208,7 @@ namespace Kuery
             var values = new StringBuilder();
             var command = connection.CreateCommand();
 
-            if (map.InsertOrReplaceColumns.Length == 0 && map.Columns.Length > 0 && map.HasAutoIncPK)
+            if (map.InsertOrReplaceColumns.Length == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
             {
                 command.CommandText = "insert or replace into "
                     + map.TableName
