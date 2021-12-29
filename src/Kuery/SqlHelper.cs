@@ -590,9 +590,9 @@ namespace Kuery
             }
         }
 
-        public Column[] InsertColumns { get; }
+        public IReadOnlyList<Column> InsertColumns { get; }
 
-        public Column[] InsertOrReplaceColumns { get; }
+        public IReadOnlyList<Column> InsertOrReplaceColumns { get; }
 
         public Column FindColumnWithPropertyName(string propertyName) =>
             Columns.FirstOrDefault(x => x.PropertyName == propertyName);
