@@ -310,7 +310,7 @@ namespace Kuery
                     _mappings.Add(key, map);
                 }
             }
-            return new TableMapping(type);
+            return map;
         }
 
         public static IEnumerable<T> Query<T>(this DbConnection connection, string sql, object param = null)
