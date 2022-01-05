@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Data;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data.Common;
@@ -31,7 +32,7 @@ namespace Kuery
             var map = GetMapping(type);
             if (map.PK != null &&
                 map.PK.IsAutoGuid &&
-                (Guid)map.PK.GetValue(item)==Guid.Empty)
+                (Guid)map.PK.GetValue(item) == Guid.Empty)
             {
                 map.PK.SetValue(item, Guid.NewGuid());
             }
@@ -230,22 +231,57 @@ namespace Kuery
             var result = new List<T>();
             using (var reader = command.ExecuteReader())
             {
-                var cols = new TableMapping.Column[reader.FieldCount];
-                for (var i = 0; i < cols.Length; i++)
+                var fastSetters = new Action<object, IDataRecord, int>[reader.FieldCount];
+                MethodInfo getSetter = null;
+                if (typeof(T) != map.MappedType)
+                {
+                    getSetter = typeof(FastColumnSetter)
+                        .GetMethod(
+                            nameof(FastColumnSetter.GetFastSetter),
+                            BindingFlags.NonPublic | BindingFlags.Static)
+                        .MakeGenericMethod(map.MappedType);
+                }
+
+                var columns = new TableMapping.Column[reader.FieldCount];
+                for (var i = 0; i < columns.Length; i++)
                 {
                     var name = reader.GetName(i);
-                    cols[i] = map.FindColumn(name);
+                    columns[i] = map.FindColumn(name);
+                    if (columns[i] != null)
+                    {
+                        if (getSetter != null)
+                        {
+                            fastSetters[i] = (Action<object, IDataRecord, int>)getSetter.Invoke(
+                                null,
+                                new object[] { command.Connection, columns[i] });
+                        }
+                        else
+                        {
+                            fastSetters[i] = FastColumnSetter.GetFastSetter<T>(command.Connection, columns[i]);
+                        }
+                    }
                 }
 
                 while (reader.Read())
                 {
                     var obj = Activator.CreateInstance(map.MappedType);
-                    for (var i = 0; i < cols.Length; i++)
+                    for (var i = 0; i < columns.Length; i++)
                     {
-                        var col = cols[i];
-                        var val = reader.GetValue(i);
-                        // TODO:
-                        col.SetValue(obj, val);
+                        if (columns[i] == null)
+                        {
+                            continue;
+                        }
+
+                        if (fastSetters[i] != null)
+                        {
+                            fastSetters[i].Invoke(obj, reader, i);
+                        }
+                        else
+                        {
+                            var col = columns[i];
+                            var val = reader.GetValue(i);
+                            col.SetValue(obj, val);
+                        }
                     }
                     result.Add((T)obj);
                 }
@@ -1802,6 +1838,234 @@ namespace Kuery
         public Task<T> FirstOrDefaultAsync(Expression<Func<T, bool>> predExpr)
         {
             return Where(predExpr).FirstOrDefaultAsync();
+        }
+    }
+
+    static class FastColumnSetter
+    {
+        internal static Action<object, IDataRecord, int> GetFastSetter<T>(
+            this DbConnection connection,
+            TableMapping.Column column)
+        {
+            Action<object, IDataRecord, int> fastSetter = null;
+            var clrType = column.PropertyInfo.PropertyType;
+            var clrTypeInfo = clrType.GetTypeInfo();
+
+            if (clrTypeInfo.IsGenericType && clrTypeInfo.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                clrType = clrTypeInfo.GenericTypeArguments[0];
+                clrTypeInfo = clrType.GetTypeInfo();
+            }
+
+            if (clrType == typeof(string))
+            {
+                fastSetter = CreateTypedSetterDelegate<T, string>(column, (r, i) =>
+                {
+                    return r.GetString(i);
+                });
+            }
+            else if (clrType == typeof(bool))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, bool>(column, (r, i) =>
+                {
+                    return r.GetBoolean(i);
+                });
+            }
+            else if (clrType == typeof(int))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, int>(column, (r, i) =>
+                {
+                    return r.GetInt32(i);
+                });
+            }
+            else if (clrType == typeof(long))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, long>(column, (r, i) =>
+                {
+                    return r.GetInt64(i);
+                });
+            }
+            else if (clrType == typeof(short))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, short>(column, (r, i) =>
+                {
+                    return r.GetInt16(i);
+                });
+            }
+            else if (clrType == typeof(decimal))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, decimal>(column, (r, i) =>
+                {
+                    return r.GetDecimal(i);
+                });
+            }
+            else if (clrType == typeof(double))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, double>(column, (r, i) =>
+                {
+                    return r.GetDouble(i);
+                });
+            }
+            else if (clrType == typeof(float))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, float>(column, (r, i) =>
+                {
+                    return r.GetFloat(i);
+                });
+            }
+            else if (clrType == typeof(DateTime))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, DateTime>(column, (r, i) =>
+                {
+                    return r.GetDateTime(i);
+                });
+            }
+            else if (clrType == typeof(DateTimeOffset))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, DateTimeOffset>(column, (r, i) =>
+                {
+                    var value = r.GetValue(i);
+                    if (value is string s)
+                    {
+                        return DateTimeOffset.Parse(s);
+                    }
+                    else
+                    {
+                        return (DateTimeOffset)value;
+                    }
+                });
+            }
+            else if (clrType == typeof(TimeSpan))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, TimeSpan>(column, (r, i) =>
+                {
+                    var value = r.GetValue(i);
+                    if (value is string s)
+                    {
+                        return TimeSpan.Parse(s);
+                    }
+                    else
+                    {
+                        return (TimeSpan)value;
+                    }
+                });
+            }
+            else if (clrType == typeof(byte[]))
+            {
+                fastSetter = CreateTypedSetterDelegate<T, byte[]>(column, (r, i) =>
+                {
+                    return (byte[])r.GetValue(i);
+                });
+            }
+            else if (clrType == typeof(byte))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, byte>(column, (r, i) =>
+                {
+                    return r.GetByte(i);
+                });
+            }
+            else if (clrType == typeof(sbyte))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, sbyte>(column, (r, i) =>
+                {
+                    return (sbyte)Convert.ChangeType(r.GetValue(i), typeof(sbyte));
+                });
+            }
+            else if (clrType == typeof(uint))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, uint>(column, (r, i) =>
+                {
+                    return (uint)Convert.ChangeType(r.GetValue(i), typeof(uint));
+                });
+            }
+            else if (clrType == typeof(ulong))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, ulong>(column, (r, i) =>
+                {
+                    return (ulong)Convert.ChangeType(r.GetValue(i), typeof(ulong));
+                });
+            }
+            else if (clrType == typeof(ushort))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, ushort>(column, (r, i) =>
+                {
+                    return (ushort)Convert.ChangeType(r.GetValue(i), typeof(ushort));
+                });
+            }
+            else if (clrType == typeof(Guid))
+            {
+                fastSetter = CreateNullableTypedSetterDelegate<T, Guid>(column, (r, i) =>
+                {
+                    return r.GetGuid(i);
+                });
+            }
+            else if (clrType == typeof(Uri))
+            {
+                fastSetter = CreateTypedSetterDelegate<T, Uri>(column, (r, i) =>
+                {
+                    var s = r.GetString(i);
+                    return new Uri(s);
+                });
+            }
+            else if (clrType == typeof(StringBuilder))
+            {
+                fastSetter = CreateTypedSetterDelegate<T, StringBuilder>(column, (r, i) =>
+                {
+                    var s = r.GetString(i);
+                    return new StringBuilder(s);
+                });
+            }
+            else if (clrType == typeof(UriBuilder))
+            {
+                fastSetter = CreateTypedSetterDelegate<T, UriBuilder>(column, (r, i) =>
+                {
+                    var s = r.GetString(i);
+                    return new UriBuilder(s);
+                });
+            }
+
+            return fastSetter;
+        }
+
+        private static Action<object, IDataRecord, int> CreateNullableTypedSetterDelegate<TObject, TColumnMember>(
+            TableMapping.Column column,
+            Func<IDataRecord, int, TColumnMember> getColumnValue)
+            where TColumnMember : struct
+        {
+            var clrTypeInfo = column.PropertyInfo.PropertyType.GetTypeInfo();
+            var isNullable = clrTypeInfo.IsGenericType && clrTypeInfo.GetGenericTypeDefinition() == typeof(Nullable<>);
+            if (isNullable)
+            {
+                var setProperty = (Action<TObject, TColumnMember?>)Delegate.CreateDelegate(
+                    typeof(Action<TObject, TColumnMember?>),
+                    null,
+                    column.PropertyInfo.GetSetMethod());
+                return (o, r, i) =>
+                {
+                    if (!r.IsDBNull(i))
+                    {
+                        setProperty.Invoke((TObject)o, getColumnValue(r, i));
+                    }
+                };
+            }
+            return CreateTypedSetterDelegate<TObject, TColumnMember>(column, getColumnValue);
+        }
+
+        private static Action<object, IDataRecord, int> CreateTypedSetterDelegate<TObject, TColumnMember>(
+            TableMapping.Column column,
+            Func<IDataRecord, int, TColumnMember> getColumnValue)
+        {
+            var setProperty = (Action<TObject, TColumnMember>)Delegate.CreateDelegate(
+                typeof(Action<TObject, TColumnMember>),
+                null,
+                column.PropertyInfo.GetSetMethod());
+            return (o, r, i) =>
+            {
+                if (!r.IsDBNull(i))
+                {
+                    setProperty.Invoke((TObject)o, getColumnValue(r, i));
+                }
+            };
         }
     }
 }
