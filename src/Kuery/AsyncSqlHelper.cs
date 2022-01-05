@@ -22,7 +22,7 @@ namespace Kuery
             var map = GetMapping(type);
             if (map.PK != null &&
                 map.PK.IsAutoGuid &&
-                (Guid)map.PK.GetValue(item)==Guid.Empty)
+                (Guid)map.PK.GetValue(item) == Guid.Empty)
             {
                 map.PK.SetValue(item, Guid.NewGuid());
             }
@@ -152,12 +152,13 @@ namespace Kuery
             }
         }
 
-        public static Task<int> DeleteAsync<T>(this DbConnection connection, object primaryKey, DbTransaction transaction = null)
-        {
-            return DeleteAsync(connection, primaryKey, GetMapping<T>(), transaction);
-        }
+        public static Task<int> DeleteAsync<T>(this DbConnection connection, object primaryKey, DbTransaction transaction = null) =>
+            connection.DeleteAsync(GetMapping<T>(), primaryKey, transaction);
 
-        public static Task<int> DeleteAsync(this DbConnection connection, object primaryKey, TableMapping map, DbTransaction transaction = null)
+        public static Task<int> DeleteAsync(this DbConnection connection, Type type, object primaryKey, DbTransaction transaction = null) =>
+            connection.DeleteAsync(GetMapping(type), primaryKey, transaction);
+
+        private static Task<int> DeleteAsync(this DbConnection connection, TableMapping map, object primaryKey, DbTransaction transaction = null)
         {
             if (map == null) throw new ArgumentNullException(nameof(map));
 
@@ -176,7 +177,7 @@ namespace Kuery
             return connection.FindAsync<T>(pk, map);
         }
 
-        public static async Task<T> FindAsync<T>(this DbConnection connection, object pk, TableMapping mapping)
+        private static async Task<T> FindAsync<T>(this DbConnection connection, object pk, TableMapping mapping)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
@@ -206,7 +207,7 @@ namespace Kuery
             return connection.GetAsync<T>(pk, map);
         }
 
-        public static async Task<T> GetAsync<T>(this DbConnection connection, object pk, TableMapping mapping)
+        private static async Task<T> GetAsync<T>(this DbConnection connection, object pk, TableMapping mapping)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
@@ -284,7 +285,10 @@ namespace Kuery
             }
         }
 
-        public static async Task<IEnumerable<object>> QueryAsync(this DbConnection connection, TableMapping mapping, string sql, object param = null)
+        public static Task<IEnumerable<object>> QueryAsync(this DbConnection connection, Type type, string sql, object param = null) =>
+            connection.QueryAsync(GetMapping(type), sql, param);
+
+        private static async Task<IEnumerable<object>> QueryAsync(this DbConnection connection, TableMapping mapping, string sql, object param = null)
         {
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
 
@@ -302,7 +306,10 @@ namespace Kuery
             }
         }
 
-        public static Task<object> FindWithQueryAsync(this DbConnection connection, TableMapping mapping, string sql, object param = null)
+        public static Task<object> FindWithQueryAsync(this DbConnection connection, Type type, string sql, object param = null) =>
+            connection.FindWithQueryAsync(GetMapping(type), sql, param);
+
+        private static Task<object> FindWithQueryAsync(this DbConnection connection, TableMapping mapping, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {

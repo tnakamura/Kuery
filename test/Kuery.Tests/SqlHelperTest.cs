@@ -1732,7 +1732,7 @@ namespace Kuery.Tests
                 }
 
                 var customer = connection.FindWithQuery(
-                    new TableMapping(typeof(Customer)),
+                    typeof(Customer),
                     @"SELECT * FROM customers WHERE id > 1");
 
                 Assert.Equal(2, ((Customer)customer).Id);
@@ -1816,7 +1816,7 @@ namespace Kuery.Tests
                 }
 
                 var customer = connection.FindWithQuery(
-                    new TableMapping(typeof(Customer)),
+                    typeof(Customer),
                     @"SELECT * FROM customers WHERE id > $id",
                     new
                     {
@@ -1897,7 +1897,7 @@ namespace Kuery.Tests
                 }
 
                 var customer = await connection.FindWithQueryAsync(
-                    new TableMapping(typeof(Customer)),
+                    typeof(Customer),
                     @"SELECT * FROM customers WHERE id > 1");
 
                 Assert.Equal(2, ((Customer)customer).Id);
@@ -1981,7 +1981,7 @@ namespace Kuery.Tests
                 }
 
                 var customer = await connection.FindWithQueryAsync(
-                    new TableMapping(typeof(Customer)),
+                    typeof(Customer),
                     @"SELECT * FROM customers WHERE id > $id",
                     new
                     {
@@ -2051,7 +2051,7 @@ namespace Kuery.Tests
                 }
 
                 var customers = connection.Query(
-                    new TableMapping(typeof(Customer)),
+                    typeof(Customer),
                     @"SELECT * FROM customers WHERE id > 1")
                     .ToList();
 
@@ -2079,7 +2079,7 @@ namespace Kuery.Tests
                 }
 
                 var customers = connection.Query(
-                    new TableMapping(typeof(Customer)),
+                    typeof(Customer),
                     @"SELECT * FROM customers WHERE id > $id",
                     new
                     {
@@ -2112,7 +2112,7 @@ namespace Kuery.Tests
 
                 var customers = (
                     await connection.QueryAsync(
-                        new TableMapping(typeof(Customer)),
+                        typeof(Customer),
                         @"SELECT * FROM customers WHERE id > 1")
                 ).ToList();
 
@@ -2141,7 +2141,7 @@ namespace Kuery.Tests
 
                 var customers = (
                     await connection.QueryAsync(
-                        new TableMapping(typeof(Customer)),
+                        typeof(Customer),
                         @"SELECT * FROM customers WHERE id > $id",
                         new
                         {

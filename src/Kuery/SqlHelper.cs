@@ -159,12 +159,13 @@ namespace Kuery
             }
         }
 
-        public static int Delete<T>(this DbConnection connection, object primaryKey, DbTransaction transaction = null)
-        {
-            return Delete(connection, primaryKey, GetMapping<T>(), transaction);
-        }
+        public static int Delete<T>(this DbConnection connection, object primaryKey, DbTransaction transaction = null) =>
+            connection.Delete(GetMapping<T>(), primaryKey, transaction);
 
-        public static int Delete(this DbConnection connection, object primaryKey, TableMapping map, DbTransaction transaction = null)
+        public static int Delete(this DbConnection connection, Type type, object primaryKey, DbTransaction transaction = null) =>
+            connection.Delete(GetMapping(type), primaryKey, transaction);
+
+        private static int Delete(this DbConnection connection, TableMapping map, object primaryKey, DbTransaction transaction = null)
         {
             if (map == null) throw new ArgumentNullException(nameof(map));
 
@@ -184,7 +185,7 @@ namespace Kuery
             return connection.Find<T>(pk, map);
         }
 
-        public static T Find<T>(this DbConnection connection, object pk, TableMapping mapping)
+        private static T Find<T>(this DbConnection connection, object pk, TableMapping mapping)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
@@ -211,10 +212,13 @@ namespace Kuery
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
             var map = GetMapping(typeof(T));
-            return connection.Get<T>(pk, map);
+            return connection.Get<T>(map, pk);
         }
 
-        public static T Get<T>(this DbConnection connection, object pk, TableMapping mapping)
+        public static T Get<T>(this DbConnection connection, Type type, object pk) =>
+            connection.Get<T>(GetMapping(type), pk);
+
+        private static T Get<T>(this DbConnection connection, TableMapping mapping, object pk)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
@@ -322,12 +326,10 @@ namespace Kuery
 
         static readonly Dictionary<string, TableMapping> _mappings = new Dictionary<string, TableMapping>();
 
-        public static TableMapping GetMapping<T>(CreateFlags createFlags = CreateFlags.None)
-        {
-            return GetMapping(typeof(T), createFlags);
-        }
+        internal static TableMapping GetMapping<T>(CreateFlags createFlags = CreateFlags.None) =>
+            GetMapping(typeof(T), createFlags);
 
-        public static TableMapping GetMapping(Type type, CreateFlags createFlags = CreateFlags.None)
+        internal static TableMapping GetMapping(Type type, CreateFlags createFlags = CreateFlags.None)
         {
             TableMapping map;
             var key = type.FullName;
@@ -358,7 +360,10 @@ namespace Kuery
             }
         }
 
-        public static IEnumerable<object> Query(this DbConnection connection, TableMapping mapping, string sql, object param = null)
+        public static IEnumerable<object> Query(this DbConnection connection, Type type, string sql, object param = null) =>
+            connection.Query(GetMapping(type), sql, param);
+
+        private static IEnumerable<object> Query(this DbConnection connection, TableMapping mapping, string sql, object param = null)
         {
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
 
@@ -376,7 +381,10 @@ namespace Kuery
             }
         }
 
-        public static object FindWithQuery(this DbConnection connection, TableMapping mapping, string sql, object param = null)
+        public static object FindWithQuery(this DbConnection connection, Type type, string sql, object param = null) =>
+            connection.FindWithQuery(GetMapping(type), sql, param);
+
+        private static object FindWithQuery(this DbConnection connection, TableMapping mapping, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
@@ -519,7 +527,7 @@ namespace Kuery
     {
     }
 
-    public sealed class TableMapping
+    internal sealed class TableMapping
     {
         public Type MappedType { get; private set; }
 
@@ -1084,7 +1092,7 @@ namespace Kuery
     {
         public DbConnection Connection { get; private set; }
 
-        public TableMapping Table { get; private set; }
+        internal TableMapping Table { get; private set; }
 
         Expression _where;
 
@@ -1109,13 +1117,13 @@ namespace Kuery
         bool _deferred;
 
 
-        public TableQuery(DbConnection connection, TableMapping table)
+        internal TableQuery(DbConnection connection, TableMapping table)
         {
             Connection = connection;
             Table = table;
         }
 
-        public TableQuery(DbConnection connection)
+        internal TableQuery(DbConnection connection)
         {
             Connection = connection;
             Table = SqlHelper.GetMapping(typeof(T));
