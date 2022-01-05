@@ -21,7 +21,7 @@ namespace Kuery.Tests
             using (var connection = fixture.CreateConnection())
             {
                 connection.Open();
-                using (var command=connection.CreateCommand())
+                using (var command = connection.CreateCommand())
                 {
                     command.CommandText = "DELETE FROM customers";
                     command.ExecuteNonQuery();
@@ -1421,6 +1421,7 @@ namespace Kuery.Tests
                 connection.Open();
 
                 var insertedCount = connection.InsertAll(
+                    typeof(Customer),
                     new List<Customer>()
                     {
                         new Customer
@@ -1435,8 +1436,7 @@ namespace Kuery.Tests
                             Code = "222",
                             Name = "bar",
                         },
-                    },
-                    typeof(Customer));
+                    });
 
                 Assert.Equal(2, insertedCount);
             }
@@ -1450,6 +1450,7 @@ namespace Kuery.Tests
                 await connection.OpenAsync();
 
                 var insertedCount = await connection.InsertAllAsync(
+                    typeof(Customer),
                     new List<Customer>()
                     {
                         new Customer
@@ -1464,8 +1465,7 @@ namespace Kuery.Tests
                             Code = "222",
                             Name = "bar",
                         },
-                    },
-                    typeof(Customer));
+                    });
 
                 Assert.Equal(2, insertedCount);
             }

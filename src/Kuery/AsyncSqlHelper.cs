@@ -12,9 +12,9 @@ namespace Kuery
     {
 
         public static Task<int> InsertAsync<T>(this DbConnection connection, T item, DbTransaction transaction = null) =>
-            connection.InsertAsync(item, typeof(T), transaction);
+            connection.InsertAsync(typeof(T), item, transaction);
 
-        public static async Task<int> InsertAsync(this DbConnection connection, object item, Type type, DbTransaction transaction = null)
+        public static async Task<int> InsertAsync(this DbConnection connection, Type type, object item, DbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
@@ -59,19 +59,19 @@ namespace Kuery
             var result = 0;
             foreach (var item in items)
             {
-                result += await connection.InsertAsync(item, Orm.GetType(item), transaction);
+                result += await connection.InsertAsync(Orm.GetType(item), item, transaction);
             }
             return result;
         }
 
-        public static async Task<int> InsertAllAsync(this DbConnection connection, IEnumerable items, Type type, DbTransaction transaction = null)
+        public static async Task<int> InsertAllAsync(this DbConnection connection, Type type, IEnumerable items, DbTransaction transaction = null)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
 
             var result = 0;
             foreach (var item in items)
             {
-                result += await connection.InsertAsync(item, type, transaction);
+                result += await connection.InsertAsync(type, item, transaction);
             }
             return result;
         }
@@ -80,10 +80,10 @@ namespace Kuery
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
 
-            return connection.UpdateAsync(item, typeof(T), transaction);
+            return connection.UpdateAsync(typeof(T), item, transaction);
         }
 
-        public static Task<int> UpdateAsync(this DbConnection connection, object item, Type type, DbTransaction transaction = null)
+        public static Task<int> UpdateAsync(this DbConnection connection, Type type, object item, DbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
@@ -121,10 +121,10 @@ namespace Kuery
             {
                 return Task.FromResult(0);
             }
-            return connection.InsertOrReplaceAsync(item, Orm.GetType(item), transaction);
+            return connection.InsertOrReplaceAsync(Orm.GetType(item), item, transaction);
         }
 
-        public static Task<int> InsertOrReplaceAsync(this DbConnection connection, object item, Type type, DbTransaction transaction = null)
+        public static Task<int> InsertOrReplaceAsync(this DbConnection connection, Type type, object item, DbTransaction transaction = null)
         {
             if (type == null)
             {
@@ -174,10 +174,10 @@ namespace Kuery
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
             var map = GetMapping(typeof(T));
-            return connection.FindAsync<T>(pk, map);
+            return connection.FindAsync<T>(map, pk);
         }
 
-        private static async Task<T> FindAsync<T>(this DbConnection connection, object pk, TableMapping mapping)
+        private static async Task<T> FindAsync<T>(this DbConnection connection, TableMapping mapping, object pk)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
@@ -204,10 +204,10 @@ namespace Kuery
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
             var map = GetMapping(typeof(T));
-            return connection.GetAsync<T>(pk, map);
+            return connection.GetAsync<T>(map, pk);
         }
 
-        private static async Task<T> GetAsync<T>(this DbConnection connection, object pk, TableMapping mapping)
+        private static async Task<T> GetAsync<T>(this DbConnection connection, TableMapping mapping, object pk)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));

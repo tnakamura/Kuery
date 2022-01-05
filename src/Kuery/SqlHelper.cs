@@ -22,9 +22,9 @@ namespace Kuery
         }
 
         public static int Insert<T>(this DbConnection connection, T item, DbTransaction transaction = null) =>
-            connection.Insert(item, typeof(T), transaction);
+            connection.Insert(typeof(T), item, transaction);
 
-        public static int Insert(this DbConnection connection, object item, Type type, DbTransaction transaction = null)
+        public static int Insert(this DbConnection connection, Type type, object item, DbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
@@ -69,12 +69,12 @@ namespace Kuery
             var result = 0;
             foreach (var item in items)
             {
-                result += connection.Insert(item, Orm.GetType(item), transaction);
+                result += connection.Insert(Orm.GetType(item), item, transaction);
             }
             return result;
         }
 
-        public static int InsertAll(this DbConnection connection, IEnumerable items, Type type, DbTransaction transaction = null)
+        public static int InsertAll(this DbConnection connection, Type type, IEnumerable items, DbTransaction transaction = null)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
             if (type == null) throw new ArgumentNullException(nameof(type));
@@ -82,7 +82,7 @@ namespace Kuery
             var result = 0;
             foreach (var item in items)
             {
-                result += connection.Insert(item, type, transaction);
+                result += connection.Insert(type, item, transaction);
             }
             return result;
         }
@@ -92,10 +92,10 @@ namespace Kuery
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
 
-            return connection.Update(item, typeof(T), transaction);
+            return connection.Update(typeof(T), item, transaction);
         }
 
-        public static int Update(this DbConnection connection, object item, Type type, DbTransaction transaction = null)
+        public static int Update(this DbConnection connection, Type type, object item, DbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
@@ -132,10 +132,10 @@ namespace Kuery
             {
                 return 0;
             }
-            return connection.InsertOrReplace(item, Orm.GetType(item), transaction);
+            return connection.InsertOrReplace(Orm.GetType(item), item, transaction);
         }
 
-        public static int InsertOrReplace(this DbConnection connection, object item, Type type, DbTransaction transaction = null)
+        public static int InsertOrReplace(this DbConnection connection, Type type, object item, DbTransaction transaction = null)
         {
             if (item == null)
             {
@@ -182,10 +182,10 @@ namespace Kuery
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
             var map = GetMapping(typeof(T));
-            return connection.Find<T>(pk, map);
+            return connection.Find<T>(map, pk);
         }
 
-        private static T Find<T>(this DbConnection connection, object pk, TableMapping mapping)
+        private static T Find<T>(this DbConnection connection, TableMapping mapping, object pk)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
@@ -324,15 +324,15 @@ namespace Kuery
             }
         }
 
-        static readonly Dictionary<string, TableMapping> _mappings = new Dictionary<string, TableMapping>();
+        static readonly Dictionary<Type, TableMapping> _mappings = new Dictionary<Type, TableMapping>();
 
         internal static TableMapping GetMapping<T>(CreateFlags createFlags = CreateFlags.None) =>
             GetMapping(typeof(T), createFlags);
 
         internal static TableMapping GetMapping(Type type, CreateFlags createFlags = CreateFlags.None)
         {
+            var key = type;
             TableMapping map;
-            var key = type.FullName;
             lock (_mappings)
             {
                 if (_mappings.TryGetValue(key, out map))
