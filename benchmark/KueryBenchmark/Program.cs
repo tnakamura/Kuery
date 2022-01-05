@@ -2,14 +2,20 @@
 using System.Data.Common;
 using System.IO;
 using BenchmarkDotNet.Running;
+using BenchmarkDotNet.Diagnosers;
+using BenchmarkDotNet.Configs;
 using Kuery;
 
 namespace KueryBenchmark
 {
     internal class Program
     {
-        static void Main(string[] args) =>
-            BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
+        static void Main(string[] args)
+        {
+            var config = DefaultConfig.Instance
+                .AddDiagnoser(MemoryDiagnoser.Default);
+            BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, config);
+        }
     }
 
     [SQLite.Table("todo")]
