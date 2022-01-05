@@ -231,7 +231,6 @@ namespace Kuery
             var result = new List<T>();
             using (var reader = command.ExecuteReader())
             {
-                var fastSetters = new Action<object, IDataRecord, int>[reader.FieldCount];
                 MethodInfo getSetter = null;
                 if (typeof(T) != map.MappedType)
                 {
@@ -242,6 +241,7 @@ namespace Kuery
                         .MakeGenericMethod(map.MappedType);
                 }
 
+                var fastSetters = new Action<object, IDataRecord, int>[reader.FieldCount];
                 var columns = new TableMapping.Column[reader.FieldCount];
                 for (var i = 0; i < columns.Length; i++)
                 {
@@ -253,11 +253,12 @@ namespace Kuery
                         {
                             fastSetters[i] = (Action<object, IDataRecord, int>)getSetter.Invoke(
                                 null,
-                                new object[] { command.Connection, columns[i] });
+                                new object[] { columns[i] });
                         }
                         else
                         {
-                            fastSetters[i] = FastColumnSetter.GetFastSetter<T>(command.Connection, columns[i]);
+                            //fastSetters[i] = FastColumnSetter.GetFastSetter<T>(columns[i]);
+                            fastSetters[i] = columns[i].GetFastSetter<T>();
                         }
                     }
                 }
@@ -787,6 +788,13 @@ namespace Kuery
             public object GetValue(object obj)
             {
                 return _prop.GetValue(obj, null);
+            }
+
+            private Action<object, IDataRecord, int> _fastSetter;
+
+            internal Action<object, IDataRecord, int> GetFastSetter<T>()
+            {
+                return _fastSetter ?? (_fastSetter = FastColumnSetter.GetFastSetter<T>(this));
             }
         }
     }
@@ -1844,7 +1852,6 @@ namespace Kuery
     static class FastColumnSetter
     {
         internal static Action<object, IDataRecord, int> GetFastSetter<T>(
-            this DbConnection connection,
             TableMapping.Column column)
         {
             Action<object, IDataRecord, int> fastSetter = null;

@@ -2,8 +2,6 @@
 using System.Data.Common;
 using System.IO;
 using BenchmarkDotNet.Running;
-using BenchmarkDotNet.Diagnosers;
-using BenchmarkDotNet.Configs;
 using Kuery;
 
 namespace KueryBenchmark
@@ -12,9 +10,8 @@ namespace KueryBenchmark
     {
         static void Main(string[] args)
         {
-            var config = DefaultConfig.Instance
-                .AddDiagnoser(MemoryDiagnoser.Default);
-            BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, config);
+            BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly)
+                .Run(args, new BenchmarkConfig());
         }
     }
 
