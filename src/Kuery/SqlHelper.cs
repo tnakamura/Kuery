@@ -272,8 +272,8 @@ namespace Kuery
                         }
                         else
                         {
-                            //fastSetters[i] = FastColumnSetter.GetFastSetter<T>(columns[i]);
-                            _fastSetters[i] = _columns[i].GetFastSetter<T>();
+                            //_fastSetters[i] = FastColumnSetter.GetFastSetter<T>(_columns[i]);
+                            _fastSetters[i] = _columns[i].FastSetter;
                         }
                     }
                 }
@@ -609,7 +609,7 @@ namespace Kuery
                 var ignore = p.IsDefined(typeof(IgnoreAttribute), true);
                 if (!ignore)
                 {
-                    cols.Add(new Column(p, createFlags));
+                    cols.Add(new Column(MappedType, p, createFlags));
                 }
             }
             Columns = cols.ToArray();
@@ -691,11 +691,16 @@ namespace Kuery
 
             public bool StoreAsText { get; }
 
-            public Column(PropertyInfo prop, CreateFlags createFlags = CreateFlags.None)
+            internal readonly Type MappedType;
+
+            internal readonly Action<object, IDataRecord, int> FastSetter;
+
+            public Column(Type mappedType, PropertyInfo prop, CreateFlags createFlags = CreateFlags.None)
             {
                 var colAttr = prop.CustomAttributes.FirstOrDefault(x => x.AttributeType == typeof(ColumnAttribute));
 
                 _prop = prop;
+                MappedType = mappedType;
                 Name = (colAttr != null && colAttr.ConstructorArguments.Count > 0) ?
                     colAttr.ConstructorArguments[0].Value?.ToString() :
                     prop.Name;
@@ -730,6 +735,8 @@ namespace Kuery
                     .GetTypeInfo()
                     .CustomAttributes
                     .Any(x => x.AttributeType == typeof(StoreAsTextAttribute));
+
+                FastSetter = FastColumnSetter.Typeless.GetFastSetter(this);
             }
 
             public void SetValue(object obj, object val)
@@ -814,13 +821,6 @@ namespace Kuery
             public object GetValue(object obj)
             {
                 return _prop.GetValue(obj, null);
-            }
-
-            private Action<object, IDataRecord, int> _fastSetter;
-
-            internal Action<object, IDataRecord, int> GetFastSetter<T>()
-            {
-                return _fastSetter ?? (_fastSetter = FastColumnSetter.GetFastSetter<T>(this));
             }
         }
     }
@@ -1085,7 +1085,7 @@ namespace Kuery
     }
 
     [Flags]
-    public enum CreateFlags
+    internal enum CreateFlags
     {
         None = 0x000,
         ImplicitPK = 0x001,
@@ -1133,7 +1133,6 @@ namespace Kuery
         private Expression _selector;
 
         private bool _deferred;
-
 
         internal TableQuery(DbConnection connection, TableMapping table)
         {
@@ -1877,6 +1876,25 @@ namespace Kuery
 
     static class FastColumnSetter
     {
+        internal static class Typeless
+        {
+            private static readonly MethodInfo _getSetterMethodInfo;
+
+            static Typeless()
+            {
+                _getSetterMethodInfo = typeof(FastColumnSetter).GetMethod(
+                    nameof(FastColumnSetter.GetFastSetter),
+                    BindingFlags.NonPublic | BindingFlags.Static);
+            }
+
+            internal static Action<object, IDataRecord, int> GetFastSetter(
+                TableMapping.Column column)
+            {
+                var getSetter = _getSetterMethodInfo.MakeGenericMethod(column.MappedType);
+                return (Action<object, IDataRecord, int>)getSetter.Invoke(null, new object[] { column });
+            }
+        }
+
         internal static Action<object, IDataRecord, int> GetFastSetter<T>(
             TableMapping.Column column)
         {
