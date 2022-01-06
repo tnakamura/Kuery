@@ -242,9 +242,9 @@ namespace Kuery
 
                 if (typeof(T) != map.MappedType)
                 {
-                    _getSetter = typeof(FastColumnSetter)
+                    _getSetter = typeof(FastSetter)
                         .GetMethod(
-                            nameof(FastColumnSetter.GetFastSetter),
+                            nameof(FastSetter.GetFastSetter),
                             BindingFlags.NonPublic | BindingFlags.Static)
                         .MakeGenericMethod(map.MappedType);
                 }
@@ -733,7 +733,7 @@ namespace Kuery
                     .CustomAttributes
                     .Any(x => x.AttributeType == typeof(StoreAsTextAttribute));
 
-                FastSetter = FastColumnSetter.Typeless.GetFastSetter(this);
+                FastSetter = Kuery.FastSetter.Typeless.GetFastSetter(this);
             }
 
             public void SetValue(object obj, object val)
@@ -1890,7 +1890,7 @@ namespace Kuery
         }
     }
 
-    static class FastColumnSetter
+    static class FastSetter
     {
         internal static class Typeless
         {
@@ -1898,8 +1898,8 @@ namespace Kuery
 
             static Typeless()
             {
-                _getSetterMethodInfo = typeof(FastColumnSetter).GetMethod(
-                    nameof(FastColumnSetter.GetFastSetter),
+                _getSetterMethodInfo = typeof(FastSetter).GetMethod(
+                    nameof(FastSetter.GetFastSetter),
                     BindingFlags.NonPublic | BindingFlags.Static);
             }
 
