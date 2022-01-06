@@ -324,7 +324,7 @@ namespace Kuery
             }
         }
 
-        static readonly Dictionary<Type, TableMapping> _mappings = new Dictionary<Type, TableMapping>();
+        private static readonly Dictionary<Type, TableMapping> _mappings = new Dictionary<Type, TableMapping>();
 
         internal static TableMapping GetMapping<T>(CreateFlags createFlags = CreateFlags.None) =>
             GetMapping(typeof(T), createFlags);
@@ -422,7 +422,7 @@ namespace Kuery
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class TableAttribute : Attribute
     {
-        public string Name { get; set; }
+        public string Name { get; }
 
         public bool WithoutRowId { get; set; }
 
@@ -435,7 +435,7 @@ namespace Kuery
     [AttributeUsage(AttributeTargets.Property)]
     public sealed class ColumnAttribute : Attribute
     {
-        public string Name { get; set; }
+        public string Name { get; }
 
         public ColumnAttribute(string name)
         {
@@ -491,7 +491,7 @@ namespace Kuery
     [AttributeUsage(AttributeTargets.Property)]
     public sealed class MaxLengthAttribute : Attribute
     {
-        public int Value { get; private set; }
+        public int Value { get; }
 
         public MaxLengthAttribute(int length)
         {
@@ -509,7 +509,7 @@ namespace Kuery
     [AttributeUsage(AttributeTargets.Property)]
     public sealed class CollationAttribute : Attribute
     {
-        public string Value { get; private set; }
+        public string Value { get; }
 
         public CollationAttribute(string collation)
         {
@@ -652,33 +652,33 @@ namespace Kuery
         public Column FindColumn(string columnName) =>
             _lookupByColumnName.TryGetValue(columnName.ToLower(), out var column) ? column : null;
 
-        public sealed class Column
+        internal sealed class Column
         {
             private readonly PropertyInfo _prop;
 
-            public string Name { get; private set; }
+            public string Name { get; }
 
             public PropertyInfo PropertyInfo => _prop;
 
             public string PropertyName => _prop.Name;
 
-            public Type ColumnType { get; private set; }
+            public Type ColumnType { get; }
 
-            public string Collation { get; private set; }
+            public string Collation { get; }
 
-            public bool IsAutoInc { get; private set; }
+            public bool IsAutoInc { get; }
 
-            public bool IsAutoGuid { get; private set; }
+            public bool IsAutoGuid { get; }
 
-            public bool IsPK { get; private set; }
+            public bool IsPK { get; }
 
-            public IEnumerable<IndexedAttribute> Indices { get; set; }
+            public IEnumerable<IndexedAttribute> Indices { get; }
 
-            public bool IsNullable { get; private set; }
+            public bool IsNullable { get; }
 
-            public int? MaxStringLength { get; private set; }
+            public int? MaxStringLength { get; }
 
-            public bool StoreAsText { get; private set; }
+            public bool StoreAsText { get; }
 
             public Column(PropertyInfo prop, CreateFlags createFlags = CreateFlags.None)
             {
@@ -837,16 +837,16 @@ namespace Kuery
             }
         }
 
-        public bool IsEnum { get; private set; }
+        public bool IsEnum { get; }
 
-        public bool StoreAsText { get; private set; }
+        public bool StoreAsText { get; }
 
-        public Dictionary<int, string> EnumValues { get; private set; }
+        public Dictionary<int, string> EnumValues { get; }
     }
 
     static class EnumCache
     {
-        private static readonly Dictionary<Type, EnumCacheInfo> Cache = new Dictionary<Type, EnumCacheInfo>();
+        private static readonly Dictionary<Type, EnumCacheInfo> _cache = new Dictionary<Type, EnumCacheInfo>();
 
         public static EnumCacheInfo GetInfo<T>()
         {
@@ -855,12 +855,12 @@ namespace Kuery
 
         public static EnumCacheInfo GetInfo(Type type)
         {
-            lock (Cache)
+            lock (_cache)
             {
-                if (!Cache.TryGetValue(type, out var info))
+                if (!_cache.TryGetValue(type, out var info))
                 {
                     info = new EnumCacheInfo(type);
-                    Cache[type] = info;
+                    _cache[type] = info;
                 }
                 return info;
             }
@@ -1097,31 +1097,31 @@ namespace Kuery
 
     public sealed class TableQuery<T> : BaseTableQuery, IEnumerable<T>
     {
-        public DbConnection Connection { get; private set; }
+        public DbConnection Connection { get; }
 
-        internal TableMapping Table { get; private set; }
+        internal TableMapping Table { get; }
 
-        Expression _where;
+        private Expression _where;
 
-        List<Ordering> _orderBys;
+        private List<Ordering> _orderBys;
 
-        int? _limit;
+        private int? _limit;
 
-        int? _offset;
+        private int? _offset;
 
-        BaseTableQuery _joinInner;
+        private BaseTableQuery _joinInner;
 
-        Expression _joinInnerKeySelector;
+        private Expression _joinInnerKeySelector;
 
-        BaseTableQuery _joinOuter;
+        private BaseTableQuery _joinOuter;
 
-        Expression _joinOuterKeySelector;
+        private Expression _joinOuterKeySelector;
 
-        Expression _joinSelector;
+        private Expression _joinSelector;
 
-        Expression _selector;
+        private Expression _selector;
 
-        bool _deferred;
+        private bool _deferred;
 
 
         internal TableQuery(DbConnection connection, TableMapping table)
@@ -1136,9 +1136,9 @@ namespace Kuery
             Table = SqlHelper.GetMapping(typeof(T));
         }
 
-        TableQuery<U> Clone<U>()
+        private TableQuery<TOther> Clone<TOther>()
         {
-            var q = new TableQuery<U>(Connection, Table);
+            var q = new TableQuery<TOther>(Connection, Table);
             q._where = _where;
             q._deferred = _deferred;
             if (_orderBys != null)
@@ -1440,14 +1440,14 @@ namespace Kuery
             return cmd;
         }
 
-        class CompileResult
+        sealed class CompileResult
         {
             public string CommandText { get; set; }
 
             public object Value { get; set; }
         }
 
-        CompileResult CompileExpr(Expression expr, List<object> queryArgs)
+        private CompileResult CompileExpr(Expression expr, List<object> queryArgs)
         {
             if (expr == null)
             {
@@ -1708,7 +1708,7 @@ namespace Kuery
                 $"Cannot compile: {expr.NodeType}");
         }
 
-        static object ConvertTo(object obj, Type t)
+        private static object ConvertTo(object obj, Type t)
         {
             var nut = Nullable.GetUnderlyingType(t);
             if (nut != null)
@@ -1728,7 +1728,7 @@ namespace Kuery
             }
         }
 
-        static string CompileNullBinaryExpression(BinaryExpression expression, CompileResult parameter)
+        private static string CompileNullBinaryExpression(BinaryExpression expression, CompileResult parameter)
         {
             switch (expression.NodeType)
             {
@@ -1753,7 +1753,7 @@ namespace Kuery
             }
         }
 
-        static string GetSqlName(Expression expr)
+        private static string GetSqlName(Expression expr)
         {
             switch (expr.NodeType)
             {
