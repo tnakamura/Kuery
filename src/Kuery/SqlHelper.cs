@@ -16,10 +16,8 @@ namespace Kuery
 {
     public static partial class SqlHelper
     {
-        public static TableQuery<T> Table<T>(this DbConnection connection)
-        {
-            return new TableQuery<T>(connection, new TableMapping(typeof(T)));
-        }
+        public static TableQuery<T> Table<T>(this DbConnection connection) =>
+            new TableQuery<T>(connection, GetMapping<T>());
 
         public static int Insert<T>(this DbConnection connection, T item, DbTransaction transaction = null) =>
             connection.Insert(typeof(T), item, transaction);
@@ -1407,9 +1405,10 @@ namespace Kuery
                 Table.TableName +
                 "\"";
 
-            var args = new List<object>();
+            List<object> args = null;
             if (_where != null)
             {
+                args = new List<object>();
                 var w = CompileExpr(_where, args);
                 cmdText += " where " + w.CommandText;
             }
@@ -1440,12 +1439,15 @@ namespace Kuery
 
             var cmd = Connection.CreateCommand();
             cmd.CommandText = cmdText.ToString();
-            for (var i = 0; i < args.Count; i++)
+            if (args != null)
             {
-                var p = cmd.CreateParameter();
-                p.Value = args[i];
-                p.ParameterName = "$p" + (i + 1).ToString();
-                cmd.Parameters.Add(p);
+                for (var i = 0; i < args.Count; i++)
+                {
+                    var p = cmd.CreateParameter();
+                    p.Value = args[i];
+                    p.ParameterName = "$p" + (i + 1).ToString();
+                    cmd.Parameters.Add(p);
+                }
             }
             return cmd;
         }

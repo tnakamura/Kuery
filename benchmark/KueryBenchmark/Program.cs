@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Data.Common;
-using System.IO;
-using BenchmarkDotNet.Running;
-using BenchmarkDotNet.Configs;
 using System.Diagnostics;
+using System.IO;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Running;
 using Kuery;
 
 namespace KueryBenchmark
@@ -101,6 +101,8 @@ namespace KueryBenchmark
 
         protected Microsoft.Data.Sqlite.SqliteConnection KueryConnection { get; private set; }
 
+        protected Microsoft.Data.Sqlite.SqliteConnection SqliteConnection { get; private set; }
+        
         [BenchmarkDotNet.Attributes.GlobalSetup]
         public virtual void GlobalSetup()
         {
@@ -121,15 +123,25 @@ namespace KueryBenchmark
                 {
                     DataSource = Path.Combine(
                         AppContext.BaseDirectory,
-                        "kuery.sqlitee"),
+                        "kuery.sqlite3"),
                 }.ToString());
             KueryConnection.Open();
+
+            SqliteConnection = new Microsoft.Data.Sqlite.SqliteConnection(
+                new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+                {
+                    DataSource = Path.Combine(
+                        AppContext.BaseDirectory,
+                        "ado-dot-net.sqlite3"),
+                }.ToString());
+            SqliteConnection.Open();
         }
 
         [BenchmarkDotNet.Attributes.GlobalCleanup]
         public virtual void GlobalCleanup()
         {
             KueryConnection?.Close();
+            SqliteConnection?.Close();
         }
 
         [BenchmarkDotNet.Attributes.IterationSetup]
@@ -141,6 +153,8 @@ namespace KueryBenchmark
                 .GetAwaiter().GetResult();
 
             KueryConnection.CreateTodoTable();
+
+            SqliteConnection.CreateTodoTable();
         }
 
         [BenchmarkDotNet.Attributes.IterationCleanup]
@@ -152,6 +166,8 @@ namespace KueryBenchmark
                 .GetAwaiter().GetResult();
 
             KueryConnection.DropTodoTable();
+
+            SqliteConnection.DropTodoTable();
         }
     }
 }
