@@ -192,8 +192,7 @@ namespace Kuery
 
             using (var command = connection.CreateGetByPrimaryKeyCommand(mapping, pk))
             {
-                var result = ExecuteQuery<T>(command, mapping);
-                return result.FirstOrDefault();
+                return ExecuteQueryFirstOrDefault<T>(command, mapping);
             }
         }
 
@@ -230,92 +229,104 @@ namespace Kuery
             }
         }
 
-        internal static List<T> ExecuteQuery<T>(this DbCommand command, TableMapping map)
+        private readonly struct Deserializer<T>
         {
-            var result = new List<T>();
-            using (var reader = command.ExecuteReader())
+            private readonly TableMapping _map;
+
+            private readonly MethodInfo _getSetter;
+
+            private readonly TableMapping.Column[] _columns;
+
+            private readonly Action<object, IDataRecord, int>[] _fastSetters;
+
+            public Deserializer(TableMapping map, IDataReader reader)
             {
-                MethodInfo getSetter = null;
+                _map = map;
+
                 if (typeof(T) != map.MappedType)
                 {
-                    getSetter = typeof(FastColumnSetter)
+                    _getSetter = typeof(FastColumnSetter)
                         .GetMethod(
                             nameof(FastColumnSetter.GetFastSetter),
                             BindingFlags.NonPublic | BindingFlags.Static)
                         .MakeGenericMethod(map.MappedType);
                 }
+                else
+                {
+                    _getSetter = null;
+                }
 
-                var fastSetters = new Action<object, IDataRecord, int>[reader.FieldCount];
-                var columns = new TableMapping.Column[reader.FieldCount];
-                for (var i = 0; i < columns.Length; i++)
+                _columns = new TableMapping.Column[reader.FieldCount];
+                _fastSetters = new Action<object, IDataRecord, int>[reader.FieldCount];
+                for (var i = 0; i < _columns.Length; i++)
                 {
                     var name = reader.GetName(i);
-                    columns[i] = map.FindColumn(name);
-                    if (columns[i] != null)
+                    _columns[i] = map.FindColumn(name);
+                    if (_columns[i] != null)
                     {
-                        if (getSetter != null)
+                        if (_getSetter != null)
                         {
-                            fastSetters[i] = (Action<object, IDataRecord, int>)getSetter.Invoke(
+                            _fastSetters[i] = (Action<object, IDataRecord, int>)_getSetter.Invoke(
                                 null,
-                                new object[] { columns[i] });
+                                new object[] { _columns[i] });
                         }
                         else
                         {
                             //fastSetters[i] = FastColumnSetter.GetFastSetter<T>(columns[i]);
-                            fastSetters[i] = columns[i].GetFastSetter<T>();
+                            _fastSetters[i] = _columns[i].GetFastSetter<T>();
                         }
                     }
-                }
-
-                while (reader.Read())
-                {
-                    var obj = Activator.CreateInstance(map.MappedType);
-                    for (var i = 0; i < columns.Length; i++)
-                    {
-                        if (columns[i] == null)
-                        {
-                            continue;
-                        }
-
-                        if (fastSetters[i] != null)
-                        {
-                            fastSetters[i].Invoke(obj, reader, i);
-                        }
-                        else
-                        {
-                            var col = columns[i];
-                            var val = reader.GetValue(i);
-                            col.SetValue(obj, val);
-                        }
-                    }
-                    result.Add((T)obj);
                 }
             }
-            return result;
+
+            public T Deserialize(IDataRecord record)
+            {
+                var obj = Activator.CreateInstance(_map.MappedType);
+                for (var i = 0; i < _columns.Length; i++)
+                {
+                    if (_columns[i] == null)
+                    {
+                        continue;
+                    }
+
+                    if (_fastSetters[i] != null)
+                    {
+                        _fastSetters[i].Invoke(obj, record, i);
+                    }
+                    else
+                    {
+                        var col = _columns[i];
+                        var val = record.GetValue(i);
+                        col.SetValue(obj, val);
+                    }
+                }
+                return (T)obj;
+            }
+        }
+
+        internal static List<T> ExecuteQuery<T>(this DbCommand command, TableMapping map)
+        {
+            using (var reader = command.ExecuteReader())
+            {
+                var result = new List<T>();
+                var deserializer = new Deserializer<T>(map, reader);
+                while (reader.Read())
+                {
+                    var obj = deserializer.Deserialize(reader);
+                    result.Add(obj);
+                }
+                return result;
+            }
         }
 
         internal static T ExecuteQueryFirstOrDefault<T>(this DbCommand command, TableMapping map)
         {
             using (var reader = command.ExecuteReader())
             {
-                var cols = new TableMapping.Column[reader.FieldCount];
-                for (var i = 0; i < cols.Length; i++)
-                {
-                    var name = reader.GetName(i);
-                    cols[i] = map.FindColumn(name);
-                }
-
+                var deserializer = new Deserializer<T>(map, reader);
                 if (reader.Read())
                 {
-                    var obj = Activator.CreateInstance(map.MappedType);
-                    for (var i = 0; i < cols.Length; i++)
-                    {
-                        var col = cols[i];
-                        var val = reader.GetValue(i);
-                        // TODO:
-                        col.SetValue(obj, val);
-                    }
-                    return (T)obj;
+                    return deserializer.Deserialize(reader);
                 }
                 else
                 {

@@ -221,54 +221,27 @@ namespace Kuery
 
         internal static async Task<List<T>> ExecuteQueryAsync<T>(this DbCommand command, TableMapping map)
         {
-            var result = new List<T>();
             using (var reader = await command.ExecuteReaderAsync())
             {
-                var cols = new TableMapping.Column[reader.FieldCount];
-                for (var i = 0; i < cols.Length; i++)
-                {
-                    var name = reader.GetName(i);
-                    cols[i] = map.FindColumn(name);
-                }
-
+                var result = new List<T>();
+                var deserializer = new Deserializer<T>(map, reader);
                 while (await reader.ReadAsync())
                 {
-                    var obj = Activator.CreateInstance(map.MappedType);
-                    for (var i = 0; i < cols.Length; i++)
-                    {
-                        var col = cols[i];
-                        var val = reader.GetValue(i);
-                        // TODO:
-                        col.SetValue(obj, val);
-                    }
-                    result.Add((T)obj);
+                    var obj = deserializer.Deserialize(reader);
+                    result.Add(obj);
                 }
+                return result;
             }
-            return result;
         }
 
         internal static async Task<T> ExecuteQueryFirstOrDefaultAsync<T>(this DbCommand command, TableMapping map)
         {
             using (var reader = await command.ExecuteReaderAsync())
             {
-                var cols = new TableMapping.Column[reader.FieldCount];
-                for (var i = 0; i < cols.Length; i++)
-                {
-                    var name = reader.GetName(i);
-                    cols[i] = map.FindColumn(name);
-                }
-
+                var deserializer = new Deserializer<T>(map, reader);
                 if (await reader.ReadAsync())
                 {
-                    var obj = Activator.CreateInstance(map.MappedType);
-                    for (var i = 0; i < cols.Length; i++)
-                    {
-                        var col = cols[i];
-                        var val = reader.GetValue(i);
-                        // TODO:
-                        col.SetValue(obj, val);
-                    }
-                    return (T)obj;
+                    return deserializer.Deserialize(reader);
                 }
                 else
                 {
