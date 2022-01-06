@@ -1399,46 +1399,62 @@ namespace Kuery
                 throw new NotSupportedException("Joins are not supported.");
             }
 
-            var cmdText = "select " +
-                selectionList +
-                " from \"" +
-                Table.TableName +
-                "\"";
+            var commandText = new StringBuilder();
+            commandText.Append("select ");
+            commandText.Append(selectionList);
+            commandText.Append(" from [");
+            commandText.Append(Table.TableName);
+            commandText.Append("] ");
 
             List<object> args = null;
             if (_where != null)
             {
                 args = new List<object>();
                 var w = CompileExpr(_where, args);
-                cmdText += " where " + w.CommandText;
+                commandText.Append(" where ");
+                commandText.Append(w.CommandText);
             }
 
-            if ((_orderBys != null) && (_orderBys.Count > 0))
+            if (_orderBys != null && _orderBys.Count > 0)
             {
-                var t = string.Join(
-                    ", ",
-                    _orderBys
-                        .Select(o => "\"" + o.ColumnName + "\"" + (o.Ascending ? "" : " desc"))
-                        .ToArray());
-                cmdText += " order by " + t;
+                commandText.Append(" order by ");
+                commandText.Append("[");
+                commandText.Append(_orderBys[0].ColumnName);
+                commandText.Append("]");
+                if (!_orderBys[0].Ascending)
+                {
+                    commandText.Append(" desc ");
+                }
+                for (var i = 1; i < _orderBys.Count; i++)
+                {
+                    commandText.Append(", [");
+                    commandText.Append(_orderBys[i].ColumnName);
+                    commandText.Append("]");
+                    if (!_orderBys[i].Ascending)
+                    {
+                        commandText.Append(" desc ");
+                    }
+                }
             }
 
             if (_limit.HasValue)
             {
-                cmdText += " limit " + _limit.Value;
+                commandText.Append(" limit ");
+                commandText.Append(_limit.Value);
             }
 
             if (_offset.HasValue)
             {
                 if (!_limit.HasValue)
                 {
-                    cmdText += " limit -1 ";
+                    commandText.Append(" limit -1 ");
                 }
-                cmdText += " offset " + _offset.Value;
+                commandText.Append(" offset ");
+                commandText.Append(_offset.Value);
             }
 
             var cmd = Connection.CreateCommand();
-            cmd.CommandText = cmdText.ToString();
+            cmd.CommandText = commandText.ToString();
             if (args != null)
             {
                 for (var i = 0; i < args.Count; i++)
@@ -1452,18 +1468,24 @@ namespace Kuery
             return cmd;
         }
 
-        sealed class CompileResult
+        private readonly struct CompileResult
         {
-            public string CommandText { get; set; }
+            public CompileResult(string commandText, object value = null)
+            {
+                CommandText = commandText;
+                Value = value;
+            }
 
-            public object Value { get; set; }
+            public readonly string CommandText;
+
+            public readonly object Value;
         }
 
         private CompileResult CompileExpr(Expression expr, List<object> queryArgs)
         {
             if (expr == null)
             {
-                throw new NotSupportedException("Expression is NLL");
+                throw new NotSupportedException("Expression is NULL");
             }
             else if (expr is BinaryExpression)
             {
@@ -1484,7 +1506,7 @@ namespace Kuery
                 {
                     text = "(" + leftr.CommandText + " " + GetSqlName(bin) + " " + rightr.CommandText + ")";
                 }
-                return new CompileResult { CommandText = text };
+                return new CompileResult(commandText: text);
             }
             else if (expr.NodeType == ExpressionType.Not)
             {
@@ -1495,17 +1517,24 @@ namespace Kuery
                 {
                     val = !((bool)val);
                 }
-                return new CompileResult
-                {
-                    CommandText = "not(" + opr.CommandText + ")",
-                    Value = val,
-                };
+                return new CompileResult(
+                    commandText: "not(" + opr.CommandText + ")",
+                    value: val);
             }
             else if (expr.NodeType == ExpressionType.Call)
             {
                 var call = (MethodCallExpression)expr;
                 var args = new CompileResult[call.Arguments.Count];
-                var obj = call.Object != null ? CompileExpr(call.Object, queryArgs) : null;
+
+                CompileResult? obj;
+                if (call.Object != null)
+                {
+                    obj = CompileExpr(call.Object, queryArgs);
+                }
+                else
+                {
+                    obj = null;
+                }
 
                 for (var i = 0; i < args.Length; i++)
                 {
@@ -1525,11 +1554,11 @@ namespace Kuery
                 {
                     if (call.Object != null && call.Object.Type == typeof(string))
                     {
-                        sqlCall = "( instr(" + obj.CommandText + "," + args[0].CommandText + ") > 0)";
+                        sqlCall = "( instr(" + obj.Value.CommandText + "," + args[0].CommandText + ") > 0)";
                     }
                     else
                     {
-                        sqlCall = "(" + args[0].CommandText + " in " + obj.CommandText + ")";
+                        sqlCall = "(" + args[0].CommandText + " in " + obj.Value.CommandText + ")";
                     }
                 }
                 else if (call.Method.Name == "StartsWith" && args.Length >= 1)
@@ -1543,11 +1572,11 @@ namespace Kuery
                     {
                         case StringComparison.Ordinal:
                         case StringComparison.CurrentCulture:
-                            sqlCall = "( substr(" + obj.CommandText + ", 1, " + args[0].Value.ToString().Length + ") = " + args[0].CommandText + ")";
+                            sqlCall = "( substr(" + obj.Value.CommandText + ", 1, " + args[0].Value.ToString().Length + ") = " + args[0].CommandText + ")";
                             break;
                         case StringComparison.OrdinalIgnoreCase:
                         case StringComparison.CurrentCultureIgnoreCase:
-                            sqlCall = "(" + obj.CommandText + " like (" + args[0].CommandText + " || '%'))";
+                            sqlCall = "(" + obj.Value.CommandText + " like (" + args[0].CommandText + " || '%'))";
                             break;
                     }
                 }
@@ -1563,9 +1592,9 @@ namespace Kuery
                         case StringComparison.Ordinal:
                         case StringComparison.CurrentCulture:
                             sqlCall = "( substr("
-                                + obj.CommandText
+                                + obj.Value.CommandText
                                 + ", length("
-                                + obj.CommandText
+                                + obj.Value.CommandText
                                 + ") - "
                                 + args[0].Value.ToString().Length
                                 + "+1, "
@@ -1576,55 +1605,49 @@ namespace Kuery
                             break;
                         case StringComparison.OrdinalIgnoreCase:
                         case StringComparison.CurrentCultureIgnoreCase:
-                            sqlCall = "(" + obj.CommandText + " like ('%' || " + args[0].CommandText + "))";
+                            sqlCall = "(" + obj.Value.CommandText + " like ('%' || " + args[0].CommandText + "))";
                             break;
                     }
                 }
                 else if (call.Method.Name == "Equals" && args.Length == 1)
                 {
-                    sqlCall = "(" + obj.CommandText + " = (" + args[0].CommandText + "))";
+                    sqlCall = "(" + obj.Value.CommandText + " = (" + args[0].CommandText + "))";
                 }
                 else if (call.Method.Name == "ToLower")
                 {
-                    sqlCall = "(lower(" + obj.CommandText + "))";
+                    sqlCall = "(lower(" + obj.Value.CommandText + "))";
                 }
                 else if (call.Method.Name == "ToUpper")
                 {
-                    sqlCall = "(upper(" + obj.CommandText + "))";
+                    sqlCall = "(upper(" + obj.Value.CommandText + "))";
                 }
                 else if (call.Method.Name == "Replace" && args.Length == 2)
                 {
-                    sqlCall = "(replace(" + obj.CommandText + "," + args[0].CommandText + "," + args[1].CommandText + "))";
+                    sqlCall = "(replace(" + obj.Value.CommandText + "," + args[0].CommandText + "," + args[1].CommandText + "))";
                 }
                 else
                 {
                     sqlCall = call.Method.Name.ToLower() + "(" + string.Join(",", args.Select(a => a.CommandText)) + ")";
                 }
-                return new CompileResult
-                {
-                    CommandText = sqlCall,
-                };
+                return new CompileResult(
+                    commandText: sqlCall);
             }
             else if (expr.NodeType == ExpressionType.Constant)
             {
                 var c = (ConstantExpression)expr;
                 queryArgs.Add(c.Value);
-                return new CompileResult
-                {
-                    CommandText = "$p" + queryArgs.Count.ToString(),
-                    Value = c.Value,
-                };
+                return new CompileResult(
+                    commandText: "$p" + queryArgs.Count.ToString(),
+                    value: c.Value);
             }
             else if (expr.NodeType == ExpressionType.Convert)
             {
                 var u = (UnaryExpression)expr;
                 var ty = u.Type;
                 var valr = CompileExpr(u.Operand, queryArgs);
-                return new CompileResult
-                {
-                    CommandText = valr.CommandText,
-                    Value = valr.Value != null ? ConvertTo(valr.Value, ty) : null,
-                };
+                return new CompileResult(
+                    commandText: valr.CommandText,
+                    value: valr.Value != null ? ConvertTo(valr.Value, ty) : null);
             }
             else if (expr.NodeType == ExpressionType.MemberAccess)
             {
@@ -1643,11 +1666,8 @@ namespace Kuery
                 if (paramExpr != null)
                 {
                     var columnName = Table.FindColumnWithPropertyName(mem.Member.Name).Name;
-                    return new CompileResult
-                    {
-                        //CommandText = $"\"{columnName}\"",
-                        CommandText = $"[{columnName}]",
-                    };
+                    return new CompileResult(
+                        commandText: $"[{columnName}]");
                 }
                 else
                 {
@@ -1699,20 +1719,16 @@ namespace Kuery
                             head = ",";
                         }
                         sb.Append(")");
-                        return new CompileResult
-                        {
-                            CommandText = sb.ToString(),
-                            Value = val,
-                        };
+                        return new CompileResult(
+                            commandText: sb.ToString(),
+                            value: val);
                     }
                     else
                     {
                         queryArgs.Add(val);
-                        return new CompileResult
-                        {
-                            CommandText = "$p" + queryArgs.Count.ToString(),
-                            Value = val,
-                        };
+                        return new CompileResult(
+                            commandText: "$p" + queryArgs.Count.ToString(),
+                            value: val);
                     }
                 }
             }
