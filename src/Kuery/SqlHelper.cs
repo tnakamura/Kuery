@@ -1,8 +1,7 @@
 ﻿using System;
-using System.Data;
 using System.Collections;
 using System.Collections.Generic;
-using System.Data.Common;
+using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -16,13 +15,13 @@ namespace Kuery
 {
     public static partial class SqlHelper
     {
-        public static TableQuery<T> Table<T>(this DbConnection connection) =>
+        public static TableQuery<T> Table<T>(this IDbConnection connection) =>
             new TableQuery<T>(connection, GetMapping<T>());
 
-        public static int Insert<T>(this DbConnection connection, T item, DbTransaction transaction = null) =>
+        public static int Insert<T>(this IDbConnection connection, T item, IDbTransaction transaction = null) =>
             connection.Insert(typeof(T), item, transaction);
 
-        public static int Insert(this DbConnection connection, Type type, object item, DbTransaction transaction = null)
+        public static int Insert(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
@@ -51,7 +50,7 @@ namespace Kuery
             return count;
         }
 
-        private static long GetLastRowId(this DbConnection connection, DbTransaction transaction = null)
+        private static long GetLastRowId(this IDbConnection connection, IDbTransaction transaction = null)
         {
             using (var command = connection.CreateLastInsertRowIdCommand())
             {
@@ -60,7 +59,7 @@ namespace Kuery
             }
         }
 
-        public static int InsertAll(this DbConnection connection, IEnumerable items, DbTransaction transaction = null)
+        public static int InsertAll(this IDbConnection connection, IEnumerable items, IDbTransaction transaction = null)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
 
@@ -72,7 +71,7 @@ namespace Kuery
             return result;
         }
 
-        public static int InsertAll(this DbConnection connection, Type type, IEnumerable items, DbTransaction transaction = null)
+        public static int InsertAll(this IDbConnection connection, Type type, IEnumerable items, IDbTransaction transaction = null)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
             if (type == null) throw new ArgumentNullException(nameof(type));
@@ -86,14 +85,14 @@ namespace Kuery
         }
 
 
-        public static int Update<T>(this DbConnection connection, T item, DbTransaction transaction = null)
+        public static int Update<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
 
             return connection.Update(typeof(T), item, transaction);
         }
 
-        public static int Update(this DbConnection connection, Type type, object item, DbTransaction transaction = null)
+        public static int Update(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
@@ -105,7 +104,7 @@ namespace Kuery
             }
         }
 
-        public static int UpdateAll(this DbConnection connection, IEnumerable items, DbTransaction transaction = null)
+        public static int UpdateAll(this IDbConnection connection, IEnumerable items, IDbTransaction transaction = null)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
 
@@ -124,7 +123,7 @@ namespace Kuery
             return result;
         }
 
-        public static int InsertOrReplace(this DbConnection connection, object item, DbTransaction transaction = null)
+        public static int InsertOrReplace(this IDbConnection connection, object item, IDbTransaction transaction = null)
         {
             if (item == null)
             {
@@ -133,7 +132,7 @@ namespace Kuery
             return connection.InsertOrReplace(Orm.GetType(item), item, transaction);
         }
 
-        public static int InsertOrReplace(this DbConnection connection, Type type, object item, DbTransaction transaction = null)
+        public static int InsertOrReplace(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
         {
             if (item == null)
             {
@@ -146,7 +145,7 @@ namespace Kuery
             }
         }
 
-        public static int Delete<T>(this DbConnection connection, T item, DbTransaction transaction = null)
+        public static int Delete<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
 
@@ -157,13 +156,13 @@ namespace Kuery
             }
         }
 
-        public static int Delete<T>(this DbConnection connection, object primaryKey, DbTransaction transaction = null) =>
+        public static int Delete<T>(this IDbConnection connection, object primaryKey, IDbTransaction transaction = null) =>
             connection.Delete(GetMapping<T>(), primaryKey, transaction);
 
-        public static int Delete(this DbConnection connection, Type type, object primaryKey, DbTransaction transaction = null) =>
+        public static int Delete(this IDbConnection connection, Type type, object primaryKey, IDbTransaction transaction = null) =>
             connection.Delete(GetMapping(type), primaryKey, transaction);
 
-        private static int Delete(this DbConnection connection, TableMapping map, object primaryKey, DbTransaction transaction = null)
+        private static int Delete(this IDbConnection connection, TableMapping map, object primaryKey, IDbTransaction transaction = null)
         {
             if (map == null) throw new ArgumentNullException(nameof(map));
 
@@ -175,7 +174,7 @@ namespace Kuery
         }
 
 
-        public static T Find<T>(this DbConnection connection, object pk)
+        public static T Find<T>(this IDbConnection connection, object pk)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
@@ -183,7 +182,7 @@ namespace Kuery
             return connection.Find<T>(map, pk);
         }
 
-        private static T Find<T>(this DbConnection connection, TableMapping mapping, object pk)
+        private static T Find<T>(this IDbConnection connection, TableMapping mapping, object pk)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
@@ -194,17 +193,17 @@ namespace Kuery
             }
         }
 
-        public static T Find<T>(this DbConnection connection, Expression<Func<T, bool>> predicate)
+        public static T Find<T>(this IDbConnection connection, Expression<Func<T, bool>> predicate)
         {
             return connection.Table<T>().FirstOrDefault(predicate);
         }
 
-        public static T Get<T>(this DbConnection connection, Expression<Func<T, bool>> predicate)
+        public static T Get<T>(this IDbConnection connection, Expression<Func<T, bool>> predicate)
         {
             return connection.Table<T>().First(predicate);
         }
 
-        public static T Get<T>(this DbConnection connection, object pk)
+        public static T Get<T>(this IDbConnection connection, object pk)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
@@ -212,10 +211,10 @@ namespace Kuery
             return connection.Get<T>(map, pk);
         }
 
-        public static T Get<T>(this DbConnection connection, Type type, object pk) =>
+        public static T Get<T>(this IDbConnection connection, Type type, object pk) =>
             connection.Get<T>(GetMapping(type), pk);
 
-        private static T Get<T>(this DbConnection connection, TableMapping mapping, object pk)
+        private static T Get<T>(this IDbConnection connection, TableMapping mapping, object pk)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
@@ -302,7 +301,7 @@ namespace Kuery
             }
         }
 
-        internal static List<T> ExecuteQuery<T>(this DbCommand command, TableMapping map)
+        internal static List<T> ExecuteQuery<T>(this IDbCommand command, TableMapping map)
         {
             using (var reader = command.ExecuteReader())
             {
@@ -317,7 +316,7 @@ namespace Kuery
             }
         }
 
-        internal static T ExecuteQueryFirstOrDefault<T>(this DbCommand command, TableMapping map)
+        internal static T ExecuteQueryFirstOrDefault<T>(this IDbCommand command, TableMapping map)
         {
             using (var reader = command.ExecuteReader())
             {
@@ -361,7 +360,7 @@ namespace Kuery
             return map;
         }
 
-        public static IEnumerable<T> Query<T>(this DbConnection connection, string sql, object param = null)
+        public static IEnumerable<T> Query<T>(this IDbConnection connection, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
@@ -369,10 +368,10 @@ namespace Kuery
             }
         }
 
-        public static IEnumerable<object> Query(this DbConnection connection, Type type, string sql, object param = null) =>
+        public static IEnumerable<object> Query(this IDbConnection connection, Type type, string sql, object param = null) =>
             connection.Query(GetMapping(type), sql, param);
 
-        private static IEnumerable<object> Query(this DbConnection connection, TableMapping mapping, string sql, object param = null)
+        private static IEnumerable<object> Query(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
         {
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
 
@@ -382,7 +381,7 @@ namespace Kuery
             }
         }
 
-        public static T FindWithQuery<T>(this DbConnection connection, string sql, object param = null)
+        public static T FindWithQuery<T>(this IDbConnection connection, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
@@ -390,10 +389,10 @@ namespace Kuery
             }
         }
 
-        public static object FindWithQuery(this DbConnection connection, Type type, string sql, object param = null) =>
+        public static object FindWithQuery(this IDbConnection connection, Type type, string sql, object param = null) =>
             connection.FindWithQuery(GetMapping(type), sql, param);
 
-        private static object FindWithQuery(this DbConnection connection, TableMapping mapping, string sql, object param = null)
+        private static object FindWithQuery(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
@@ -401,7 +400,7 @@ namespace Kuery
             }
         }
 
-        public static int Execute(this DbConnection connection, string sql, object param = null)
+        public static int Execute(this IDbConnection connection, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
@@ -409,7 +408,7 @@ namespace Kuery
             }
         }
 
-        public static T ExecuteScalar<T>(this DbConnection connection, string sql, object param = null)
+        public static T ExecuteScalar<T>(this IDbConnection connection, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
@@ -1106,7 +1105,7 @@ namespace Kuery
 
     public sealed class TableQuery<T> : BaseTableQuery, IEnumerable<T>
     {
-        public DbConnection Connection { get; }
+        public IDbConnection Connection { get; }
 
         internal TableMapping Table { get; }
 
@@ -1132,13 +1131,13 @@ namespace Kuery
 
         private bool _deferred;
 
-        internal TableQuery(DbConnection connection, TableMapping table)
+        internal TableQuery(IDbConnection connection, TableMapping table)
         {
             Connection = connection;
             Table = table;
         }
 
-        internal TableQuery(DbConnection connection)
+        internal TableQuery(IDbConnection connection)
         {
             Connection = connection;
             Table = SqlHelper.GetMapping(typeof(T));
@@ -1260,8 +1259,7 @@ namespace Kuery
                     parameter.Value = args[i];
                     command.Parameters.Add(parameter);
                 }
-                var result = command.ExecuteNonQueryAsync();
-                return result;
+                return command.TryExecuteNonQueryAsync();
             }
         }
 
@@ -1392,7 +1390,7 @@ namespace Kuery
             }
         }
 
-        private DbCommand GenerateCommand(string selectionList)
+        private IDbCommand GenerateCommand(string selectionList)
         {
             if (_joinInner != null && _joinOuter != null)
             {
@@ -1828,7 +1826,7 @@ namespace Kuery
         {
             using (var command = GenerateCommand("count(*)"))
             {
-                return (int)(long)await command.ExecuteScalarAsync();
+                return (int)(long)await command.TryExecuteScalarAsync();
             }
         }
 

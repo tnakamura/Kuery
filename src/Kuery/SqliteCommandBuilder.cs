@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.Common;
+using System.Data;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -9,7 +9,7 @@ namespace Kuery
 {
     internal static class SqliteCommandBuilder
     {
-        internal static DbCommand CreateGetByPrimaryKeyCommand(this DbConnection connection, TableMapping map, object pk)
+        internal static IDbCommand CreateGetByPrimaryKeyCommand(this IDbConnection connection, TableMapping map, object pk)
         {
             var command = connection.CreateCommand();
             command.CommandText = map.GetByPrimaryKeySql;
@@ -23,14 +23,14 @@ namespace Kuery
             return command;
         }
 
-        internal static DbCommand CreateLastInsertRowIdCommand(this DbConnection connection)
+        internal static IDbCommand CreateLastInsertRowIdCommand(this IDbConnection connection)
         {
             var command = connection.CreateCommand();
             command.CommandText = "select last_insert_rowid();";
             return command;
         }
 
-        internal static DbCommand CreateInsertCommand(this DbConnection connection, object item, Type type)
+        internal static IDbCommand CreateInsertCommand(this IDbConnection connection, object item, Type type)
         {
             var map = SqlHelper.GetMapping(type);
             var columns = new StringBuilder();
@@ -90,7 +90,7 @@ namespace Kuery
             return command;
         }
 
-        internal static DbCommand CreateUpdateCommand(this DbConnection connection, object item, Type type)
+        internal static IDbCommand CreateUpdateCommand(this IDbConnection connection, object item, Type type)
         {
             var mapping = SqlHelper.GetMapping(type);
             if (mapping.PK == null)
@@ -152,7 +152,7 @@ namespace Kuery
             return command;
         }
 
-        internal static string GetParameterPrefix(this DbConnection connection)
+        internal static string GetParameterPrefix(this IDbConnection connection)
         {
             switch (connection.GetType().FullName)
             {
@@ -164,12 +164,12 @@ namespace Kuery
             }
         }
 
-        internal static string GetParameterName(this DbConnection connection, string name)
+        internal static string GetParameterName(this IDbConnection connection, string name)
         {
             return connection.GetParameterPrefix() + name;
         }
 
-        internal static DbCommand CreateDeleteCommand(this DbConnection connection, object item, Type type)
+        internal static IDbCommand CreateDeleteCommand(this IDbConnection connection, object item, Type type)
         {
             var map = SqlHelper.GetMapping(type);
             if (map.PK == null)
@@ -181,7 +181,7 @@ namespace Kuery
             return connection.CreateDeleteCommand(map.PK.GetValue(item), map);
         }
 
-        internal static DbCommand CreateDeleteCommand(this DbConnection connection, object primaryKey, TableMapping map)
+        internal static IDbCommand CreateDeleteCommand(this IDbConnection connection, object primaryKey, TableMapping map)
         {
             var pk = map.PK;
             if (pk == null)
@@ -204,7 +204,7 @@ namespace Kuery
             return command;
         }
 
-        internal static DbCommand CreateInsertOrReplaceCommand(this DbConnection connection, object item, Type type)
+        internal static IDbCommand CreateInsertOrReplaceCommand(this IDbConnection connection, object item, Type type)
         {
             var map = SqlHelper.GetMapping(type);
             var columns = new StringBuilder();
@@ -259,7 +259,7 @@ namespace Kuery
             return command;
         }
 
-        internal static DbCommand CreateParameterizedCommand(this DbConnection connection, string sql, object param = null)
+        internal static IDbCommand CreateParameterizedCommand(this IDbConnection connection, string sql, object param = null)
         {
             var command = connection.CreateCommand();
             command.CommandText = sql;
