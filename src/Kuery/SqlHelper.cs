@@ -529,21 +529,25 @@ namespace Kuery
 
     internal sealed class TableMapping
     {
-        public Type MappedType { get; private set; }
+        public Type MappedType { get; }
 
-        public string TableName { get; private set; }
+        public string TableName { get; }
 
-        public bool WithoutRowId { get; private set; }
+        public bool WithoutRowId { get; }
 
-        public IReadOnlyList<Column> Columns { get; private set; }
+        public IReadOnlyList<Column> Columns { get; }
 
-        public Column PK { get; private set; }
+        public Column PK { get; }
 
-        public string GetByPrimaryKeySql { get; private set; }
+        public string GetByPrimaryKeySql { get; }
 
-        public CreateFlags CreateFlags { get; private set; }
+        public CreateFlags CreateFlags { get; }
 
         private readonly Column _autoPk;
+
+        private readonly IReadOnlyDictionary<string, Column> _lookupByColumnName;
+
+        private readonly IReadOnlyDictionary<string, Column> _lookupByPropertyName;
 
         public TableMapping(Type type, CreateFlags createFlags = CreateFlags.None)
         {
@@ -610,6 +614,9 @@ namespace Kuery
                 }
             }
 
+            _lookupByColumnName = Columns.ToDictionary(x => x.Name.ToLower());
+            _lookupByPropertyName = Columns.ToDictionary(x => x.PropertyName);
+
             HasAutoIncPK = _autoPk != null;
 
             if (PK != null)
@@ -625,7 +632,7 @@ namespace Kuery
             InsertOrReplaceColumns = Columns.ToArray();
         }
 
-        public bool HasAutoIncPK { get; private set; }
+        public bool HasAutoIncPK { get; }
 
         public void SetAutoIncPk(object obj, long id)
         {
@@ -640,10 +647,10 @@ namespace Kuery
         public IReadOnlyList<Column> InsertOrReplaceColumns { get; }
 
         public Column FindColumnWithPropertyName(string propertyName) =>
-            Columns.FirstOrDefault(x => x.PropertyName == propertyName);
+            _lookupByPropertyName.TryGetValue(propertyName, out var column) ? column : null;
 
         public Column FindColumn(string columnName) =>
-            Columns.FirstOrDefault(x => x.Name.ToLower() == columnName.ToLower());
+            _lookupByColumnName.TryGetValue(columnName.ToLower(), out var column) ? column : null;
 
         public sealed class Column
         {

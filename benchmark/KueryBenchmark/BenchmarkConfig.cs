@@ -15,7 +15,8 @@ namespace KueryBenchmark
         public BenchmarkConfig() :
             base()
         {
-            var baseConfig = Job.ShortRun.WithWarmupCount(5).WithIterationCount(5);
+            //var baseConfig = Job.ShortRun.WithWarmupCount(5).WithIterationCount(5);
+            var baseConfig = Job.Default;
             AddJob(baseConfig.WithRuntime(CoreRuntime.Core31).WithJit(Jit.RyuJit).WithPlatform(Platform.X64));
 
             AddLogger(ConsoleLogger.Default);
