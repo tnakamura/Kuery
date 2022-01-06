@@ -1561,7 +1561,7 @@ namespace Kuery
                         sqlCall = "(" + args[0].CommandText + " in " + obj.Value.CommandText + ")";
                     }
                 }
-                else if (call.Method.Name == "StartsWith" && args.Length >= 1)
+                else if (call.Method.Name == nameof(string.StartsWith) && args.Length >= 1)
                 {
                     var startsWithCmpOp = StringComparison.CurrentCulture;
                     if (args.Length == 2)
@@ -1580,7 +1580,7 @@ namespace Kuery
                             break;
                     }
                 }
-                else if (call.Method.Name == "EndsWith" && args.Length == 1)
+                else if (call.Method.Name == nameof(string.EndsWith) && args.Length == 1)
                 {
                     var endsWithCmpOp = StringComparison.CurrentCulture;
                     if (args.Length == 2)
@@ -1609,19 +1609,19 @@ namespace Kuery
                             break;
                     }
                 }
-                else if (call.Method.Name == "Equals" && args.Length == 1)
+                else if (call.Method.Name == nameof(object.Equals) && args.Length == 1)
                 {
                     sqlCall = "(" + obj.Value.CommandText + " = (" + args[0].CommandText + "))";
                 }
-                else if (call.Method.Name == "ToLower")
+                else if (call.Method.Name == nameof(string.ToLower))
                 {
                     sqlCall = "(lower(" + obj.Value.CommandText + "))";
                 }
-                else if (call.Method.Name == "ToUpper")
+                else if (call.Method.Name == nameof(string.ToUpper))
                 {
                     sqlCall = "(upper(" + obj.Value.CommandText + "))";
                 }
-                else if (call.Method.Name == "Replace" && args.Length == 2)
+                else if (call.Method.Name == nameof(string.Replace) && args.Length == 2)
                 {
                     sqlCall = "(replace(" + obj.Value.CommandText + "," + args[0].CommandText + "," + args[1].CommandText + "))";
                 }

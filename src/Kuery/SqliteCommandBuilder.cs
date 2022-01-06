@@ -39,9 +39,9 @@ namespace Kuery
 
             if (map.InsertColumns.Count == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
             {
-                command.CommandText = "insert into "
+                command.CommandText = "insert into ["
                     + map.TableName
-                    + " default values";
+                    + "] default values";
             }
             else
             {
@@ -78,9 +78,9 @@ namespace Kuery
                     }
                 }
 
-                command.CommandText = "insert into "
+                command.CommandText = "insert into ["
                     + map.TableName
-                    + " ("
+                    + "] ("
                     + columns.ToString()
                     + ") values ("
                     + values.ToString()
@@ -100,40 +100,43 @@ namespace Kuery
             }
 
             var sql = new StringBuilder();
-            sql.Append("update " + mapping.TableName);
+            sql.Append("update [");
+            sql.Append(mapping.TableName);
+            sql.Append("] ");
+
             var command = connection.CreateCommand();
 
-            var cols = mapping.Columns.Where(x => x != mapping.PK).ToList();
-            if (cols.Count == 0)
+            var cols = mapping.Columns.Where(x => x != mapping.PK).ToArray();
+            if (cols.Length == 0)
             {
-                cols = mapping.Columns.ToList();
+                cols = mapping.Columns.ToArray();
             }
 
-            var first = true;
-            foreach (var col in cols)
+            for (var i = 0; i < cols.Length; i++)
             {
+                var col = cols[i];
                 var parameter = command.CreateParameter();
                 parameter.ParameterName = connection.GetParameterName(col.Name);
                 parameter.Value = col.GetValue(item);
                 command.Parameters.Add(parameter);
 
-                if (first)
+                if (i == 0)
                 {
                     sql.Append(" set ");
-                    first = false;
                 }
                 else
                 {
                     sql.Append(",");
                 }
+                sql.Append("[");
                 sql.Append(col.Name);
-                sql.Append(" = ");
+                sql.Append("] = ");
                 sql.Append(parameter.ParameterName);
             }
 
-            sql.Append(" where ");
+            sql.Append(" where [");
             sql.Append(mapping.PK.Name);
-            sql.Append(" = ");
+            sql.Append("] = ");
             sql.Append(connection.GetParameterName(mapping.PK.Name));
 
             var pkParameterName = connection.GetParameterName(mapping.PK.Name);
@@ -210,9 +213,9 @@ namespace Kuery
 
             if (map.InsertOrReplaceColumns.Count == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
             {
-                command.CommandText = "insert or replace into "
+                command.CommandText = "insert or replace into ["
                     + map.TableName
-                    + " default values";
+                    + "] default values";
             }
             else
             {
@@ -225,7 +228,9 @@ namespace Kuery
                     }
 
                     var col = map.InsertOrReplaceColumns[i];
-                    columns.Append("[" + col.Name + "]");
+                    columns.Append("[");
+                    columns.Append(col.Name);
+                    columns.Append("]");
 
                     var value = col.GetValue(item);
                     if (value is null && col.IsNullable)
@@ -242,9 +247,9 @@ namespace Kuery
                     }
                 }
 
-                command.CommandText = "insert or replace into "
+                command.CommandText = "insert or replace into ["
                     + map.TableName
-                    + " ("
+                    + "] ("
                     + columns.ToString()
                     + ") values ("
                     + values.ToString()
