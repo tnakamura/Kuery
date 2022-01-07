@@ -8,22 +8,76 @@ Install [Kuery](https://www.nuget.org/packages/Kuery) from Nuget.
 
 ## Usage
 
+```cs
+[Table("todo")]
+public class Todo
+{
+    [PrimaryKey]
+    [Column("id")]
+    [AutoIncrement]
+    public int Id { get; set; }
+
+    [NotNull]
+    [Column("name")]
+    public string Name { get; set; }
+
+    [Column("description")]
+    public string Description { get; set; }
+
+    [NotNull]
+    [Column("done")]
+    public bool IsDone { get; set; }
+
+    [NotNull]
+    [Column("created_at")]
+    public DateTimeOffset CreatedAt { get; set; }
+
+    [NotNull]
+    [Column("updated_at")]
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+```
+
 ### Synchronous API
 
 ```cs
+var todo =new Todo()
+{
+    Name = "Study English",
+    Description = "Study English Everyday",
+    CreatedAt = DateTimeOffset.Now,
+    UpdatedAt = DateTimeOffset.Now,
+});
+
 using SqliteConnection connection = new SqliteConnection("Your connection string");
 connection.Open();
 
-List<Company> companies = connection.Table<Company>().Where(x => x.Name == "Google").ToList();
+connection.Insert(todo);
+
+List<Todo> todos = connection.Table<Todo>()
+    .Where(x => x.Name == "Study English")
+    .ToList();
 ```
 
 ### Asynchronous API
 
 ```cs
+var todo =new Todo()
+{
+    Name = "Study English",
+    Description = "Study English Everyday",
+    CreatedAt = DateTimeOffset.Now,
+    UpdatedAt = DateTimeOffset.Now,
+});
+
 using SqliteConnection connection = new SqliteConnection("Your connection string");
 await connection.OpenAsync();
 
-List<Company> companies = await connection.Table<Company>().Where(x => x.Name == "Google").ToListAsync();
+await connection.InsertAsync(todo);
+
+List<Todo> todos = await connection.Table<Todo>()
+    .Where(x => x.Name == "Study English")
+    .ToListAsync();
 ```
 
 #### Manual SQL
@@ -32,9 +86,9 @@ List<Company> companies = await connection.Table<Company>().Where(x => x.Name ==
 using SqliteConnection connection = new SqliteConnection("Your connection string");
 connection.Open();
 
-IEnumerable<Company> companies = connection.Query<Company>(
-    "SELECT * FROM companies WHERE name = $Name",
-    new { Name = "Google" });
+IEnumerable<Todo> todos = connection.Query<Todo>(
+    "SELECT * FROM todo WHERE name = $name",
+    new { name = "Study English" });
 ```
 
 ## Contribution
