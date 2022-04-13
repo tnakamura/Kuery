@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Kuery.Tests.Sqlite
@@ -31,7 +31,7 @@ namespace Kuery.Tests.Sqlite
             public string Email { get; set; }
         }
 
-        void CreateTable(DbConnection connection)
+        void CreateTable(SqliteConnection connection)
         {
             connection.DropTable(nameof(AsyncCustomer));
 

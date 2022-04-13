@@ -1,5 +1,5 @@
-﻿using System.Data.Common;
-using System.Linq;
+﻿using System.Linq;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Kuery.Tests.Sqlite
@@ -36,7 +36,7 @@ namespace Kuery.Tests.Sqlite
 
         }
 
-        void CreateTable(DbConnection connection)
+        void CreateTable(SqliteConnection connection)
         {
             connection.DropTable(nameof(EnumNullableTestObj));
 

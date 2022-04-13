@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Data.Common;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 
@@ -9,10 +8,10 @@ namespace Kuery.Tests.SqlClient
     {
         public string Database { get; }
 
-        public DbConnection CreateConnection() =>
+        public SqlConnection CreateConnection() =>
             CreateConnection(Database);
 
-        private static DbConnection CreateConnection(string database)
+        private static SqlConnection CreateConnection(string database)
         {
             var csb = new SqlConnectionStringBuilder();
             csb.DataSource = "(local)";
@@ -21,9 +20,9 @@ namespace Kuery.Tests.SqlClient
             return new SqlConnection(csb.ToString());
         }
 
-        public async Task<DbConnection> OpenNewConnectionAsync()
+        public async Task<SqlConnection> OpenNewConnectionAsync()
         {
-            DbConnection connection = null;
+            SqlConnection connection = null;
             try
             {
                 connection = CreateConnection();
@@ -37,9 +36,9 @@ namespace Kuery.Tests.SqlClient
             }
         }
 
-        public DbConnection OpenNewConnection()
+        public SqlConnection OpenNewConnection()
         {
-            DbConnection connection = null;
+            SqlConnection connection = null;
             try
             {
                 connection = CreateConnection();

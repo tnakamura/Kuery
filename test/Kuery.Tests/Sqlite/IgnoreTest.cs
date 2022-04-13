@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using System.Data.Common;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Kuery.Tests.Sqlite
@@ -38,7 +38,7 @@ namespace Kuery.Tests.Sqlite
             }
         }
 
-        void CreateIgnoreTestObjTable(DbConnection connection)
+        void CreateIgnoreTestObjTable(SqliteConnection connection)
         {
             connection.DropTable(nameof(IgnoreTestObj));
 
@@ -115,7 +115,7 @@ namespace Kuery.Tests.Sqlite
             public string Name { get; set; }
         }
 
-        void CreateIgnoreInheritTableClassTable(DbConnection connection)
+        void CreateIgnoreInheritTableClassTable(SqliteConnection connection)
         {
             connection.DropTable(nameof(IgnoreInheritTableClass));
 
@@ -162,7 +162,7 @@ namespace Kuery.Tests.Sqlite
             public string Value { get; set; }
         }
 
-        void CreateRedefinedClassTable(DbConnection connection)
+        void CreateRedefinedClassTable(SqliteConnection connection)
         {
             connection.DropTable(nameof(RedefinedClass));
 

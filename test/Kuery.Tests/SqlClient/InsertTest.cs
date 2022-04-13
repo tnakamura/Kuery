@@ -1,18 +1,18 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
-using Microsoft.Data.Sqlite;
+using Microsoft.Data.SqlClient;
 using Xunit;
 
-namespace Kuery.Tests.Sqlite
+namespace Kuery.Tests.SqlClient
 {
-    public class InsertTest : IClassFixture<SqliteFixture>, IDisposable
+    public class InsertTest : IClassFixture<SqlClientFixture>, IDisposable
     {
-        readonly SqliteFixture fixture;
+        readonly SqlClientFixture fixture;
 
-        readonly SqliteConnection connection;
+        readonly SqlConnection connection;
 
-        public InsertTest(SqliteFixture fixture)
+        public InsertTest(SqlClientFixture fixture)
         {
             this.fixture = fixture;
             connection = fixture.OpenNewConnection();
@@ -64,7 +64,7 @@ namespace Kuery.Tests.Sqlite
             public int Id { get; set; }
         }
 
-        private void DropTestTables(SqliteConnection connection)
+        private void DropTestTables(SqlConnection connection)
         {
             connection.DropTable(nameof(InsertTestObj));
             connection.DropTable(nameof(InsertTestObj2));
@@ -72,7 +72,7 @@ namespace Kuery.Tests.Sqlite
             connection.DropTable(nameof(UniqueObj));
         }
 
-        private void CreateTestTable(SqliteConnection connection)
+        private void CreateTestTable(SqlConnection connection)
         {
             DropTestTables(connection);
 

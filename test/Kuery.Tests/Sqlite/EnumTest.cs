@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data.Common;
-using System.IO;
-using System.Linq;
-using System.Text;
+﻿using System.Linq;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Kuery.Tests.Sqlite
@@ -62,7 +58,7 @@ namespace Kuery.Tests.Sqlite
 
         }
 
-        void CreateTestTable(DbConnection connection)
+        void CreateTestTable(SqliteConnection connection)
         {
             connection.DropTable(nameof(EnumTestObj));
             connection.DropTable(nameof(StringTestObj));

@@ -1,10 +1,7 @@
 ﻿using System;
-using System.IO;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using Microsoft.Data.Sqlite;
 using Xunit;
-using System.Data.Common;
 
 namespace Kuery.Tests.Sqlite
 {
@@ -43,7 +40,7 @@ namespace Kuery.Tests.Sqlite
             }
         }
 
-        void CreateTestTable(DbConnection connection)
+        void CreateTestTable(SqliteConnection connection)
         {
             connection.DropTable(nameof(ByteArrayClass));
 

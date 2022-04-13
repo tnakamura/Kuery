@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.Linq;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Kuery.Tests.Sqlite
@@ -15,7 +15,7 @@ namespace Kuery.Tests.Sqlite
             this.fixture = fixture;
         }
 
-        void CreateTables(DbConnection connection)
+        void CreateTables(SqliteConnection connection)
         {
             connection.DropTable(nameof(Product));
             connection.DropTable(nameof(Order));

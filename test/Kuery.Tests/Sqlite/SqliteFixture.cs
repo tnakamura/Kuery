@@ -1,7 +1,6 @@
 using System;
-using System.Data.Common;
-using System.Threading.Tasks;
 using System.IO;
+using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 
 namespace Kuery.Tests.Sqlite
@@ -10,19 +9,19 @@ namespace Kuery.Tests.Sqlite
     {
         public string DataSource { get; }
 
-        public DbConnection CreateConnection() =>
+        public SqliteConnection CreateConnection() =>
             CreateConnection(DataSource);
 
-        private static DbConnection CreateConnection(string dataSource)
+        private static SqliteConnection CreateConnection(string dataSource)
         {
             var csb = new SqliteConnectionStringBuilder();
             csb.DataSource = dataSource;
             return new SqliteConnection(csb.ToString());
         }
 
-        public async Task<DbConnection> OpenNewConnectionAsync()
+        public async Task<SqliteConnection> OpenNewConnectionAsync()
         {
-            DbConnection connection = null;
+            SqliteConnection connection = null;
             try
             {
                 connection = CreateConnection();
@@ -36,9 +35,9 @@ namespace Kuery.Tests.Sqlite
             }
         }
 
-        public DbConnection OpenNewConnection()
+        public SqliteConnection OpenNewConnection()
         {
-            DbConnection connection = null;
+            SqliteConnection connection = null;
             try
             {
                 connection = CreateConnection();

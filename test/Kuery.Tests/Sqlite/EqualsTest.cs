@@ -1,6 +1,6 @@
 ﻿using System;
-using System.Data.Common;
 using System.Linq;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Kuery.Tests.Sqlite
@@ -26,7 +26,7 @@ namespace Kuery.Tests.Sqlite
 
         public class TestObjString : TestObjBase<string> { }
 
-        void CreateTestTable(DbConnection connection)
+        void CreateTestTable(SqliteConnection connection)
         {
             connection.DropTable(nameof(TestObjString));
 
