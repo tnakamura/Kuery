@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using System.IO;
 using Microsoft.Data.Sqlite;
 
-namespace Kuery.Tests
+namespace Kuery.Tests.Sqlite
 {
     public class SqliteFixture : IDisposable
     {

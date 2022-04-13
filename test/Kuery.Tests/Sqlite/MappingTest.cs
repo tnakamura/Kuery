@@ -3,7 +3,7 @@ using System.Data.Common;
 using System.Collections.Generic;
 using Xunit;
 
-namespace Kuery.Tests
+namespace Kuery.Tests.Sqlite
 {
     public class MappingTest : IClassFixture<SqliteFixture>
     {

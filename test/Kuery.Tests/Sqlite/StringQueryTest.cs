@@ -1,7 +1,7 @@
 ﻿using System;
 using Xunit;
 
-namespace Kuery.Tests
+namespace Kuery.Tests.Sqlite
 {
     public class StringQueryTest : IClassFixture<SqliteFixture>, IDisposable
     {

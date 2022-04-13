@@ -2,7 +2,7 @@
 using System.Data.Common;
 using Xunit;
 
-namespace Kuery.Tests
+namespace Kuery.Tests.Sqlite
 {
     public class IgnoreTest : IClassFixture<SqliteFixture>
     {
@@ -20,16 +20,16 @@ namespace Kuery.Tests
 
             public string Text { get; set; }
 
-            [Kuery.Ignore]
+            [Ignore]
             public Dictionary<int, string> Edibles
             {
-                get { return this._edibles; }
-                set { this._edibles = value; }
+                get { return _edibles; }
+                set { _edibles = value; }
             }
 
             protected Dictionary<int, string> _edibles = new Dictionary<int, string>();
 
-            [Kuery.Ignore]
+            [Ignore]
             public string IgnoredText { get; set; }
 
             public override string ToString()

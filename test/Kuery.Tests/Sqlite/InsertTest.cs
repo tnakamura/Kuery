@@ -5,7 +5,7 @@ using System.Linq;
 using Microsoft.Data.Sqlite;
 using Xunit;
 
-namespace Kuery.Tests
+namespace Kuery.Tests.Sqlite
 {
     public class InsertTest : IClassFixture<SqliteFixture>, IDisposable
     {
@@ -222,7 +222,7 @@ namespace Kuery.Tests
             });
 
             Assert.Equal(
-                testObjects.Count-1,
+                testObjects.Count - 1,
                 connection.Table<UniqueObj>().Count());
         }
 

@@ -6,7 +6,7 @@ using System.Text;
 using Xunit;
 using System.Data.Common;
 
-namespace Kuery.Tests
+namespace Kuery.Tests.Sqlite
 {
     public class ByteArrayTest : IClassFixture<SqliteFixture>
     {
@@ -117,7 +117,7 @@ namespace Kuery.Tests
             foreach (var b in byteArrays)
             {
                 con.Insert(b);
-                if (b.bytes != null && criterion.SequenceEqual<byte>(b.bytes))
+                if (b.bytes != null && criterion.SequenceEqual(b.bytes))
                 {
                     id = b.ID;
                 }

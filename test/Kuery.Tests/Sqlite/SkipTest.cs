@@ -2,7 +2,7 @@
 using System.Linq;
 using Xunit;
 
-namespace Kuery.Tests
+namespace Kuery.Tests.Sqlite
 {
     public class SkipTest : IClassFixture<SqliteFixture>
     {

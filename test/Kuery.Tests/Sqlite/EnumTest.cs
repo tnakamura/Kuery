@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using Xunit;
 
-namespace Kuery.Tests
+namespace Kuery.Tests.Sqlite
 {
     public class EnumTest : IClassFixture<SqliteFixture>
     {

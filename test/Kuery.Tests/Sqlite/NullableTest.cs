@@ -1,7 +1,7 @@
 ﻿using System.Data.Common;
 using Xunit;
 
-namespace Kuery.Tests
+namespace Kuery.Tests.Sqlite
 {
     public class NullableTest : IClassFixture<SqliteFixture>
     {
@@ -22,7 +22,7 @@ namespace Kuery.Tests
             public override bool Equals(object obj)
             {
                 NullableIntClass other = (NullableIntClass)obj;
-                return this.ID == other.ID && this.NullableInt == other.NullableInt;
+                return ID == other.ID && NullableInt == other.NullableInt;
             }
 
             public override int GetHashCode()
@@ -87,7 +87,7 @@ namespace Kuery.Tests
             public override bool Equals(object obj)
             {
                 NullableFloatClass other = (NullableFloatClass)obj;
-                return this.ID == other.ID && this.NullableFloat == other.NullableFloat;
+                return ID == other.ID && NullableFloat == other.NullableFloat;
             }
 
             public override int GetHashCode()

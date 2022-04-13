@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using System.Transactions;
 using Xunit;
 
-namespace Kuery.Tests
+namespace Kuery.Tests.Sqlite
 {
     public class SqlHelperTest : IClassFixture<SqliteFixture>, IDisposable
     {

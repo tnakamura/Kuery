@@ -3,7 +3,7 @@ using System.Data.Common;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Kuery.Tests
+namespace Kuery.Tests.Sqlite
 {
     public class DateTimeTest : IClassFixture<SqliteFixture>
     {

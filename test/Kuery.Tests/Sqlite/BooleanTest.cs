@@ -10,7 +10,7 @@ using System.Diagnostics;
 using Xunit;
 
 
-namespace Kuery.Tests
+namespace Kuery.Tests.Sqlite
 {
     public class BooleanTest : IClassFixture<SqliteFixture>
     {
@@ -62,7 +62,7 @@ namespace Kuery.Tests
             {
                 db.Insert(new VO()
                 {
-                    Flag = (i % 3 == 0),
+                    Flag = i % 3 == 0,
                     Text = $"VO{i}",
                 });
             }

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Kuery.Tests
+namespace Kuery.Tests.Sqlite
 {
     public class AsyncTest : IClassFixture<SqliteFixture>
     {
@@ -285,7 +285,7 @@ namespace Kuery.Tests
                 "select * from AsyncCustomer where id=$Id",
                 new
                 {
-                    Id = customers[2].Id,
+                    customers[2].Id,
                 });
             task.Wait();
             var loaded = task.Result.ToList();
@@ -415,7 +415,7 @@ namespace Kuery.Tests
             CreateTable(conn);
 
             // create...
-            var customer = this.CreateCustomer();
+            var customer = CreateCustomer();
             conn.InsertAsync(customer).Wait();
 
             // query...
@@ -436,7 +436,7 @@ namespace Kuery.Tests
             CreateTable(conn);
 
             // create...
-            var customer = this.CreateCustomer();
+            var customer = CreateCustomer();
             conn.InsertAsync(customer).Wait();
 
             // query...
@@ -456,7 +456,7 @@ namespace Kuery.Tests
             CreateTable(conn);
 
             // create...
-            var customer = this.CreateCustomer();
+            var customer = CreateCustomer();
             conn.InsertAsync(customer).Wait();
 
             // query...
@@ -472,7 +472,7 @@ namespace Kuery.Tests
             CreateTable(conn);
 
             // create...
-            AsyncCustomer customer = this.CreateCustomer();
+            AsyncCustomer customer = CreateCustomer();
             conn.InsertAsync(customer).Wait();
 
             // query...
@@ -492,7 +492,7 @@ namespace Kuery.Tests
             CreateTable(conn);
 
             // create...
-            var customer = this.CreateCustomer();
+            var customer = CreateCustomer();
             conn.InsertAsync(customer).Wait();
 
             // query...
@@ -512,7 +512,7 @@ namespace Kuery.Tests
             CreateTable(conn);
 
             // create...
-            AsyncCustomer customer = this.CreateCustomer();
+            AsyncCustomer customer = CreateCustomer();
             conn.InsertAsync(customer).Wait();
 
             // query...
@@ -535,7 +535,7 @@ namespace Kuery.Tests
 
             // create...
             for (int index = 0; index < 10; index++)
-                conn.InsertAsync(this.CreateCustomer()).Wait();
+                conn.InsertAsync(CreateCustomer()).Wait();
 
             // load...
             var query = conn.Table<AsyncCustomer>();
@@ -555,7 +555,7 @@ namespace Kuery.Tests
 
             // create...
             for (int index = 0; index < 10; index++)
-                conn.InsertAsync(this.CreateCustomer()).Wait();
+                conn.InsertAsync(CreateCustomer()).Wait();
 
             // query...
             var query = conn.Table<AsyncCustomer>().OrderBy(v => v.Email);
@@ -577,7 +577,7 @@ namespace Kuery.Tests
 
             // create...
             for (int index = 0; index < 10; index++)
-                conn.InsertAsync(this.CreateCustomer()).Wait();
+                conn.InsertAsync(CreateCustomer()).Wait();
 
             // query...
             var query = conn.Table<AsyncCustomer>().OrderByDescending(v => v.Email);
@@ -599,7 +599,7 @@ namespace Kuery.Tests
             // create...
             for (int index = 0; index < 10; index++)
             {
-                var customer = this.CreateCustomer();
+                var customer = CreateCustomer();
                 customer.FirstName = index.ToString();
                 conn.InsertAsync(customer).Wait();
             }
@@ -625,7 +625,7 @@ namespace Kuery.Tests
             // create...
             for (int index = 0; index < 10; index++)
             {
-                var customer = this.CreateCustomer();
+                var customer = CreateCustomer();
                 customer.FirstName = index.ToString();
                 conn.InsertAsync(customer).Wait();
             }
@@ -651,7 +651,7 @@ namespace Kuery.Tests
             // create...
             for (int index = 0; index < 10; index++)
             {
-                var customer = this.CreateCustomer();
+                var customer = CreateCustomer();
                 customer.FirstName = index.ToString();
                 conn.InsertAsync(customer).Wait();
             }
@@ -677,7 +677,7 @@ namespace Kuery.Tests
             // create...
             for (int index = 0; index < 10; index++)
             {
-                var customer = this.CreateCustomer();
+                var customer = CreateCustomer();
                 customer.FirstName = index.ToString();
                 conn.InsertAsync(customer).Wait();
             }
