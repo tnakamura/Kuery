@@ -16,6 +16,7 @@ namespace Kuery.Tests.SqlClient
             var csb = new SqlConnectionStringBuilder();
             csb.DataSource = "(local)";
             csb.InitialCatalog = database;
+            csb.TrustServerCertificate = true;
             csb.IntegratedSecurity = true;
             return new SqlConnection(csb.ToString());
         }
@@ -83,12 +84,12 @@ namespace Kuery.Tests.SqlClient
 
         private void CreateDatabase()
         {
-            using (var connection = CreateConnection())
+            using (var connection = CreateConnection("master"))
             {
                 connection.Open();
                 using (var command = connection.CreateCommand())
                 {
-                    command.CommandText = $"CREATE DATABASE [{Database}] IF NOT EXISTS";
+                    command.CommandText = $"CREATE DATABASE [{Database}]";
                     command.ExecuteNonQuery();
                 }
             }
@@ -96,12 +97,21 @@ namespace Kuery.Tests.SqlClient
 
         private void DeleteDatabase()
         {
-            using (var connection = CreateConnection())
+            using (var connection = CreateConnection("master"))
             {
                 connection.Open();
                 using (var command = connection.CreateCommand())
                 {
-                    command.CommandText = $"DROP DATABASE [{Database}] IF EXISTS";
+                    command.CommandText = $@"
+DECLARE @SQL nvarchar(1000);
+IF EXISTS (SELECT 1 FROM sys.databases WHERE [name] = N'{Database}')
+BEGIN
+    SET @SQL = N'USE [{Database}];
+                 ALTER DATABASE [{Database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                 USE [master];
+                 DROP DATABASE [{Database}];';
+    EXEC (@SQL);
+END;";
                     command.ExecuteNonQuery();
                 }
             }

@@ -16,6 +16,8 @@ namespace Kuery.Tests.SqlClient
         {
             this.fixture = fixture;
             connection = fixture.OpenNewConnection();
+
+            DropTestTables(connection);
             CreateTestTable(connection);
         }
 
@@ -79,8 +81,8 @@ namespace Kuery.Tests.SqlClient
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    create table if not exists {nameof(InsertTestObj)} (
-                        {nameof(InsertTestObj.Id)} integer primary key autoincrement,
+                    create table [{nameof(InsertTestObj)}] (
+                        {nameof(InsertTestObj.Id)} integer primary key identity,
                         {nameof(InsertTestObj.Text)} text null
                     );";
                 cmd.ExecuteNonQuery();
@@ -88,8 +90,8 @@ namespace Kuery.Tests.SqlClient
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    create table if not exists {nameof(InsertTestObj2)} (
-                        {nameof(InsertTestObj2.Id)} integer primary key autoincrement,
+                    create table [{nameof(InsertTestObj2)}] (
+                        {nameof(InsertTestObj2.Id)} integer primary key identity,
                         {nameof(InsertTestObj2.Text)} text null
                     );";
                 cmd.ExecuteNonQuery();
@@ -97,16 +99,16 @@ namespace Kuery.Tests.SqlClient
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    create table if not exists {nameof(OneColumnObj)} (
-                        {nameof(OneColumnObj.Id)} integer primary key autoincrement
+                    create table [{nameof(OneColumnObj)}] (
+                        {nameof(OneColumnObj.Id)} integer primary key identity
                     );";
                 cmd.ExecuteNonQuery();
             }
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = $@"
-                    create table if not exists {nameof(UniqueObj)} (
-                        {nameof(UniqueObj.Id)} integer primary key autoincrement
+                    create table [{nameof(UniqueObj)}] (
+                        {nameof(UniqueObj.Id)} integer primary key identity
                     );";
                 cmd.ExecuteNonQuery();
             }
@@ -215,7 +217,7 @@ namespace Kuery.Tests.SqlClient
                 .ToList();
             testObjects[testObjects.Count - 1].Id = 1; // causes the insert to fail because of duplicate key
 
-            Assert.Throws<SqliteException>(() =>
+            Assert.Throws<SqlException>(() =>
             {
                 connection.InsertAll(testObjects);
             });
@@ -245,7 +247,7 @@ namespace Kuery.Tests.SqlClient
                 .ToList();
             testObjects[testObjects.Count - 1].Id = 1; // causes the insert to fail because of duplicate key
 
-            Assert.Throws<SqliteException>(() =>
+            Assert.Throws<SqlException>(() =>
             {
                 var tx = connection.BeginTransaction();
                 try
