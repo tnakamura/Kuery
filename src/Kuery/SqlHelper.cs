@@ -1866,7 +1866,12 @@ namespace Kuery
         {
             using (var command = GenerateCommand("count(*)"))
             {
-                return (int)(long)await command.TryExecuteScalarAsync();
+                var result = await command.TryExecuteScalarAsync().ConfigureAwait(false);
+                if (result is long l)
+                {
+                    return (int)l;
+                }
+                return (int)result;
             }
         }
 

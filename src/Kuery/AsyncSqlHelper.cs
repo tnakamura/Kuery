@@ -60,7 +60,7 @@ namespace Kuery
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static Task<object> TryExecuteScalarAsync(this IDbCommand command )
+        internal static Task<object> TryExecuteScalarAsync(this IDbCommand command)
         {
             if (command is DbCommand dbCommand)
             {
@@ -286,10 +286,10 @@ namespace Kuery
 
         internal static async Task<T> ExecuteQueryFirstOrDefaultAsync<T>(this IDbCommand command, TableMapping map)
         {
-            using (var reader = await command.TryExecuteReaderAsync())
+            using (var reader = await command.TryExecuteReaderAsync().ConfigureAwait(false))
             {
                 var deserializer = new Deserializer<T>(map, reader);
-                if (await reader.ReadAsync())
+                if (await reader.ReadAsync().ConfigureAwait(false))
                 {
                     return deserializer.Deserialize(reader);
                 }

@@ -69,8 +69,8 @@ namespace Kuery.Tests.SqlClient
                     command.CommandText =
                         @"CREATE TABLE customers (
                             id INTEGER NOT NULL PRIMARY KEY,
-                            code TEXT NOT NULL,
-                            name TEXT NOT NULL
+                            code NVARCHAR(50) NOT NULL,
+                            name NVARCHAR(100) NOT NULL
                           )";
                     command.ExecuteNonQuery();
                 }
