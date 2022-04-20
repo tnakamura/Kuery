@@ -5,11 +5,8 @@ using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
-
-[assembly: InternalsVisibleTo("Kuery.Tests")]
 
 namespace Kuery
 {
@@ -1240,7 +1237,7 @@ namespace Kuery
             }
 
             var args = new List<object>();
-            var cmdText = "delete from \"" + Table.TableName + "\"";
+            var cmdText = "delete from [" + Table.TableName + "]";
             var w = CompileExpr(pred, args);
             cmdText += " where " + w.CommandText;
 
@@ -1250,7 +1247,7 @@ namespace Kuery
                 for (var i = 0; i < args.Count; i++)
                 {
                     var parameter = command.CreateParameter();
-                    parameter.ParameterName = "$p" + (i + 1).ToString();
+                    parameter.ParameterName = Connection.GetParameterName("p" + (i + 1).ToString());
                     parameter.Value = args[i];
                     command.Parameters.Add(parameter);
                 }
@@ -1281,7 +1278,7 @@ namespace Kuery
             }
 
             var args = new List<object>();
-            var cmdText = "delete from \"" + Table.TableName + "\"";
+            var cmdText = "delete from [" + Table.TableName + "]";
             var w = CompileExpr(pred, args);
             cmdText += " where " + w.CommandText;
 
@@ -1291,7 +1288,7 @@ namespace Kuery
                 for (var i = 0; i < args.Count; i++)
                 {
                     var parameter = command.CreateParameter();
-                    parameter.ParameterName = "$p" + (i + 1).ToString();
+                    parameter.ParameterName = Connection.GetParameterName("p" + (i + 1).ToString());
                     parameter.Value = args[i];
                     command.Parameters.Add(parameter);
                 }
@@ -1355,10 +1352,9 @@ namespace Kuery
             if (orderExpr.NodeType == ExpressionType.Lambda)
             {
                 var lambda = (LambdaExpression)orderExpr;
-
-                MemberExpression mem = null;
-
                 var unary = lambda.Body as UnaryExpression;
+
+                MemberExpression mem;
                 if (unary != null && unary.NodeType == ExpressionType.Convert)
                 {
                     mem = unary.Operand as MemberExpression;
@@ -1515,6 +1511,9 @@ namespace Kuery
             public readonly object Value;
         }
 
+        private string GetParameterName(string name) =>
+            Connection.GetParameterName(name);
+
         private CompileResult CompileExpr(Expression expr, List<object> queryArgs)
         {
             if (expr == null)
@@ -1528,11 +1527,11 @@ namespace Kuery
                 var rightr = CompileExpr(bin.Right, queryArgs);
 
                 string text;
-                if (leftr.CommandText == ("$p" + queryArgs.Count.ToString()) && leftr.Value == null)
+                if (leftr.CommandText == GetParameterName("p" + queryArgs.Count.ToString()) && leftr.Value == null)
                 {
                     text = CompileNullBinaryExpression(bin, rightr);
                 }
-                else if (rightr.CommandText == ("$p" + queryArgs.Count.ToString()) && rightr.Value == null)
+                else if (rightr.CommandText == GetParameterName("p" + queryArgs.Count.ToString()) && rightr.Value == null)
                 {
                     text = CompileNullBinaryExpression(bin, leftr);
                 }
@@ -1671,7 +1670,7 @@ namespace Kuery
                 var c = (ConstantExpression)expr;
                 queryArgs.Add(c.Value);
                 return new CompileResult(
-                    commandText: "$p" + queryArgs.Count.ToString(),
+                    commandText: GetParameterName("p" + queryArgs.Count.ToString()),
                     value: c.Value);
             }
             else if (expr.NodeType == ExpressionType.Convert)
@@ -1714,7 +1713,7 @@ namespace Kuery
                             throw new NotSupportedException(
                                 "Member access failed to compile expression");
                         }
-                        if (r.CommandText == ("$p" + queryArgs.Count.ToString()))
+                        if (r.CommandText == GetParameterName("p" + queryArgs.Count.ToString()))
                         {
                             queryArgs.RemoveAt(queryArgs.Count - 1);
                         }
@@ -1749,7 +1748,7 @@ namespace Kuery
                         {
                             queryArgs.Add(a);
                             sb.Append(head);
-                            sb.Append("$p" + queryArgs.Count.ToString());
+                            sb.Append(GetParameterName("p" + queryArgs.Count.ToString()));
                             head = ",";
                         }
                         sb.Append(")");
@@ -1761,7 +1760,7 @@ namespace Kuery
                     {
                         queryArgs.Add(val);
                         return new CompileResult(
-                            commandText: "$p" + queryArgs.Count.ToString(),
+                            commandText: GetParameterName("p" + queryArgs.Count.ToString()),
                             value: val);
                     }
                 }
@@ -1790,7 +1789,7 @@ namespace Kuery
             }
         }
 
-        private static string CompileNullBinaryExpression(BinaryExpression expression, CompileResult parameter)
+        private string CompileNullBinaryExpression(BinaryExpression expression, CompileResult parameter)
         {
             switch (expression.NodeType)
             {
@@ -1808,7 +1807,7 @@ namespace Kuery
                 case ExpressionType.GreaterThanOrEqual:
                 case ExpressionType.LessThan:
                 case ExpressionType.LessThanOrEqual:
-                    return "(" + parameter.CommandText + " < $" + parameter.CommandText.TrimStart('[').TrimEnd(']') + ")";
+                    return "(" + parameter.CommandText + " < " + parameter.CommandText.TrimStart('[').TrimEnd(']') + ")";
                 default:
                     throw new NotSupportedException(
                         $"Cannot compile Null-BinaryExpression with type {expression.NodeType}");
