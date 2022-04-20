@@ -25,14 +25,23 @@ namespace Kuery
 
         internal static IDbCommand CreateLastInsertRowIdCommand(this IDbConnection connection)
         {
+            string commandText;
+            if (connection.IsSqlite())
+            {
+                commandText = "select last_insert_rowid();";
+            }
+            else
+            {
+                commandText = "select @@IDENTITY";
+            }
             var command = connection.CreateCommand();
-            command.CommandText = "select last_insert_rowid();";
+            command.CommandText = commandText;
             return command;
         }
 
         internal static IDbCommand CreateInsertCommand(this IDbConnection connection, object item, Type type)
         {
-            var map = SqlHelper.GetMapping(type);
+            var map = connection.GetMapping(type);
             var columns = new StringBuilder();
             var values = new StringBuilder();
             var command = connection.CreateCommand();
@@ -92,7 +101,7 @@ namespace Kuery
 
         internal static IDbCommand CreateUpdateCommand(this IDbConnection connection, object item, Type type)
         {
-            var mapping = SqlHelper.GetMapping(type);
+            var mapping = connection.GetMapping(type);
             if (mapping.PK == null)
             {
                 throw new NotSupportedException(
@@ -152,16 +161,38 @@ namespace Kuery
             return command;
         }
 
-        internal static string GetParameterPrefix(this IDbConnection connection)
+        private static bool IsSqlite(this IDbConnection connection)
         {
             switch (connection.GetType().FullName)
             {
                 case "System.Data.Sqlite.SqliteConnection":
                 case "Microsoft.Data.Sqlite.SqliteConnection":
-                    return "$";
+                    return true;
                 default:
-                    return "@";
+                    return false;
             }
+        }
+
+        private static bool IsSqlServer(this IDbConnection connection)
+        {
+            switch (connection.GetType().FullName)
+            {
+                case "System.Data.SqlClient.SqlConnection":
+                case "Microsoft.Data.SqlClient.SqlConnection":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        internal static string GetParameterPrefix(this IDbConnection connection)
+        {
+            if (connection.IsSqlite())
+                return "$";
+            else if (connection.IsSqlServer())
+                return "@";
+            else
+                return "@";
         }
 
         internal static string GetParameterName(this IDbConnection connection, string name)
@@ -171,7 +202,7 @@ namespace Kuery
 
         internal static IDbCommand CreateDeleteCommand(this IDbConnection connection, object item, Type type)
         {
-            var map = SqlHelper.GetMapping(type);
+            var map = connection.GetMapping(type);
             if (map.PK == null)
             {
                 throw new NotSupportedException(
@@ -206,7 +237,7 @@ namespace Kuery
 
         internal static IDbCommand CreateInsertOrReplaceCommand(this IDbConnection connection, object item, Type type)
         {
-            var map = SqlHelper.GetMapping(type);
+            var map = connection.GetMapping(type);
             var columns = new StringBuilder();
             var values = new StringBuilder();
             var command = connection.CreateCommand();

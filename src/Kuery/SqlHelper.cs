@@ -15,18 +15,23 @@ namespace Kuery
 {
     public static partial class SqlHelper
     {
-        public static TableQuery<T> Table<T>(this IDbConnection connection) =>
-            new TableQuery<T>(connection, GetMapping<T>());
+        public static TableQuery<T> Table<T>(this IDbConnection connection)
+        {
+            var map = connection.GetMapping<T>();
+            return new TableQuery<T>(connection, map);
+        }
 
-        public static int Insert<T>(this IDbConnection connection, T item, IDbTransaction transaction = null) =>
-            connection.Insert(typeof(T), item, transaction);
+        public static int Insert<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
+        {
+            return connection.Insert(typeof(T), item, transaction);
+        }
 
         public static int Insert(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
 
-            var map = GetMapping(type);
+            var map = connection.GetMapping(type);
             if (map.PK != null &&
                 map.PK.IsAutoGuid &&
                 (Guid)map.PK.GetValue(item) == Guid.Empty)
@@ -55,6 +60,11 @@ namespace Kuery
             using (var command = connection.CreateLastInsertRowIdCommand())
             {
                 command.Transaction = transaction;
+                var result = command.ExecuteScalar();
+                if (result is decimal d)
+                {
+                    return (long)d;
+                }
                 return (long)command.ExecuteScalar();
             }
         }
@@ -156,11 +166,17 @@ namespace Kuery
             }
         }
 
-        public static int Delete<T>(this IDbConnection connection, object primaryKey, IDbTransaction transaction = null) =>
-            connection.Delete(GetMapping<T>(), primaryKey, transaction);
+        public static int Delete<T>(this IDbConnection connection, object primaryKey, IDbTransaction transaction = null)
+        {
+            var map = connection.GetMapping<T>();
+            return connection.Delete(map, primaryKey, transaction);
+        }
 
-        public static int Delete(this IDbConnection connection, Type type, object primaryKey, IDbTransaction transaction = null) =>
-            connection.Delete(GetMapping(type), primaryKey, transaction);
+        public static int Delete(this IDbConnection connection, Type type, object primaryKey, IDbTransaction transaction = null)
+        {
+            var map = connection.GetMapping(type);
+            return connection.Delete(map, primaryKey, transaction);
+        }
 
         private static int Delete(this IDbConnection connection, TableMapping map, object primaryKey, IDbTransaction transaction = null)
         {
@@ -178,7 +194,7 @@ namespace Kuery
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
-            var map = GetMapping(typeof(T));
+            var map = connection.GetMapping(typeof(T));
             return connection.Find<T>(map, pk);
         }
 
@@ -207,12 +223,15 @@ namespace Kuery
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
-            var map = GetMapping(typeof(T));
+            var map = connection.GetMapping(typeof(T));
             return connection.Get<T>(map, pk);
         }
 
-        public static T Get<T>(this IDbConnection connection, Type type, object pk) =>
-            connection.Get<T>(GetMapping(type), pk);
+        public static T Get<T>(this IDbConnection connection, Type type, object pk)
+        {
+            var map = connection.GetMapping(type);
+            return connection.Get<T>(map, pk);
+        }
 
         private static T Get<T>(this IDbConnection connection, TableMapping mapping, object pk)
         {
@@ -334,10 +353,10 @@ namespace Kuery
 
         private static readonly Dictionary<Type, TableMapping> _mappings = new Dictionary<Type, TableMapping>();
 
-        internal static TableMapping GetMapping<T>(CreateFlags createFlags = CreateFlags.None) =>
-            GetMapping(typeof(T), createFlags);
+        internal static TableMapping GetMapping<T>(this IDbConnection connection, CreateFlags createFlags = CreateFlags.None) =>
+            connection.GetMapping(typeof(T), createFlags);
 
-        internal static TableMapping GetMapping(Type type, CreateFlags createFlags = CreateFlags.None)
+        internal static TableMapping GetMapping(this IDbConnection connection, Type type, CreateFlags createFlags = CreateFlags.None)
         {
             var key = type;
             TableMapping map;
@@ -347,13 +366,19 @@ namespace Kuery
                 {
                     if (createFlags != CreateFlags.None && createFlags != map.CreateFlags)
                     {
-                        map = new TableMapping(type, createFlags);
+                        map = new TableMapping(
+                            type: type,
+                            parameterPrefix: connection.GetParameterPrefix(),
+                            createFlags: createFlags);
                         _mappings[key] = map;
                     }
                 }
                 else
                 {
-                    map = new TableMapping(type, createFlags);
+                    map = new TableMapping(
+                        type: type,
+                        parameterPrefix: connection.GetParameterPrefix(),
+                        createFlags: createFlags);
                     _mappings.Add(key, map);
                 }
             }
@@ -364,12 +389,16 @@ namespace Kuery
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                return ExecuteQuery<T>(command, GetMapping<T>());
+                var map = connection.GetMapping<T>();
+                return ExecuteQuery<T>(command, map);
             }
         }
 
-        public static IEnumerable<object> Query(this IDbConnection connection, Type type, string sql, object param = null) =>
-            connection.Query(GetMapping(type), sql, param);
+        public static IEnumerable<object> Query(this IDbConnection connection, Type type, string sql, object param = null)
+        {
+            var map = connection.GetMapping(type);
+            return connection.Query(map, sql, param);
+        }
 
         private static IEnumerable<object> Query(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
         {
@@ -385,12 +414,16 @@ namespace Kuery
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                return ExecuteQueryFirstOrDefault<T>(command, GetMapping<T>());
+                var map = connection.GetMapping<T>();
+                return ExecuteQueryFirstOrDefault<T>(command, map);
             }
         }
 
-        public static object FindWithQuery(this IDbConnection connection, Type type, string sql, object param = null) =>
-            connection.FindWithQuery(GetMapping(type), sql, param);
+        public static object FindWithQuery(this IDbConnection connection, Type type, string sql, object param = null)
+        {
+            var map = connection.GetMapping(type);
+            return connection.FindWithQuery(map, sql, param);
+        }
 
         private static object FindWithQuery(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
         {
@@ -557,7 +590,7 @@ namespace Kuery
 
         private readonly IReadOnlyDictionary<string, Column> _lookupByPropertyName;
 
-        public TableMapping(Type type, CreateFlags createFlags = CreateFlags.None)
+        internal TableMapping(Type type, string parameterPrefix, CreateFlags createFlags = CreateFlags.None)
         {
             MappedType = type;
             CreateFlags = createFlags;
@@ -629,7 +662,7 @@ namespace Kuery
 
             if (PK != null)
             {
-                GetByPrimaryKeySql = $"select * from [{TableName}] where [{PK.Name}] = ${PK.Name}";
+                GetByPrimaryKeySql = $"select * from [{TableName}] where [{PK.Name}] = {parameterPrefix}{PK.Name}";
             }
             else
             {
@@ -1140,7 +1173,7 @@ namespace Kuery
         internal TableQuery(IDbConnection connection)
         {
             Connection = connection;
-            Table = SqlHelper.GetMapping(typeof(T));
+            Table = connection.GetMapping(typeof(T));
         }
 
         private TableQuery<TOther> Clone<TOther>()
@@ -1459,7 +1492,7 @@ namespace Kuery
                 {
                     var p = cmd.CreateParameter();
                     p.Value = args[i];
-                    p.ParameterName = "$p" + (i + 1).ToString();
+                    p.ParameterName = Connection.GetParameterName("p" + (i + 1).ToString());
                     cmd.Parameters.Add(p);
                 }
             }
@@ -1813,7 +1846,12 @@ namespace Kuery
         {
             using (var command = GenerateCommand("count(*)"))
             {
-                return (int)(long)command.ExecuteScalar();
+                var result = command.ExecuteScalar();
+                if (result is long l)
+                {
+                    return (int)l;
+                }
+                return (int)result;
             }
         }
 

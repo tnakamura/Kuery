@@ -91,7 +91,7 @@ namespace Kuery.Tests.SqlClient
             {
                 cmd.CommandText = $@"
                     create table [{nameof(InsertTestObj2)}] (
-                        {nameof(InsertTestObj2.Id)} integer primary key identity,
+                        {nameof(InsertTestObj2.Id)} integer primary key,
                         {nameof(InsertTestObj2.Text)} text null
                     );";
                 cmd.ExecuteNonQuery();
@@ -108,7 +108,7 @@ namespace Kuery.Tests.SqlClient
             {
                 cmd.CommandText = $@"
                     create table [{nameof(UniqueObj)}] (
-                        {nameof(UniqueObj.Id)} integer primary key identity
+                        {nameof(UniqueObj.Id)} integer primary key
                     );";
                 cmd.ExecuteNonQuery();
             }

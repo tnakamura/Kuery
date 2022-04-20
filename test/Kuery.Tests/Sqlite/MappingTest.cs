@@ -1,6 +1,5 @@
-using System;
-using System.Data.Common;
 using System.Collections.Generic;
+using System.Data.Common;
 using Xunit;
 
 namespace Kuery.Tests.Sqlite
@@ -27,7 +26,8 @@ namespace Kuery.Tests.Sqlite
         [Fact]
         public void HasGoodNames()
         {
-            var mapping = SqlHelper.GetMapping<AFunnyTableName>();
+            using var con = fixture.CreateConnection();
+            var mapping = con.GetMapping<AFunnyTableName>();
             Assert.Equal("AGoodTableName", mapping.TableName);
             Assert.Equal("Id", mapping.Columns[0].Name);
             Assert.Equal("AGoodColumnName", mapping.Columns[1].Name);

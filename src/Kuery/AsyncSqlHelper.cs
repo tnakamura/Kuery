@@ -21,7 +21,7 @@ namespace Kuery
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
 
-            var map = GetMapping(type);
+            var map = connection.GetMapping(type);
             if (map.PK != null &&
                 map.PK.IsAutoGuid &&
                 (Guid)map.PK.GetValue(item) == Guid.Empty)
@@ -60,7 +60,7 @@ namespace Kuery
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static Task<object> TryExecuteScalarAsync(this IDbCommand command)
+        internal static Task<object> TryExecuteScalarAsync(this IDbCommand command )
         {
             if (command is DbCommand dbCommand)
             {
@@ -182,11 +182,17 @@ namespace Kuery
             }
         }
 
-        public static Task<int> DeleteAsync<T>(this IDbConnection connection, object primaryKey, IDbTransaction transaction = null) =>
-            connection.DeleteAsync(GetMapping<T>(), primaryKey, transaction);
+        public static Task<int> DeleteAsync<T>(this IDbConnection connection, object primaryKey, IDbTransaction transaction = null)
+        {
+            var map = connection.GetMapping<T>();
+            return connection.DeleteAsync(map, primaryKey, transaction);
+        }
 
-        public static Task<int> DeleteAsync(this IDbConnection connection, Type type, object primaryKey, IDbTransaction transaction = null) =>
-            connection.DeleteAsync(GetMapping(type), primaryKey, transaction);
+        public static Task<int> DeleteAsync(this IDbConnection connection, Type type, object primaryKey, IDbTransaction transaction = null)
+        {
+            var map = connection.GetMapping(type);
+            return connection.DeleteAsync(map, primaryKey, transaction);
+        }
 
         private static Task<int> DeleteAsync(this IDbConnection connection, TableMapping map, object primaryKey, IDbTransaction transaction = null)
         {
@@ -203,7 +209,7 @@ namespace Kuery
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
-            var map = GetMapping(typeof(T));
+            var map = connection.GetMapping(typeof(T));
             return connection.FindAsync<T>(map, pk);
         }
 
@@ -233,7 +239,7 @@ namespace Kuery
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
-            var map = GetMapping(typeof(T));
+            var map = connection.GetMapping(typeof(T));
             return connection.GetAsync<T>(map, pk);
         }
 
@@ -298,12 +304,16 @@ namespace Kuery
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                return await ExecuteQueryAsync<T>(command, GetMapping<T>());
+                var map = connection.GetMapping<T>();
+                return await ExecuteQueryAsync<T>(command, map);
             }
         }
 
-        public static Task<IEnumerable<object>> QueryAsync(this IDbConnection connection, Type type, string sql, object param = null) =>
-            connection.QueryAsync(GetMapping(type), sql, param);
+        public static Task<IEnumerable<object>> QueryAsync(this IDbConnection connection, Type type, string sql, object param = null)
+        {
+            var map = connection.GetMapping(type);
+            return connection.QueryAsync(map, sql, param);
+        }
 
         private static async Task<IEnumerable<object>> QueryAsync(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
         {
@@ -319,12 +329,16 @@ namespace Kuery
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                return ExecuteQueryFirstOrDefaultAsync<T>(command, GetMapping<T>());
+                var map = connection.GetMapping<T>();
+                return ExecuteQueryFirstOrDefaultAsync<T>(command, map);
             }
         }
 
-        public static Task<object> FindWithQueryAsync(this IDbConnection connection, Type type, string sql, object param = null) =>
-            connection.FindWithQueryAsync(GetMapping(type), sql, param);
+        public static Task<object> FindWithQueryAsync(this IDbConnection connection, Type type, string sql, object param = null)
+        {
+            var map = connection.GetMapping(type);
+            return connection.FindWithQueryAsync(map, sql, param);
+        }
 
         private static Task<object> FindWithQueryAsync(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
         {

@@ -56,7 +56,9 @@ namespace Kuery.Tests.Sqlite
         [Fact]
         public void MappingIgnoreColumn()
         {
-            var m = SqlHelper.GetMapping<IgnoreTestObj>();
+            using var con = fixture.OpenNewConnection();
+
+            var m = con.GetMapping<IgnoreTestObj>();
 
             Assert.Equal(2, m.Columns.Count);
         }
