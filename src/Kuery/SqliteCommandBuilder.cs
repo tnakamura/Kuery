@@ -237,9 +237,94 @@ namespace Kuery
 
         internal static IDbCommand CreateInsertOrReplaceCommand(this IDbConnection connection, object item, Type type)
         {
+            if (connection.IsSqlite())
+            {
+                return connection.CreateInsertOrReplaceCommandForSqlite(item, type);
+            }
+            else
+            {
+                return connection.CreateMergeCommandForSqlServer(item, type);
+            }
+        }
+
+        private static IDbCommand CreateMergeCommandForSqlServer(this IDbConnection connection, object item, Type type)
+        {
             var map = connection.GetMapping(type);
-            var columns = new StringBuilder();
-            var values = new StringBuilder();
+            var command = connection.CreateCommand();
+
+            if (map.InsertOrReplaceColumns.Count == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
+            {
+                command.CommandText = $@"MERGE [{map.TableName}] AS tgt
+USING (SELECT @{map.PK.Name}) AS src ([{map.PK.Name}])
+ON (tgt.[{map.PK.Name}] = src.[{map.PK.Name}])
+WHEN NOT MATCHED THEN
+    INSERT [{map.TableName}] DEFAULT VALUES;
+";
+                var parameter = command.CreateParameter();
+                parameter.ParameterName = "@" + map.PK.Name;
+                parameter.Value = map.PK.GetValue(item);
+                command.Parameters.Add(parameter);
+            }
+            else
+            {
+                var pkParameter = command.CreateParameter();
+                pkParameter.ParameterName = "@" + map.PK.Name;
+                pkParameter.Value = map.PK.GetValue(item);
+                command.Parameters.Add(pkParameter);
+
+                var insertColumns = new StringBuilder();
+                var updateColumns = new StringBuilder();
+                var values = new StringBuilder();
+                for (var i = 0; i < map.InsertColumns.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        insertColumns.Append(",");
+                        updateColumns.Append(",");
+                        values.Append(",");
+                    }
+
+                    var col = map.InsertColumns[i];
+                    insertColumns.Append("[");
+                    insertColumns.Append(col.Name);
+                    insertColumns.Append("]");
+                    updateColumns.Append("[");
+                    updateColumns.Append(col.Name);
+                    updateColumns.Append("] = ");
+
+                    var value = col.GetValue(item);
+                    if (value is null && col.IsNullable)
+                    {
+                        values.Append("NULL");
+                    }
+                    else
+                    {
+                        var parameter = command.CreateParameter();
+                        parameter.ParameterName = connection.GetParameterName(col.Name);
+                        parameter.Value = col.GetValue(item);
+                        command.Parameters.Add(parameter);
+
+                        values.Append(parameter.ParameterName);
+                        updateColumns.Append(parameter.ParameterName);
+                    }
+                }
+
+                command.CommandText = $@"MERGE [{map.TableName}] AS tgt
+USING (SELECT @{map.PK.Name}) AS src ([{map.PK.Name}])
+ON (tgt.[{map.PK.Name}] = src.[{map.PK.Name}])
+WHEN MATCHED THEN
+    UPDATE SET {updateColumns}
+WHEN NOT MATCHED THEN
+    INSERT ({insertColumns})
+    VALUES ({values});";
+            }
+
+            return command;
+        }
+
+        private static IDbCommand CreateInsertOrReplaceCommandForSqlite(this IDbConnection connection, object item, Type type)
+        {
+            var map = connection.GetMapping(type);
             var command = connection.CreateCommand();
 
             if (map.InsertOrReplaceColumns.Count == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
@@ -250,6 +335,8 @@ namespace Kuery
             }
             else
             {
+                var columns = new StringBuilder();
+                var values = new StringBuilder();
                 for (var i = 0; i < map.InsertOrReplaceColumns.Count; i++)
                 {
                     if (i > 0)

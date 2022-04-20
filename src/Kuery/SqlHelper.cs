@@ -351,18 +351,18 @@ namespace Kuery
             }
         }
 
-        private static readonly Dictionary<Type, TableMapping> _mappings = new Dictionary<Type, TableMapping>();
+        private static readonly Dictionary<(Type, Type), TableMapping> _s_mappings = new Dictionary<(Type, Type), TableMapping>();
 
         internal static TableMapping GetMapping<T>(this IDbConnection connection, CreateFlags createFlags = CreateFlags.None) =>
             connection.GetMapping(typeof(T), createFlags);
 
         internal static TableMapping GetMapping(this IDbConnection connection, Type type, CreateFlags createFlags = CreateFlags.None)
         {
-            var key = type;
+            var key = (connection.GetType(), type);
             TableMapping map;
-            lock (_mappings)
+            lock (_s_mappings)
             {
-                if (_mappings.TryGetValue(key, out map))
+                if (_s_mappings.TryGetValue(key, out map))
                 {
                     if (createFlags != CreateFlags.None && createFlags != map.CreateFlags)
                     {
@@ -370,7 +370,7 @@ namespace Kuery
                             type: type,
                             parameterPrefix: connection.GetParameterPrefix(),
                             createFlags: createFlags);
-                        _mappings[key] = map;
+                        _s_mappings[key] = map;
                     }
                 }
                 else
@@ -379,7 +379,7 @@ namespace Kuery
                         type: type,
                         parameterPrefix: connection.GetParameterPrefix(),
                         createFlags: createFlags);
-                    _mappings.Add(key, map);
+                    _s_mappings.Add(key, map);
                 }
             }
             return map;
@@ -590,7 +590,10 @@ namespace Kuery
 
         private readonly IReadOnlyDictionary<string, Column> _lookupByPropertyName;
 
-        internal TableMapping(Type type, string parameterPrefix, CreateFlags createFlags = CreateFlags.None)
+        internal TableMapping(
+            Type type,
+            string parameterPrefix,
+            CreateFlags createFlags = CreateFlags.None)
         {
             MappedType = type;
             CreateFlags = createFlags;
