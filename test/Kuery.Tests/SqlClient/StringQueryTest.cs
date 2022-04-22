@@ -79,7 +79,8 @@ namespace Kuery.Tests.SqlClient
                 Assert.Equal(2, fs.Count);
 
                 var lfs = connection.Table<Product>().Where(x => x.Name.StartsWith("f")).ToList();
-                Assert.Empty(lfs);
+                //Assert.Empty(lfs);
+                Assert.Equal(2, lfs.Count);
 
 
                 var lfs2 = connection.Table<Product>().Where(x => x.Name.StartsWith("f", StringComparison.OrdinalIgnoreCase)).ToList();

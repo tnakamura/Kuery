@@ -1719,11 +1719,25 @@ namespace Kuery
                     {
                         case StringComparison.Ordinal:
                         case StringComparison.CurrentCulture:
-                            sqlCall = "( substr(" + obj.Value.CommandText + ", 1, " + args[0].Value.ToString().Length + ") = " + args[0].CommandText + ")";
+                            if (Connection.IsSqlServer())
+                            {
+                                sqlCall = "( SUBSTRING(" + obj.Value.CommandText + ", 1, " + args[0].Value.ToString().Length + ") = " + args[0].CommandText + ")";
+                            }
+                            else
+                            {
+                                sqlCall = "( substr(" + obj.Value.CommandText + ", 1, " + args[0].Value.ToString().Length + ") = " + args[0].CommandText + ")";
+                            }
                             break;
                         case StringComparison.OrdinalIgnoreCase:
                         case StringComparison.CurrentCultureIgnoreCase:
-                            sqlCall = "(" + obj.Value.CommandText + " like (" + args[0].CommandText + " || '%'))";
+                            if (Connection.IsSqlServer())
+                            {
+                                sqlCall = "(" + obj.Value.CommandText + " like (" + args[0].CommandText + " + N'%'))";
+                            }
+                            else
+                            {
+                                sqlCall = "(" + obj.Value.CommandText + " like (" + args[0].CommandText + " || '%'))";
+                            }
                             break;
                     }
                 }
@@ -1769,7 +1783,14 @@ namespace Kuery
                             break;
                         case StringComparison.OrdinalIgnoreCase:
                         case StringComparison.CurrentCultureIgnoreCase:
-                            sqlCall = "(" + obj.Value.CommandText + " like ('%' || " + args[0].CommandText + "))";
+                            if (Connection.IsSqlServer())
+                            {
+                                sqlCall = "(" + obj.Value.CommandText + " like (N'%' + " + args[0].CommandText + "))";
+                            }
+                            else
+                            {
+                                sqlCall = "(" + obj.Value.CommandText + " like ('%' || " + args[0].CommandText + "))";
+                            }
                             break;
                     }
                 }
