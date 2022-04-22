@@ -1591,8 +1591,13 @@ namespace Kuery
             {
                 for (var i = 0; i < args.Count; i++)
                 {
+                    var a = args[i];
+                    if (a == null)
+                    {
+                        continue;
+                    }
                     var p = cmd.CreateParameter();
-                    p.Value = args[i];
+                    p.Value = a;
                     p.ParameterName = Connection.GetParameterName("p" + (i + 1).ToString());
                     cmd.Parameters.Add(p);
                 }
@@ -1681,11 +1686,11 @@ namespace Kuery
                 {
                     sqlCall = "(" + args[0].CommandText + " like " + args[1].CommandText + ")";
                 }
-                else if (call.Method.Name == "Contains" && args.Length == 2)
+                else if (call.Method.Name == nameof(Enumerable.Contains) && args.Length == 2)
                 {
                     sqlCall = "(" + args[1].CommandText + " in " + args[0].CommandText + ")";
                 }
-                else if (call.Method.Name == "Contains" && args.Length == 1)
+                else if (call.Method.Name == nameof(Enumerable.Contains) && args.Length == 1)
                 {
                     if (call.Object != null && call.Object.Type == typeof(string))
                     {
