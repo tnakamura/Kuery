@@ -11,7 +11,7 @@ namespace Kuery.Tests
 
         public decimal Price { get; set; }
 
-        public uint TotalSales { get; set; }
+        public int TotalSales { get; set; }
     }
 
     public class Order

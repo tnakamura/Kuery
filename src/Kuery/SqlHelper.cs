@@ -1694,7 +1694,14 @@ namespace Kuery
                 {
                     if (call.Object != null && call.Object.Type == typeof(string))
                     {
-                        sqlCall = "( instr(" + obj.Value.CommandText + "," + args[0].CommandText + ") > 0)";
+                        if (Connection.IsSqlServer())
+                        {
+                            sqlCall = "( CHARINDEX(" + args[0].CommandText + "," + obj.Value.CommandText + ") > 0)";
+                        }
+                        else
+                        {
+                            sqlCall = "( instr(" + obj.Value.CommandText + "," + args[0].CommandText + ") > 0)";
+                        }
                     }
                     else
                     {
