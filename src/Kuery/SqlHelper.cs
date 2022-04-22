@@ -1258,7 +1258,7 @@ namespace Kuery
 
         public Task<int> DeleteAsync() => DeleteAsync(null);
 
-        public Task<int> DeleteAsync(Expression<Func<T, bool>> predExpr)
+        public async Task<int> DeleteAsync(Expression<Func<T, bool>> predExpr)
         {
             if (_limit.HasValue || _offset.HasValue)
             {
@@ -1292,7 +1292,7 @@ namespace Kuery
                     parameter.Value = args[i];
                     command.Parameters.Add(parameter);
                 }
-                return command.TryExecuteNonQueryAsync();
+                return await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
             }
         }
 

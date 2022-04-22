@@ -5,8 +5,8 @@ using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 namespace Kuery
 {
@@ -46,11 +46,11 @@ namespace Kuery
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static Task<int> TryExecuteNonQueryAsync(this IDbCommand command)
+        internal static async Task<int> TryExecuteNonQueryAsync(this IDbCommand command)
         {
             if (command is DbCommand dbCommand)
             {
-                return dbCommand.ExecuteNonQueryAsync();
+                return await dbCommand.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
             else
             {
@@ -60,11 +60,11 @@ namespace Kuery
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static Task<object> TryExecuteScalarAsync(this IDbCommand command)
+        internal static async Task<object> TryExecuteScalarAsync(this IDbCommand command)
         {
             if (command is DbCommand dbCommand)
             {
-                return dbCommand.ExecuteScalarAsync();
+                return await dbCommand.ExecuteScalarAsync().ConfigureAwait(false);
             }
             else
             {
@@ -78,7 +78,7 @@ namespace Kuery
             using (var command = connection.CreateLastInsertRowIdCommand())
             {
                 command.Transaction = transaction;
-                return (long)await command.TryExecuteScalarAsync();
+                return (long)await command.TryExecuteScalarAsync().ConfigureAwait(false);
             }
         }
 
@@ -89,7 +89,7 @@ namespace Kuery
             var result = 0;
             foreach (var item in items)
             {
-                result += await connection.InsertAsync(Orm.GetType(item), item, transaction);
+                result += await connection.InsertAsync(Orm.GetType(item), item, transaction).ConfigureAwait(false);
             }
             return result;
         }
@@ -101,19 +101,19 @@ namespace Kuery
             var result = 0;
             foreach (var item in items)
             {
-                result += await connection.InsertAsync(type, item, transaction);
+                result += await connection.InsertAsync(type, item, transaction).ConfigureAwait(false);
             }
             return result;
         }
 
-        public static Task<int> UpdateAsync<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
+        public static async Task<int> UpdateAsync<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
 
-            return connection.UpdateAsync(typeof(T), item, transaction);
+            return await connection.UpdateAsync(typeof(T), item, transaction).ConfigureAwait(false);
         }
 
-        public static Task<int> UpdateAsync(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
+        public static async Task<int> UpdateAsync(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
@@ -121,7 +121,7 @@ namespace Kuery
             using (var command = connection.CreateUpdateCommand(item, type))
             {
                 command.Transaction = transaction;
-                return command.TryExecuteNonQueryAsync();
+                return await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
             }
         }
 
@@ -138,23 +138,23 @@ namespace Kuery
                     {
                         command.Transaction = transaction;
                     }
-                    result += await command.TryExecuteNonQueryAsync();
+                    result += await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
                 }
             }
             return result;
         }
 
 
-        public static Task<int> InsertOrReplaceAsync(this IDbConnection connection, object item, IDbTransaction transaction = null)
+        public static async Task<int> InsertOrReplaceAsync(this IDbConnection connection, object item, IDbTransaction transaction = null)
         {
             if (item == null)
             {
-                return Task.FromResult(0);
+                return 0;
             }
-            return connection.InsertOrReplaceAsync(Orm.GetType(item), item, transaction);
+            return await connection.InsertOrReplaceAsync(Orm.GetType(item), item, transaction).ConfigureAwait(false);
         }
 
-        public static Task<int> InsertOrReplaceAsync(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
+        public static async Task<int> InsertOrReplaceAsync(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
         {
             if (type == null)
             {
@@ -162,55 +162,55 @@ namespace Kuery
             }
             if (item == null)
             {
-                return Task.FromResult(0);
+                return 0;
             }
             using (var command = connection.CreateInsertOrReplaceCommand(item, type))
             {
                 command.Transaction = transaction;
-                return command.TryExecuteNonQueryAsync();
+                return await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
             }
         }
 
-        public static Task<int> DeleteAsync<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
+        public static async Task<int> DeleteAsync<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
 
             using (var command = connection.CreateDeleteCommand(item, typeof(T)))
             {
                 command.Transaction = transaction;
-                return command.TryExecuteNonQueryAsync();
+                return await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
             }
         }
 
-        public static Task<int> DeleteAsync<T>(this IDbConnection connection, object primaryKey, IDbTransaction transaction = null)
+        public static async Task<int> DeleteAsync<T>(this IDbConnection connection, object primaryKey, IDbTransaction transaction = null)
         {
             var map = connection.GetMapping<T>();
-            return connection.DeleteAsync(map, primaryKey, transaction);
+            return await connection.DeleteAsync(map, primaryKey, transaction).ConfigureAwait(false);
         }
 
-        public static Task<int> DeleteAsync(this IDbConnection connection, Type type, object primaryKey, IDbTransaction transaction = null)
+        public static async Task<int> DeleteAsync(this IDbConnection connection, Type type, object primaryKey, IDbTransaction transaction = null)
         {
             var map = connection.GetMapping(type);
-            return connection.DeleteAsync(map, primaryKey, transaction);
+            return await connection.DeleteAsync(map, primaryKey, transaction).ConfigureAwait(false);
         }
 
-        private static Task<int> DeleteAsync(this IDbConnection connection, TableMapping map, object primaryKey, IDbTransaction transaction = null)
+        private static async Task<int> DeleteAsync(this IDbConnection connection, TableMapping map, object primaryKey, IDbTransaction transaction = null)
         {
             if (map == null) throw new ArgumentNullException(nameof(map));
 
             using (var command = connection.CreateDeleteCommand(primaryKey, map))
             {
                 command.Transaction = transaction;
-                return command.TryExecuteNonQueryAsync();
+                return await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
             }
         }
 
-        public static Task<T> FindAsync<T>(this IDbConnection connection, object pk)
+        public static async Task<T> FindAsync<T>(this IDbConnection connection, object pk)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
             var map = connection.GetMapping(typeof(T));
-            return connection.FindAsync<T>(map, pk);
+            return await connection.FindAsync<T>(map, pk).ConfigureAwait(false);
         }
 
         private static async Task<T> FindAsync<T>(this IDbConnection connection, TableMapping mapping, object pk)
@@ -220,27 +220,31 @@ namespace Kuery
 
             using (var command = connection.CreateGetByPrimaryKeyCommand(mapping, pk))
             {
-                var result = await ExecuteQueryAsync<T>(command, mapping);
+                var result = await ExecuteQueryAsync<T>(command, mapping).ConfigureAwait(false);
                 return result.FirstOrDefault();
             }
         }
 
-        public static Task<T> FindAsync<T>(this IDbConnection connection, Expression<Func<T, bool>> predicate)
+        public static async Task<T> FindAsync<T>(this IDbConnection connection, Expression<Func<T, bool>> predicate)
         {
-            return connection.Table<T>().FirstOrDefaultAsync(predicate);
+            return await connection.Table<T>()
+                .FirstOrDefaultAsync(predicate)
+                .ConfigureAwait(false);
         }
 
-        public static Task<T> GetAsync<T>(this IDbConnection connection, Expression<Func<T, bool>> predicate)
+        public static async Task<T> GetAsync<T>(this IDbConnection connection, Expression<Func<T, bool>> predicate)
         {
-            return connection.Table<T>().FirstAsync(predicate);
+            return await connection.Table<T>()
+                .FirstAsync(predicate)
+                .ConfigureAwait(false);
         }
 
-        public static Task<T> GetAsync<T>(this IDbConnection connection, object pk)
+        public static async Task<T> GetAsync<T>(this IDbConnection connection, object pk)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
             var map = connection.GetMapping(typeof(T));
-            return connection.GetAsync<T>(map, pk);
+            return await connection.GetAsync<T>(map, pk).ConfigureAwait(false);
         }
 
         private static async Task<T> GetAsync<T>(this IDbConnection connection, TableMapping mapping, object pk)
@@ -250,17 +254,17 @@ namespace Kuery
 
             using (var command = connection.CreateGetByPrimaryKeyCommand(mapping, pk))
             {
-                var result = await ExecuteQueryAsync<T>(command, mapping);
+                var result = await ExecuteQueryAsync<T>(command, mapping).ConfigureAwait(false);
                 return result.First();
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static Task<DbDataReader> TryExecuteReaderAsync(this IDbCommand command)
+        internal static async Task<DbDataReader> TryExecuteReaderAsync(this IDbCommand command)
         {
             if (command is DbCommand dbCommand)
             {
-                return dbCommand.ExecuteReaderAsync();
+                return await dbCommand.ExecuteReaderAsync().ConfigureAwait(false);
             }
             else
             {
@@ -271,11 +275,11 @@ namespace Kuery
 
         internal static async Task<List<T>> ExecuteQueryAsync<T>(this IDbCommand command, TableMapping map)
         {
-            using (var reader = await command.TryExecuteReaderAsync())
+            using (var reader = await command.TryExecuteReaderAsync().ConfigureAwait(false))
             {
                 var result = new List<T>();
                 var deserializer = new Deserializer<T>(map, reader);
-                while (await reader.ReadAsync())
+                while (await reader.ReadAsync().ConfigureAwait(false))
                 {
                     var obj = deserializer.Deserialize(reader);
                     result.Add(obj);
@@ -305,14 +309,14 @@ namespace Kuery
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
                 var map = connection.GetMapping<T>();
-                return await ExecuteQueryAsync<T>(command, map);
+                return await ExecuteQueryAsync<T>(command, map).ConfigureAwait(false);
             }
         }
 
-        public static Task<IEnumerable<object>> QueryAsync(this IDbConnection connection, Type type, string sql, object param = null)
+        public static async Task<IEnumerable<object>> QueryAsync(this IDbConnection connection, Type type, string sql, object param = null)
         {
             var map = connection.GetMapping(type);
-            return connection.QueryAsync(map, sql, param);
+            return await connection.QueryAsync(map, sql, param).ConfigureAwait(false);
         }
 
         private static async Task<IEnumerable<object>> QueryAsync(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
@@ -321,38 +325,38 @@ namespace Kuery
 
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                return await ExecuteQueryAsync<object>(command, mapping);
+                return await ExecuteQueryAsync<object>(command, mapping).ConfigureAwait(false);
             }
         }
 
-        public static Task<T> FindWithQueryAsync<T>(this IDbConnection connection, string sql, object param = null)
+        public static async Task<T> FindWithQueryAsync<T>(this IDbConnection connection, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
                 var map = connection.GetMapping<T>();
-                return ExecuteQueryFirstOrDefaultAsync<T>(command, map);
+                return await ExecuteQueryFirstOrDefaultAsync<T>(command, map).ConfigureAwait(false);
             }
         }
 
-        public static Task<object> FindWithQueryAsync(this IDbConnection connection, Type type, string sql, object param = null)
+        public static async Task<object> FindWithQueryAsync(this IDbConnection connection, Type type, string sql, object param = null)
         {
             var map = connection.GetMapping(type);
-            return connection.FindWithQueryAsync(map, sql, param);
+            return await connection.FindWithQueryAsync(map, sql, param).ConfigureAwait(false);
         }
 
-        private static Task<object> FindWithQueryAsync(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
+        private static async Task<object> FindWithQueryAsync(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                return ExecuteQueryFirstOrDefaultAsync<object>(command, mapping);
+                return await ExecuteQueryFirstOrDefaultAsync<object>(command, mapping).ConfigureAwait(false);
             }
         }
 
-        public static Task<int> ExecuteAsync(this IDbConnection connection, string sql, object param = null)
+        public static async Task<int> ExecuteAsync(this IDbConnection connection, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                return command.TryExecuteNonQueryAsync();
+                return await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
             }
         }
 
@@ -360,7 +364,7 @@ namespace Kuery
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                var result = await command.TryExecuteScalarAsync();
+                var result = await command.TryExecuteScalarAsync().ConfigureAwait(false);
                 if (result is null || result is DBNull)
                 {
                     return default;

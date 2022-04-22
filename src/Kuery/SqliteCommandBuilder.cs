@@ -267,10 +267,13 @@ WHEN NOT MATCHED THEN
             }
             else
             {
-                var pkParameter = command.CreateParameter();
-                pkParameter.ParameterName = "@" + map.PK.Name;
-                pkParameter.Value = map.PK.GetValue(item);
-                command.Parameters.Add(pkParameter);
+                if (map.PK.IsAutoInc)
+                {
+                    var pkParameter = command.CreateParameter();
+                    pkParameter.ParameterName = "@" + map.PK.Name;
+                    pkParameter.Value = map.PK.GetValue(item);
+                    command.Parameters.Add(pkParameter);
+                }
 
                 var insertColumns = new StringBuilder();
                 var updateColumns = new StringBuilder();
