@@ -1738,17 +1738,34 @@ namespace Kuery
                     {
                         case StringComparison.Ordinal:
                         case StringComparison.CurrentCulture:
-                            sqlCall = "( substr("
-                                + obj.Value.CommandText
-                                + ", length("
-                                + obj.Value.CommandText
-                                + ") - "
-                                + args[0].Value.ToString().Length
-                                + "+1, "
-                                + args[0].Value.ToString().Length
-                                + ") = "
-                                + args[0].CommandText
-                                + ")";
+                            if (Connection.IsSqlServer())
+                            {
+                                sqlCall = "( SUBSTRING("
+                                    + obj.Value.CommandText
+                                    + ", LEN("
+                                    + obj.Value.CommandText
+                                    + ") - "
+                                    + args[0].Value.ToString().Length
+                                    + "+1, "
+                                    + args[0].Value.ToString().Length
+                                    + ") = "
+                                    + args[0].CommandText
+                                    + ")";
+                            }
+                            else
+                            {
+                                sqlCall = "( substr("
+                                    + obj.Value.CommandText
+                                    + ", length("
+                                    + obj.Value.CommandText
+                                    + ") - "
+                                    + args[0].Value.ToString().Length
+                                    + "+1, "
+                                    + args[0].Value.ToString().Length
+                                    + ") = "
+                                    + args[0].CommandText
+                                    + ")";
+                            }
                             break;
                         case StringComparison.OrdinalIgnoreCase:
                         case StringComparison.CurrentCultureIgnoreCase:

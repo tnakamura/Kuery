@@ -102,7 +102,8 @@ namespace Kuery.Tests.SqlClient
                 Assert.Equal(2, fs.Count);
 
                 var lfs = connection.Table<Product>().Where(x => x.Name.EndsWith("Ar")).ToList();
-                Assert.Empty(lfs);
+                //Assert.Empty(lfs);
+                Assert.Equal(2, lfs.Count);
 
                 var bs = connection.Table<Product>().Where(x => x.Name.EndsWith("o")).ToList();
                 Assert.Single(bs);
