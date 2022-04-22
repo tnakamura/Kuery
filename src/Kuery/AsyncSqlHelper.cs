@@ -13,8 +13,10 @@ namespace Kuery
     public static partial class SqlHelper
     {
 
-        public static Task<int> InsertAsync<T>(this IDbConnection connection, T item, IDbTransaction transaction = null) =>
-            connection.InsertAsync(typeof(T), item, transaction);
+        public static async Task<int> InsertAsync<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
+        {
+            return await connection.InsertAsync(typeof(T), item, transaction).ConfigureAwait(false);
+        }
 
         public static async Task<int> InsertAsync(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
         {
@@ -33,12 +35,12 @@ namespace Kuery
             using (var command = connection.CreateInsertCommand(item, type))
             {
                 command.Transaction = transaction;
-                count = await command.TryExecuteNonQueryAsync();
+                count = await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
             }
 
             if (map.HasAutoIncPK)
             {
-                var id = await connection.GetLastRowIdAsync();
+                var id = await connection.GetLastRowIdAsync().ConfigureAwait(false);
                 map.SetAutoIncPk(item, id);
             }
 
@@ -78,7 +80,12 @@ namespace Kuery
             using (var command = connection.CreateLastInsertRowIdCommand())
             {
                 command.Transaction = transaction;
-                return (long)await command.TryExecuteScalarAsync().ConfigureAwait(false);
+                var result = await command.TryExecuteScalarAsync().ConfigureAwait(false);
+                if (result is decimal d)
+                {
+                    return (long)d;
+                }
+                return (long)result;
             }
         }
 
