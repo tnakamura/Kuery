@@ -120,7 +120,8 @@ namespace Kuery.Tests.SqlClient
                 Assert.Equal(2, fs.Count);
 
                 var lfs = connection.Table<Product>().Where(x => x.Name.Contains("O")).ToList();
-                Assert.Empty(lfs);
+                //Assert.Empty(lfs);
+                Assert.Equal(2, lfs.Count);
 
                 var lfsu = connection.Table<Product>().Where(x => x.Name.ToUpper().Contains("O")).ToList();
                 Assert.Equal(2, lfsu.Count);
