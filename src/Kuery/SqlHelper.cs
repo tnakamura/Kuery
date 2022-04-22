@@ -1136,7 +1136,7 @@ namespace Kuery
         }
     }
 
-    public sealed class TableQuery<T> : BaseTableQuery, IEnumerable<T>
+    public sealed partial class TableQuery<T> : BaseTableQuery, IEnumerable<T>
     {
         public IDbConnection Connection { get; }
 
@@ -1256,46 +1256,6 @@ namespace Kuery
             }
         }
 
-        public Task<int> DeleteAsync() => DeleteAsync(null);
-
-        public async Task<int> DeleteAsync(Expression<Func<T, bool>> predExpr)
-        {
-            if (_limit.HasValue || _offset.HasValue)
-            {
-                throw new InvalidOperationException("Cannot delete with limits or offsets");
-            }
-            if (_where == null && predExpr == null)
-            {
-                throw new InvalidOperationException("No condition specified");
-            }
-
-            var pred = _where;
-
-            if (predExpr != null && predExpr.NodeType == ExpressionType.Lambda)
-            {
-                var lambda = (LambdaExpression)predExpr;
-                pred = pred != null ? Expression.AndAlso(pred, lambda.Body) : lambda.Body;
-            }
-
-            var args = new List<object>();
-            var cmdText = "delete from [" + Table.TableName + "]";
-            var w = CompileExpr(pred, args);
-            cmdText += " where " + w.CommandText;
-
-            using (var command = Connection.CreateCommand())
-            {
-                command.CommandText = cmdText;
-                for (var i = 0; i < args.Count; i++)
-                {
-                    var parameter = command.CreateParameter();
-                    parameter.ParameterName = Connection.GetParameterName("p" + (i + 1).ToString());
-                    parameter.Value = args[i];
-                    command.Parameters.Add(parameter);
-                }
-                return await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
-            }
-        }
-
         public TableQuery<T> Take(int n)
         {
             var q = Clone<T>();
@@ -1313,11 +1273,6 @@ namespace Kuery
         public T ElementAt(int index)
         {
             return Skip(index).Take(1).First();
-        }
-
-        public Task<T> ElementAtAsync(int index)
-        {
-            return Skip(index).Take(1).FirstAsync();
         }
 
         public TableQuery<T> Deferred()
@@ -1398,18 +1353,6 @@ namespace Kuery
         public T[] ToArray()
         {
             return GenerateCommand("*").ExecuteQuery<T>(Table).ToArray();
-        }
-
-        public async Task<List<T>> ToListAsync()
-        {
-            return await GenerateCommand("*")
-                .ExecuteQueryAsync<T>(Table)
-                .ConfigureAwait(false);
-        }
-
-        public async Task<T[]> ToArrayAsync()
-        {
-            return (await ToListAsync().ConfigureAwait(false)).ToArray();
         }
 
         void AddWhere(Expression pred)
@@ -2014,24 +1957,6 @@ namespace Kuery
             return Where(predExpr).Count();
         }
 
-        public async Task<int> CountAsync()
-        {
-            using (var command = GenerateCommand("count(*)"))
-            {
-                var result = await command.TryExecuteScalarAsync().ConfigureAwait(false);
-                if (result is long l)
-                {
-                    return (int)l;
-                }
-                return (int)result;
-            }
-        }
-
-        public Task<int> CountAsync(Expression<Func<T, bool>> predExpr)
-        {
-            return Where(predExpr).CountAsync();
-        }
-
         public IEnumerator<T> GetEnumerator()
         {
             return ToList().GetEnumerator();
@@ -2062,28 +1987,6 @@ namespace Kuery
         public T FirstOrDefault(Expression<Func<T, bool>> predExpr)
         {
             return Where(predExpr).FirstOrDefault();
-        }
-
-        public async Task<T> FirstAsync()
-        {
-            var list = await Take(1).ToListAsync();
-            return list.First();
-        }
-
-        public async Task<T> FirstOrDefaultAsync()
-        {
-            var list = await Take(1).ToListAsync();
-            return list.FirstOrDefault();
-        }
-
-        public Task<T> FirstAsync(Expression<Func<T, bool>> predExpr)
-        {
-            return Where(predExpr).FirstAsync();
-        }
-
-        public Task<T> FirstOrDefaultAsync(Expression<Func<T, bool>> predExpr)
-        {
-            return Where(predExpr).FirstOrDefaultAsync();
         }
     }
 

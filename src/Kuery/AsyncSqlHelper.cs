@@ -6,6 +6,7 @@ using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Kuery
@@ -13,12 +14,21 @@ namespace Kuery
     public static partial class SqlHelper
     {
 
-        public static async Task<int> InsertAsync<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
+        public static async Task<int> InsertAsync<T>(
+            this IDbConnection connection,
+            T item,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
-            return await connection.InsertAsync(typeof(T), item, transaction).ConfigureAwait(false);
+            return await connection.InsertAsync(typeof(T), item, transaction, cancellationToken).ConfigureAwait(false);
         }
 
-        public static async Task<int> InsertAsync(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
+        public static async Task<int> InsertAsync(
+            this IDbConnection connection,
+            Type type,
+            object item,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
@@ -35,12 +45,12 @@ namespace Kuery
             using (var command = connection.CreateInsertCommand(item, type))
             {
                 command.Transaction = transaction;
-                count = await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
+                count = await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
 
             if (map.HasAutoIncPK)
             {
-                var id = await connection.GetLastRowIdAsync().ConfigureAwait(false);
+                var id = await connection.GetLastRowIdAsync(transaction, cancellationToken).ConfigureAwait(false);
                 map.SetAutoIncPk(item, id);
             }
 
@@ -48,11 +58,11 @@ namespace Kuery
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static async Task<int> TryExecuteNonQueryAsync(this IDbCommand command)
+        internal static async Task<int> TryExecuteNonQueryAsync(this IDbCommand command, CancellationToken cancellationToken = default)
         {
             if (command is DbCommand dbCommand)
             {
-                return await dbCommand.ExecuteNonQueryAsync().ConfigureAwait(false);
+                return await dbCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -62,11 +72,11 @@ namespace Kuery
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static async Task<object> TryExecuteScalarAsync(this IDbCommand command)
+        internal static async Task<object> TryExecuteScalarAsync(this IDbCommand command, CancellationToken cancellationToken = default)
         {
             if (command is DbCommand dbCommand)
             {
-                return await dbCommand.ExecuteScalarAsync().ConfigureAwait(false);
+                return await dbCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -75,12 +85,15 @@ namespace Kuery
             }
         }
 
-        private static async Task<long> GetLastRowIdAsync(this IDbConnection connection, IDbTransaction transaction = null)
+        private static async Task<long> GetLastRowIdAsync(
+            this IDbConnection connection,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
             using (var command = connection.CreateLastInsertRowIdCommand())
             {
                 command.Transaction = transaction;
-                var result = await command.TryExecuteScalarAsync().ConfigureAwait(false);
+                var result = await command.TryExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
                 if (result is decimal d)
                 {
                     return (long)d;
@@ -89,38 +102,55 @@ namespace Kuery
             }
         }
 
-        public static async Task<int> InsertAllAsync(this IDbConnection connection, IEnumerable items, IDbTransaction transaction = null)
+        public static async Task<int> InsertAllAsync(
+            this IDbConnection connection,
+            IEnumerable items,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
 
             var result = 0;
             foreach (var item in items)
             {
-                result += await connection.InsertAsync(Orm.GetType(item), item, transaction).ConfigureAwait(false);
+                result += await connection.InsertAsync(Orm.GetType(item), item, transaction, cancellationToken).ConfigureAwait(false);
             }
             return result;
         }
 
-        public static async Task<int> InsertAllAsync(this IDbConnection connection, Type type, IEnumerable items, IDbTransaction transaction = null)
+        public static async Task<int> InsertAllAsync(
+            this IDbConnection connection,
+            Type type,
+            IEnumerable items,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
 
             var result = 0;
             foreach (var item in items)
             {
-                result += await connection.InsertAsync(type, item, transaction).ConfigureAwait(false);
+                result += await connection.InsertAsync(type, item, transaction, cancellationToken).ConfigureAwait(false);
             }
             return result;
         }
 
-        public static async Task<int> UpdateAsync<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
+        public static async Task<int> UpdateAsync<T>(
+            this IDbConnection connection,
+            T item,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
 
-            return await connection.UpdateAsync(typeof(T), item, transaction).ConfigureAwait(false);
+            return await connection.UpdateAsync(typeof(T), item, transaction, cancellationToken).ConfigureAwait(false);
         }
 
-        public static async Task<int> UpdateAsync(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
+        public static async Task<int> UpdateAsync(
+            this IDbConnection connection, Type type,
+            object item,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
@@ -128,11 +158,15 @@ namespace Kuery
             using (var command = connection.CreateUpdateCommand(item, type))
             {
                 command.Transaction = transaction;
-                return await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
+                return await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
-        public static async Task<int> UpdateAllAsync(this IDbConnection connection, IEnumerable items, IDbTransaction transaction = null)
+        public static async Task<int> UpdateAllAsync(
+            this IDbConnection connection,
+            IEnumerable items,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
 
@@ -145,23 +179,32 @@ namespace Kuery
                     {
                         command.Transaction = transaction;
                     }
-                    result += await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
+                    result += await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
                 }
             }
             return result;
         }
 
 
-        public static async Task<int> InsertOrReplaceAsync(this IDbConnection connection, object item, IDbTransaction transaction = null)
+        public static async Task<int> InsertOrReplaceAsync(
+            this IDbConnection connection,
+            object item,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
             if (item == null)
             {
                 return 0;
             }
-            return await connection.InsertOrReplaceAsync(Orm.GetType(item), item, transaction).ConfigureAwait(false);
+            return await connection.InsertOrReplaceAsync(Orm.GetType(item), item, transaction, cancellationToken).ConfigureAwait(false);
         }
 
-        public static async Task<int> InsertOrReplaceAsync(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
+        public static async Task<int> InsertOrReplaceAsync(
+            this IDbConnection connection,
+            Type type,
+            object item,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
             if (type == null)
             {
@@ -174,104 +217,142 @@ namespace Kuery
             using (var command = connection.CreateInsertOrReplaceCommand(item, type))
             {
                 command.Transaction = transaction;
-                return await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
+                return await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
-        public static async Task<int> DeleteAsync<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
+        public static async Task<int> DeleteAsync<T>(
+            this IDbConnection connection,
+            T item,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
 
             using (var command = connection.CreateDeleteCommand(item, typeof(T)))
             {
                 command.Transaction = transaction;
-                return await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
+                return await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
-        public static async Task<int> DeleteAsync<T>(this IDbConnection connection, object primaryKey, IDbTransaction transaction = null)
+        public static async Task<int> DeleteAsync<T>(
+            this IDbConnection connection,
+            object primaryKey,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
             var map = connection.GetMapping<T>();
-            return await connection.DeleteAsync(map, primaryKey, transaction).ConfigureAwait(false);
+            return await connection.DeleteAsync(map, primaryKey, transaction, cancellationToken).ConfigureAwait(false);
         }
 
-        public static async Task<int> DeleteAsync(this IDbConnection connection, Type type, object primaryKey, IDbTransaction transaction = null)
+        public static async Task<int> DeleteAsync(
+            this IDbConnection connection,
+            Type type,
+            object primaryKey,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
             var map = connection.GetMapping(type);
-            return await connection.DeleteAsync(map, primaryKey, transaction).ConfigureAwait(false);
+            return await connection.DeleteAsync(map, primaryKey, transaction, cancellationToken).ConfigureAwait(false);
         }
 
-        private static async Task<int> DeleteAsync(this IDbConnection connection, TableMapping map, object primaryKey, IDbTransaction transaction = null)
+        private static async Task<int> DeleteAsync(
+            this IDbConnection connection,
+            TableMapping map,
+            object primaryKey,
+            IDbTransaction transaction = null,
+            CancellationToken cancellationToken = default)
         {
             if (map == null) throw new ArgumentNullException(nameof(map));
 
             using (var command = connection.CreateDeleteCommand(primaryKey, map))
             {
                 command.Transaction = transaction;
-                return await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
+                return await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
-        public static async Task<T> FindAsync<T>(this IDbConnection connection, object pk)
+        public static async Task<T> FindAsync<T>(
+            this IDbConnection connection,
+            object pk,
+            CancellationToken cancellationToken = default)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
             var map = connection.GetMapping(typeof(T));
-            return await connection.FindAsync<T>(map, pk).ConfigureAwait(false);
+            return await connection.FindAsync<T>(map, pk, cancellationToken).ConfigureAwait(false);
         }
 
-        private static async Task<T> FindAsync<T>(this IDbConnection connection, TableMapping mapping, object pk)
+        private static async Task<T> FindAsync<T>(
+            this IDbConnection connection,
+            TableMapping mapping,
+            object pk,
+            CancellationToken cancellationToken = default)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
 
             using (var command = connection.CreateGetByPrimaryKeyCommand(mapping, pk))
             {
-                var result = await ExecuteQueryAsync<T>(command, mapping).ConfigureAwait(false);
+                var result = await ExecuteQueryAsync<T>(command, mapping, cancellationToken).ConfigureAwait(false);
                 return result.FirstOrDefault();
             }
         }
 
-        public static async Task<T> FindAsync<T>(this IDbConnection connection, Expression<Func<T, bool>> predicate)
+        public static async Task<T> FindAsync<T>(
+            this IDbConnection connection,
+            Expression<Func<T, bool>> predicate,
+            CancellationToken cancellationToken = default)
         {
             return await connection.Table<T>()
-                .FirstOrDefaultAsync(predicate)
+                .FirstOrDefaultAsync(predicate, cancellationToken)
                 .ConfigureAwait(false);
         }
 
-        public static async Task<T> GetAsync<T>(this IDbConnection connection, Expression<Func<T, bool>> predicate)
+        public static async Task<T> GetAsync<T>(
+            this IDbConnection connection,
+            Expression<Func<T, bool>> predicate,
+            CancellationToken cancellationToken = default)
         {
             return await connection.Table<T>()
-                .FirstAsync(predicate)
+                .FirstAsync(predicate, cancellationToken)
                 .ConfigureAwait(false);
         }
 
-        public static async Task<T> GetAsync<T>(this IDbConnection connection, object pk)
+        public static async Task<T> GetAsync<T>(
+            this IDbConnection connection,
+            object pk,
+            CancellationToken cancellationToken = default)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
             var map = connection.GetMapping(typeof(T));
-            return await connection.GetAsync<T>(map, pk).ConfigureAwait(false);
+            return await connection.GetAsync<T>(map, pk, cancellationToken).ConfigureAwait(false);
         }
 
-        private static async Task<T> GetAsync<T>(this IDbConnection connection, TableMapping mapping, object pk)
+        private static async Task<T> GetAsync<T>(
+            this IDbConnection connection,
+            TableMapping mapping,
+            object pk,
+            CancellationToken cancellationToken = default)
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
 
             using (var command = connection.CreateGetByPrimaryKeyCommand(mapping, pk))
             {
-                var result = await ExecuteQueryAsync<T>(command, mapping).ConfigureAwait(false);
+                var result = await ExecuteQueryAsync<T>(command, mapping, cancellationToken).ConfigureAwait(false);
                 return result.First();
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static async Task<DbDataReader> TryExecuteReaderAsync(this IDbCommand command)
+        internal static async Task<DbDataReader> TryExecuteReaderAsync(this IDbCommand command, CancellationToken cancellationToken = default)
         {
             if (command is DbCommand dbCommand)
             {
-                return await dbCommand.ExecuteReaderAsync().ConfigureAwait(false);
+                return await dbCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -280,13 +361,16 @@ namespace Kuery
             }
         }
 
-        internal static async Task<List<T>> ExecuteQueryAsync<T>(this IDbCommand command, TableMapping map)
+        internal static async Task<List<T>> ExecuteQueryAsync<T>(
+            this IDbCommand command,
+            TableMapping map,
+            CancellationToken cancellationToken = default)
         {
-            using (var reader = await command.TryExecuteReaderAsync().ConfigureAwait(false))
+            using (var reader = await command.TryExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
                 var result = new List<T>();
                 var deserializer = new Deserializer<T>(map, reader);
-                while (await reader.ReadAsync().ConfigureAwait(false))
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 {
                     var obj = deserializer.Deserialize(reader);
                     result.Add(obj);
@@ -295,12 +379,15 @@ namespace Kuery
             }
         }
 
-        internal static async Task<T> ExecuteQueryFirstOrDefaultAsync<T>(this IDbCommand command, TableMapping map)
+        internal static async Task<T> ExecuteQueryFirstOrDefaultAsync<T>(
+            this IDbCommand command,
+            TableMapping map,
+            CancellationToken cancellationToken = default)
         {
-            using (var reader = await command.TryExecuteReaderAsync().ConfigureAwait(false))
+            using (var reader = await command.TryExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
                 var deserializer = new Deserializer<T>(map, reader);
-                if (await reader.ReadAsync().ConfigureAwait(false))
+                if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 {
                     return deserializer.Deserialize(reader);
                 }
@@ -311,67 +398,103 @@ namespace Kuery
             }
         }
 
-        public static async Task<IEnumerable<T>> QueryAsync<T>(this IDbConnection connection, string sql, object param = null)
+        public static async Task<IEnumerable<T>> QueryAsync<T>(
+            this IDbConnection connection,
+            string sql,
+            object param = null,
+            CancellationToken cancellationToken = default)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
                 var map = connection.GetMapping<T>();
-                return await ExecuteQueryAsync<T>(command, map).ConfigureAwait(false);
+                return await ExecuteQueryAsync<T>(command, map, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        public static async Task<IEnumerable<object>> QueryAsync(this IDbConnection connection, Type type, string sql, object param = null)
+        public static async Task<IEnumerable<object>> QueryAsync(
+            this IDbConnection connection,
+            Type type,
+            string sql,
+            object param = null,
+            CancellationToken cancellationToken = default)
         {
             var map = connection.GetMapping(type);
-            return await connection.QueryAsync(map, sql, param).ConfigureAwait(false);
+            return await connection.QueryAsync(map, sql, param, cancellationToken).ConfigureAwait(false);
         }
 
-        private static async Task<IEnumerable<object>> QueryAsync(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
+        private static async Task<IEnumerable<object>> QueryAsync(
+            this IDbConnection connection,
+            TableMapping mapping,
+            string sql,
+            object param = null,
+            CancellationToken cancellationToken = default)
         {
             if (mapping == null) throw new ArgumentNullException(nameof(mapping));
 
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                return await ExecuteQueryAsync<object>(command, mapping).ConfigureAwait(false);
+                return await ExecuteQueryAsync<object>(command, mapping, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        public static async Task<T> FindWithQueryAsync<T>(this IDbConnection connection, string sql, object param = null)
+        public static async Task<T> FindWithQueryAsync<T>(
+            this IDbConnection connection,
+            string sql,
+            object param = null,
+            CancellationToken cancellationToken = default)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
                 var map = connection.GetMapping<T>();
-                return await ExecuteQueryFirstOrDefaultAsync<T>(command, map).ConfigureAwait(false);
+                return await ExecuteQueryFirstOrDefaultAsync<T>(command, map, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        public static async Task<object> FindWithQueryAsync(this IDbConnection connection, Type type, string sql, object param = null)
+        public static async Task<object> FindWithQueryAsync(
+            this IDbConnection connection,
+            Type type,
+            string sql,
+            object param = null,
+            CancellationToken cancellationToken = default)
         {
             var map = connection.GetMapping(type);
-            return await connection.FindWithQueryAsync(map, sql, param).ConfigureAwait(false);
+            return await connection.FindWithQueryAsync(map, sql, param, cancellationToken).ConfigureAwait(false);
         }
 
-        private static async Task<object> FindWithQueryAsync(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
+        private static async Task<object> FindWithQueryAsync(
+            this IDbConnection connection,
+            TableMapping mapping,
+            string sql,
+            object param = null,
+            CancellationToken cancellationToken = default)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                return await ExecuteQueryFirstOrDefaultAsync<object>(command, mapping).ConfigureAwait(false);
+                return await ExecuteQueryFirstOrDefaultAsync<object>(command, mapping, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        public static async Task<int> ExecuteAsync(this IDbConnection connection, string sql, object param = null)
+        public static async Task<int> ExecuteAsync(
+            this IDbConnection connection,
+            string sql,
+            object param = null,
+            CancellationToken cancellationToken = default)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                return await command.TryExecuteNonQueryAsync().ConfigureAwait(false);
+                return await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
-        public static async Task<T> ExecuteScalarAsync<T>(this IDbConnection connection, string sql, object param = null)
+        public static async Task<T> ExecuteScalarAsync<T>(
+            this IDbConnection connection,
+            string sql,
+            object param = null,
+            CancellationToken cancellationToken = default)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                var result = await command.TryExecuteScalarAsync().ConfigureAwait(false);
+                var result = await command.TryExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
                 if (result is null || result is DBNull)
                 {
                     return default;
@@ -381,6 +504,106 @@ namespace Kuery
                     return (T)Convert.ChangeType(result, typeof(T));
                 }
             }
+        }
+    }
+
+    public sealed partial class TableQuery<T>
+    {
+        public Task<int> DeleteAsync(CancellationToken cancellationToken = default) => DeleteAsync(null, cancellationToken);
+
+        public async Task<int> DeleteAsync(Expression<Func<T, bool>> predExpr, CancellationToken cancellationToken = default)
+        {
+            if (_limit.HasValue || _offset.HasValue)
+            {
+                throw new InvalidOperationException("Cannot delete with limits or offsets");
+            }
+            if (_where == null && predExpr == null)
+            {
+                throw new InvalidOperationException("No condition specified");
+            }
+
+            var pred = _where;
+
+            if (predExpr != null && predExpr.NodeType == ExpressionType.Lambda)
+            {
+                var lambda = (LambdaExpression)predExpr;
+                pred = pred != null ? Expression.AndAlso(pred, lambda.Body) : lambda.Body;
+            }
+
+            var args = new List<object>();
+            var cmdText = "delete from [" + Table.TableName + "]";
+            var w = CompileExpr(pred, args);
+            cmdText += " where " + w.CommandText;
+
+            using (var command = Connection.CreateCommand())
+            {
+                command.CommandText = cmdText;
+                for (var i = 0; i < args.Count; i++)
+                {
+                    var parameter = command.CreateParameter();
+                    parameter.ParameterName = Connection.GetParameterName("p" + (i + 1).ToString());
+                    parameter.Value = args[i];
+                    command.Parameters.Add(parameter);
+                }
+                return await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        public Task<T> ElementAtAsync(int index, CancellationToken cancellationToken = default)
+        {
+            return Skip(index).Take(1).FirstAsync(cancellationToken);
+        }
+
+        public async Task<List<T>> ToListAsync(CancellationToken cancellationToken = default)
+        {
+            return await GenerateCommand("*")
+                .ExecuteQueryAsync<T>(Table, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task<T[]> ToArrayAsync(CancellationToken cancellationToken = default)
+        {
+            return (await ToListAsync(cancellationToken).ConfigureAwait(false)).ToArray();
+        }
+
+        public async Task<int> CountAsync(CancellationToken cancellationToken = default)
+        {
+            using (var command = GenerateCommand("count(*)"))
+            {
+                var result = await command.TryExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+                if (result is long l)
+                {
+                    return (int)l;
+                }
+                return (int)result;
+            }
+        }
+
+        public Task<int> CountAsync(Expression<Func<T, bool>> predExpr, CancellationToken cancellationToken = default)
+        {
+            return Where(predExpr).CountAsync(cancellationToken);
+        }
+
+        public async Task<T> FirstAsync(CancellationToken cancellationToken = default)
+        {
+            var list = await Take(1).ToListAsync(cancellationToken);
+            return list.First();
+        }
+
+        public async Task<T> FirstOrDefaultAsync(CancellationToken cancellationToken = default)
+        {
+            var list = await Take(1).ToListAsync(cancellationToken);
+            return list.FirstOrDefault();
+        }
+
+        public Task<T> FirstAsync(Expression<Func<T, bool>> predExpr, CancellationToken cancellationToken = default)
+        {
+            return Where(predExpr).FirstAsync(cancellationToken);
+        }
+
+        public Task<T> FirstOrDefaultAsync(Expression<Func<T, bool>> predExpr, CancellationToken cancellationToken = default)
+        {
+            return Where(predExpr).FirstOrDefaultAsync(cancellationToken);
         }
     }
 }
