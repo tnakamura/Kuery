@@ -2136,7 +2136,15 @@ namespace Kuery
             {
                 fastSetter = CreateNullableTypedSetterDelegate<T, float>(column, (r, i) =>
                 {
-                    return r.GetFloat(i);
+                    var value = r.GetValue(i);
+                    if (value is double d)
+                    {
+                        return (float)d;
+                    }
+                    else
+                    {
+                        return (float)value;
+                    }
                 });
             }
             else if (clrType == typeof(DateTime))
