@@ -1400,14 +1400,16 @@ namespace Kuery
             return GenerateCommand("*").ExecuteQuery<T>(Table).ToArray();
         }
 
-        public Task<List<T>> ToListAsync()
+        public async Task<List<T>> ToListAsync()
         {
-            return GenerateCommand("*").ExecuteQueryAsync<T>(Table);
+            return await GenerateCommand("*")
+                .ExecuteQueryAsync<T>(Table)
+                .ConfigureAwait(false);
         }
 
         public async Task<T[]> ToArrayAsync()
         {
-            return (await ToListAsync()).ToArray();
+            return (await ToListAsync().ConfigureAwait(false)).ToArray();
         }
 
         void AddWhere(Expression pred)
@@ -1423,6 +1425,18 @@ namespace Kuery
         }
 
         private IDbCommand GenerateCommand(string selectionList)
+        {
+            if (Connection.IsSqlServer())
+            {
+                return GenerateCommandForSqlServer(selectionList);
+            }
+            else
+            {
+                return GenerateCommandForSqlite(selectionList);
+            }
+        }
+
+        private IDbCommand GenerateCommandForSqlite(string selectionList)
         {
             if (_joinInner != null && _joinOuter != null)
             {
@@ -1481,6 +1495,94 @@ namespace Kuery
                 }
                 commandText.Append(" offset ");
                 commandText.Append(_offset.Value);
+            }
+
+            var cmd = Connection.CreateCommand();
+            cmd.CommandText = commandText.ToString();
+            if (args != null)
+            {
+                for (var i = 0; i < args.Count; i++)
+                {
+                    var p = cmd.CreateParameter();
+                    p.Value = args[i];
+                    p.ParameterName = Connection.GetParameterName("p" + (i + 1).ToString());
+                    cmd.Parameters.Add(p);
+                }
+            }
+            return cmd;
+        }
+
+        private IDbCommand GenerateCommandForSqlServer(string selectionList)
+        {
+            if (_joinInner != null && _joinOuter != null)
+            {
+                throw new NotSupportedException("Joins are not supported.");
+            }
+
+            var commandText = new StringBuilder();
+            commandText.Append("select ");
+            if (_limit.HasValue && !_offset.HasValue)
+            {
+                commandText.Append(" TOP (");
+                commandText.Append(_limit.Value);
+                commandText.Append(" ) ");
+            }
+            commandText.Append(selectionList);
+            commandText.Append(" from [");
+            commandText.Append(Table.TableName);
+            commandText.Append("] ");
+
+            List<object> args = null;
+            if (_where != null)
+            {
+                args = new List<object>();
+                var w = CompileExpr(_where, args);
+                commandText.Append(" where ");
+                commandText.Append(w.CommandText);
+            }
+
+            if (_orderBys != null && _orderBys.Count > 0)
+            {
+                commandText.Append(" order by ");
+                commandText.Append("[");
+                commandText.Append(_orderBys[0].ColumnName);
+                commandText.Append("]");
+                if (!_orderBys[0].Ascending)
+                {
+                    commandText.Append(" desc ");
+                }
+                for (var i = 1; i < _orderBys.Count; i++)
+                {
+                    commandText.Append(", [");
+                    commandText.Append(_orderBys[i].ColumnName);
+                    commandText.Append("]");
+                    if (!_orderBys[i].Ascending)
+                    {
+                        commandText.Append(" desc ");
+                    }
+                }
+            }
+
+            if (_offset.HasValue)
+            {
+                if (_orderBys == null || _orderBys.Count == 0)
+                {
+                    commandText.Append(" order by ");
+                    commandText.Append("[");
+                    commandText.Append(Table.PK.Name);
+                    commandText.Append("] ");
+                }
+
+                commandText.Append(" OFFSET ");
+                commandText.Append(_offset.Value);
+                commandText.Append(" ROWS ");
+
+                if (_limit.HasValue)
+                {
+                    commandText.Append(" FETCH NEXT ");
+                    commandText.Append(_limit.Value);
+                    commandText.Append(" ROWS ONLY ");
+                }
             }
 
             var cmd = Connection.CreateCommand();

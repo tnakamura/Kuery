@@ -161,7 +161,7 @@ namespace Kuery
             return command;
         }
 
-        private static bool IsSqlite(this IDbConnection connection)
+        internal static bool IsSqlite(this IDbConnection connection)
         {
             switch (connection.GetType().FullName)
             {
@@ -173,7 +173,7 @@ namespace Kuery
             }
         }
 
-        private static bool IsSqlServer(this IDbConnection connection)
+        internal static bool IsSqlServer(this IDbConnection connection)
         {
             switch (connection.GetType().FullName)
             {
