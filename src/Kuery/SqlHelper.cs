@@ -5,6 +5,7 @@ using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Kuery
@@ -1372,10 +1373,91 @@ namespace Kuery
             {
                 return GenerateCommandForSqlServer(selectionList);
             }
+            else if (Connection.IsPostgreSql())
+            {
+                return GenerateCommandForPostgreSql(selectionList);
+            }
             else
             {
                 return GenerateCommandForSqlite(selectionList);
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private string EscapeLiteral(string literal) =>
+            Connection.GetIdentity(literal);
+
+        private IDbCommand GenerateCommandForPostgreSql(string selectionList)
+        {
+            if (_joinInner != null && _joinOuter != null)
+            {
+                throw new NotSupportedException("Joins are not supported.");
+            }
+
+            var commandText = new StringBuilder();
+            commandText.Append("select ");
+            commandText.Append(selectionList);
+            commandText.Append(" from ");
+            commandText.Append(EscapeLiteral(Table.TableName));
+            commandText.Append(" ");
+
+            List<object> args = null;
+            if (_where != null)
+            {
+                args = new List<object>();
+                var w = CompileExpr(_where, args);
+                commandText.Append(" where ");
+                commandText.Append(w.CommandText);
+            }
+
+            if (_orderBys != null && _orderBys.Count > 0)
+            {
+                commandText.Append(" order by ");
+                commandText.Append(EscapeLiteral(_orderBys[0].ColumnName));
+                if (!_orderBys[0].Ascending)
+                {
+                    commandText.Append(" desc ");
+                }
+                for (var i = 1; i < _orderBys.Count; i++)
+                {
+                    commandText.Append(", ");
+                    commandText.Append(EscapeLiteral(_orderBys[i].ColumnName));
+                    if (!_orderBys[i].Ascending)
+                    {
+                        commandText.Append(" desc ");
+                    }
+                }
+            }
+
+            if (_limit.HasValue)
+            {
+                commandText.Append(" limit ");
+                commandText.Append(_limit.Value);
+            }
+
+            if (_offset.HasValue)
+            {
+                if (!_limit.HasValue)
+                {
+                    commandText.Append(" limit -1 ");
+                }
+                commandText.Append(" offset ");
+                commandText.Append(_offset.Value);
+            }
+
+            var cmd = Connection.CreateCommand();
+            cmd.CommandText = commandText.ToString();
+            if (args != null)
+            {
+                for (var i = 0; i < args.Count; i++)
+                {
+                    var p = cmd.CreateParameter();
+                    p.Value = args[i];
+                    p.ParameterName = Connection.GetParameterName("p" + (i + 1).ToString());
+                    cmd.Parameters.Add(p);
+                }
+            }
+            return cmd;
         }
 
         private IDbCommand GenerateCommandForSqlite(string selectionList)

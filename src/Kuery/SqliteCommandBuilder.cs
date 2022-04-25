@@ -30,6 +30,10 @@ namespace Kuery
             {
                 commandText = "select last_insert_rowid();";
             }
+            else if (connection.IsPostgreSql())
+            {
+                commandText = "SELECT LASTVAL();";
+            }
             else
             {
                 commandText = "select @@IDENTITY";
@@ -209,6 +213,8 @@ namespace Kuery
             if (connection.IsSqlite())
                 return "$";
             else if (connection.IsSqlServer())
+                return "@";
+            else if (connection.IsPostgreSql())
                 return "@";
             else
                 return "@";
