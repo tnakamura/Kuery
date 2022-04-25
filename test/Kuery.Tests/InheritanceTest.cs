@@ -1,8 +1,8 @@
 using Xunit;
 
-namespace Kuery.Tests.SqlClient
+namespace Kuery.Tests
 {
-    public class InheritanceTest
+    public class InheritanceTest 
     {
         class Base
         {
