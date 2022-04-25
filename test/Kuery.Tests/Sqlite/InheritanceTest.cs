@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Kuery.Tests.Sqlite
 {
-    public class InheritanceTest : IClassFixture<SqliteFixture>
+    public class InheritanceTest 
     {
         class Base
         {
@@ -17,19 +17,10 @@ namespace Kuery.Tests.Sqlite
             public string DerivedProp { get; set; }
         }
 
-        readonly SqliteFixture _fixture;
-
-        public InheritanceTest(SqliteFixture fixture)
-        {
-            _fixture = fixture;
-        }
-
         [Fact]
         public void InheritanceWorks()
         {
-            using var connection = _fixture.CreateConnection();
-
-            var mapping = connection.GetMapping<Derived>();
+            var mapping = SqlHelper.GetMapping<Derived>();
 
             Assert.Equal(3, mapping.Columns.Count);
             Assert.Equal("Id", mapping.PK.Name);

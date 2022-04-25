@@ -26,8 +26,7 @@ namespace Kuery.Tests.SqlClient
         [Fact]
         public void HasGoodNames()
         {
-            using var con = fixture.CreateConnection();
-            var mapping = con.GetMapping<AFunnyTableName>();
+            var mapping = SqlHelper.GetMapping<AFunnyTableName>();
             Assert.Equal("AGoodTableName", mapping.TableName);
             Assert.Equal("Id", mapping.Columns[0].Name);
             Assert.Equal("AGoodColumnName", mapping.Columns[1].Name);

@@ -135,7 +135,7 @@ namespace Kuery.Tests.Npgsql
             Assert.Equal(numIn, n);
 
             var inObjs = connection.Query<InsertTestObj>(
-                $"select * from {nameof(InsertTestObj)}")
+                $"select * from \"{nameof(InsertTestObj)}\"")
                 .ToArray();
             for (var i = 0; i < inObjs.Length; i++)
             {
@@ -145,7 +145,7 @@ namespace Kuery.Tests.Npgsql
             }
 
             var numCount = connection.ExecuteScalar<int>(
-                $"select count(*) from {nameof(InsertTestObj)}");
+                $"select count(*) from \"{nameof(InsertTestObj)}\"");
             Assert.Equal(numCount, n);
         }
 

@@ -12,7 +12,24 @@ namespace Kuery
         internal static IDbCommand CreateGetByPrimaryKeyCommand(this IDbConnection connection, TableMapping map, object pk)
         {
             var command = connection.CreateCommand();
-            command.CommandText = map.GetByPrimaryKeySql;
+
+            string commandText;
+            if (map.PK != null)
+            {
+                commandText = $"select * from " +
+                    connection.GetIdentity(map.TableName) +
+                    $" where " +
+                    connection.GetIdentity(map.PK.Name) +
+                    $" = " +
+                    connection.GetParameterName(map.PK.Name);
+            }
+            else
+            {
+                commandText = "select top 1 * from " +
+                    connection.GetIdentity(map.TableName);
+            }
+
+            command.CommandText = commandText;
             if (map.PK != null)
             {
                 var pkParameter = command.CreateParameter();
@@ -45,7 +62,7 @@ namespace Kuery
 
         internal static IDbCommand CreateInsertCommand(this IDbConnection connection, object item, Type type)
         {
-            var map = connection.GetMapping(type);
+            var map = SqlHelper.GetMapping(type);
             var columns = new StringBuilder();
             var values = new StringBuilder();
             var command = connection.CreateCommand();
@@ -105,7 +122,7 @@ namespace Kuery
 
         internal static IDbCommand CreateUpdateCommand(this IDbConnection connection, object item, Type type)
         {
-            var mapping = connection.GetMapping(type);
+            var mapping = SqlHelper.GetMapping(type);
             if (mapping.PK == null)
             {
                 throw new NotSupportedException(
@@ -227,7 +244,7 @@ namespace Kuery
 
         internal static IDbCommand CreateDeleteCommand(this IDbConnection connection, object item, Type type)
         {
-            var map = connection.GetMapping(type);
+            var map = SqlHelper.GetMapping(type);
             if (map.PK == null)
             {
                 throw new NotSupportedException(
@@ -266,6 +283,10 @@ namespace Kuery
             {
                 return connection.CreateInsertOrReplaceCommandForSqlite(item, type);
             }
+            else if (connection.IsPostgreSql())
+            {
+                return connection.CreateInsertOrReplaceCommandForPostgreSql(item, type);
+            }
             else
             {
                 return connection.CreateMergeCommandForSqlServer(item, type);
@@ -274,7 +295,7 @@ namespace Kuery
 
         private static IDbCommand CreateMergeCommandForSqlServer(this IDbConnection connection, object item, Type type)
         {
-            var map = connection.GetMapping(type);
+            var map = SqlHelper.GetMapping(type);
             var command = connection.CreateCommand();
 
             if (map.InsertOrReplaceColumns.Count == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
@@ -350,9 +371,77 @@ WHEN NOT MATCHED THEN
             return command;
         }
 
+        private static IDbCommand CreateInsertOrReplaceCommandForPostgreSql(this IDbConnection connection, object item, Type type)
+        {
+            var map = SqlHelper.GetMapping(type);
+            var command = connection.CreateCommand();
+
+            if (map.InsertOrReplaceColumns.Count == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
+            {
+                command.CommandText = "insert into "
+                    + "\"" + map.TableName + "\""
+                    + " default values"
+                    + " on conflict(\"" + map.PK.Name + "\")"
+                    + " do nothing;";
+            }
+            else
+            {
+                var insertColumns = new StringBuilder();
+                var updateColumns = new StringBuilder();
+                var values = new StringBuilder();
+                for (var i = 0; i < map.InsertOrReplaceColumns.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        insertColumns.Append(",");
+                        updateColumns.Append(",");
+                        values.Append(",");
+                    }
+
+                    var col = map.InsertOrReplaceColumns[i];
+                    insertColumns.Append("\"");
+                    insertColumns.Append(col.Name);
+                    insertColumns.Append("\"");
+                    updateColumns.Append("\"");
+                    updateColumns.Append(col.Name);
+                    updateColumns.Append("\" = ");
+
+                    var value = col.GetValue(item);
+                    if (value is null && col.IsNullable)
+                    {
+                        values.Append("NULL");
+                    }
+                    else
+                    {
+                        var parameter = command.CreateParameter();
+                        parameter.ParameterName = connection.GetParameterName(col.Name);
+                        parameter.Value = col.GetValue(item);
+                        command.Parameters.Add(parameter);
+
+                        values.Append(parameter.ParameterName);
+                        updateColumns.Append(parameter.ParameterName);
+                    }
+                }
+
+                command.CommandText = "insert into "
+                    + "\"" + map.TableName + "\""
+                    + " ("
+                    + insertColumns.ToString()
+                    + ") values ("
+                    + values.ToString()
+                    + ")"
+                    + " on conflict(\"" + map.PK.Name + "\")"
+                    + " do update set "
+                    + updateColumns.ToString()
+                    + ";";
+            }
+
+            return command;
+        }
+
         private static IDbCommand CreateInsertOrReplaceCommandForSqlite(this IDbConnection connection, object item, Type type)
         {
-            var map = connection.GetMapping(type);
+            var map = SqlHelper.GetMapping(type);
             var command = connection.CreateCommand();
 
             if (map.InsertOrReplaceColumns.Count == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
