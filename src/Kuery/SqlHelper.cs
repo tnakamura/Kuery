@@ -1223,7 +1223,7 @@ namespace Kuery
             }
 
             var args = new List<object>();
-            var cmdText = "delete from [" + Table.TableName + "]";
+            var cmdText = "delete from " + EscapeLiteral(Table.TableName);
             var w = CompileExpr(pred, args);
             cmdText += " where " + w.CommandText;
 
@@ -1423,10 +1423,6 @@ namespace Kuery
 
             if (_offset.HasValue)
             {
-                if (!_limit.HasValue)
-                {
-                    commandText.Append(" limit -1 ");
-                }
                 commandText.Append(" offset ");
                 commandText.Append(_offset.Value);
             }
@@ -1439,7 +1435,7 @@ namespace Kuery
                 {
                     var p = cmd.CreateParameter();
                     p.Value = args[i];
-                    p.ParameterName = Connection.GetParameterName("p" + (i + 1).ToString());
+                    p.ParameterName = GetParameterName("p" + (i + 1).ToString());
                     cmd.Parameters.Add(p);
                 }
             }
@@ -1515,7 +1511,7 @@ namespace Kuery
                 {
                     var p = cmd.CreateParameter();
                     p.Value = args[i];
-                    p.ParameterName = Connection.GetParameterName("p" + (i + 1).ToString());
+                    p.ParameterName = GetParameterName("p" + (i + 1).ToString());
                     cmd.Parameters.Add(p);
                 }
             }
@@ -1608,7 +1604,7 @@ namespace Kuery
                     }
                     var p = cmd.CreateParameter();
                     p.Value = a;
-                    p.ParameterName = Connection.GetParameterName("p" + (i + 1).ToString());
+                    p.ParameterName = GetParameterName("p" + (i + 1).ToString());
                     cmd.Parameters.Add(p);
                 }
             }
@@ -1628,6 +1624,7 @@ namespace Kuery
             public readonly object Value;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private string GetParameterName(string name) =>
             Connection.GetParameterName(name);
 
@@ -1862,7 +1859,7 @@ namespace Kuery
                 {
                     var columnName = Table.FindColumnWithPropertyName(mem.Member.Name).Name;
                     return new CompileResult(
-                        commandText: $"[{columnName}]");
+                        commandText: EscapeLiteral(columnName));
                 }
                 else
                 {

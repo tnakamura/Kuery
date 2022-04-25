@@ -530,7 +530,7 @@ namespace Kuery
             }
 
             var args = new List<object>();
-            var cmdText = "delete from [" + Table.TableName + "]";
+            var cmdText = "delete from " + EscapeLiteral(Table.TableName);
             var w = CompileExpr(pred, args);
             cmdText += " where " + w.CommandText;
 
@@ -540,7 +540,7 @@ namespace Kuery
                 for (var i = 0; i < args.Count; i++)
                 {
                     var parameter = command.CreateParameter();
-                    parameter.ParameterName = Connection.GetParameterName("p" + (i + 1).ToString());
+                    parameter.ParameterName = GetParameterName("p" + (i + 1).ToString());
                     parameter.Value = args[i];
                     command.Parameters.Add(parameter);
                 }
