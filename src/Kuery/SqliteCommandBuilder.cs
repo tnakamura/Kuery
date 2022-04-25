@@ -48,9 +48,9 @@ namespace Kuery
 
             if (map.InsertColumns.Count == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
             {
-                command.CommandText = "insert into ["
-                    + map.TableName
-                    + "] default values";
+                command.CommandText = "insert into "
+                    + connection.GetIdentity(map.TableName)
+                    + " default values";
             }
             else
             {
@@ -63,7 +63,7 @@ namespace Kuery
                     }
 
                     var col = map.InsertColumns[i];
-                    columns.Append("[" + col.Name + "]");
+                    columns.Append(connection.GetIdentity(col.Name));
 
                     var value = col.GetValue(item);
                     if (value is null && col.IsNullable)
@@ -87,9 +87,9 @@ namespace Kuery
                     }
                 }
 
-                command.CommandText = "insert into ["
-                    + map.TableName
-                    + "] ("
+                command.CommandText = "insert into "
+                    + connection.GetIdentity(map.TableName)
+                    + " ("
                     + columns.ToString()
                     + ") values ("
                     + values.ToString()
@@ -109,9 +109,9 @@ namespace Kuery
             }
 
             var sql = new StringBuilder();
-            sql.Append("update [");
-            sql.Append(mapping.TableName);
-            sql.Append("] ");
+            sql.Append("update ");
+            sql.Append(connection.GetIdentity(mapping.TableName));
+            sql.Append(" ");
 
             var command = connection.CreateCommand();
 
@@ -137,15 +137,14 @@ namespace Kuery
                 {
                     sql.Append(",");
                 }
-                sql.Append("[");
-                sql.Append(col.Name);
-                sql.Append("] = ");
+                sql.Append(connection.GetIdentity(col.Name));
+                sql.Append(" = ");
                 sql.Append(parameter.ParameterName);
             }
 
-            sql.Append(" where [");
-            sql.Append(mapping.PK.Name);
-            sql.Append("] = ");
+            sql.Append(" where ");
+            sql.Append(connection.GetIdentity(mapping.PK.Name));
+            sql.Append(" = ");
             sql.Append(connection.GetParameterName(mapping.PK.Name));
 
             var pkParameterName = connection.GetParameterName(mapping.PK.Name);
@@ -161,12 +160,32 @@ namespace Kuery
             return command;
         }
 
+        internal static string GetIdentity(this IDbConnection connection, string name)
+        {
+            if (connection.IsPostgreSql())
+            {
+                return "\"" + name + "\"";
+            }
+            return "[" + name + "]";
+        }
+
         internal static bool IsSqlite(this IDbConnection connection)
         {
             switch (connection.GetType().FullName)
             {
                 case "System.Data.Sqlite.SqliteConnection":
                 case "Microsoft.Data.Sqlite.SqliteConnection":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        internal static bool IsPostgreSql(this IDbConnection connection)
+        {
+            switch (connection.GetType().FullName)
+            {
+                case "Npgsql.NpgsqlConnection":
                     return true;
                 default:
                     return false;
@@ -222,7 +241,7 @@ namespace Kuery
             }
             var pkParamName = connection.GetParameterName("pk");
 
-            var query = $"DELETE FROM [{map.TableName}] where [{pk.Name}] = {pkParamName}";
+            var query = $"DELETE FROM {connection.GetIdentity(map.TableName)} where {connection.GetIdentity(pk.Name)} = {pkParamName}";
 
             var command = connection.CreateCommand();
             command.CommandText = query;
