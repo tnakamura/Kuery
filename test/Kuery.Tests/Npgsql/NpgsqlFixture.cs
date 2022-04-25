@@ -7,13 +7,18 @@ namespace Kuery.Tests.Npgsql
     {
         public string Database { get; }
 
+        const string MasterDatabase = "postgres";
+
         public global::Npgsql.NpgsqlConnection CreateConnection() =>
             CreateConnection(Database);
 
         private static global::Npgsql.NpgsqlConnection CreateConnection(string database)
         {
             var csb = new global::Npgsql.NpgsqlConnectionStringBuilder();
-            csb.TrustServerCertificate = true;
+            csb.Username = "postgres";
+            csb.Password = "postgres";
+            csb.Host = "localhost";
+            csb.Database = database;
             return new global::Npgsql.NpgsqlConnection(csb.ToString());
         }
 
@@ -63,10 +68,10 @@ namespace Kuery.Tests.Npgsql
                 using (var command = connection.CreateCommand())
                 {
                     command.CommandText =
-                        @"CREATE TABLE customers (
+                        @"CREATE TABLE IF NOT EXISTS customers (
                             id INTEGER NOT NULL PRIMARY KEY,
-                            code NVARCHAR(50) NOT NULL,
-                            name NVARCHAR(100) NOT NULL
+                            code VARCHAR(50) NOT NULL,
+                            name VARCHAR(100) NOT NULL
                           )";
                     command.ExecuteNonQuery();
                 }
@@ -80,12 +85,12 @@ namespace Kuery.Tests.Npgsql
 
         private void CreateDatabase()
         {
-            using (var connection = CreateConnection("master"))
+            using (var connection = CreateConnection(MasterDatabase))
             {
                 connection.Open();
                 using (var command = connection.CreateCommand())
                 {
-                    command.CommandText = $"CREATE DATABASE [{Database}]";
+                    command.CommandText = $"CREATE DATABASE \"{Database}\"";
                     command.ExecuteNonQuery();
                 }
             }
@@ -93,21 +98,12 @@ namespace Kuery.Tests.Npgsql
 
         private void DeleteDatabase()
         {
-            using (var connection = CreateConnection("master"))
+            using (var connection = CreateConnection(MasterDatabase))
             {
                 connection.Open();
                 using (var command = connection.CreateCommand())
                 {
-                    command.CommandText = $@"
-DECLARE @SQL nvarchar(1000);
-IF EXISTS (SELECT 1 FROM sys.databases WHERE [name] = N'{Database}')
-BEGIN
-    SET @SQL = N'USE [{Database}];
-                 ALTER DATABASE [{Database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-                 USE [master];
-                 DROP DATABASE [{Database}];';
-    EXEC (@SQL);
-END;";
+                    command.CommandText = $@"DROP DATABASE IF EXISTS ""{Database}"";";
                     command.ExecuteNonQuery();
                 }
             }

@@ -16,6 +16,15 @@ namespace Kuery.Tests
             }
         }
 
+        public static void DropTable(this global::Npgsql.NpgsqlConnection connection, string tableName)
+        {
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = $"drop table if exists \"{tableName}\";";
+                command.ExecuteNonQuery();
+            }
+        }
+
         public static void DropTable(this SqliteConnection connection, string tableName)
         {
             using (var command = connection.CreateCommand())
