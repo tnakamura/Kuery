@@ -58,8 +58,6 @@ namespace Kuery.Tests.Npgsql
         {
             Database = $"kuery_test_{Guid.NewGuid():N}";
 
-            DeleteDatabase();
-
             CreateDatabase();
 
             using (var connection = CreateConnection())
@@ -103,7 +101,15 @@ namespace Kuery.Tests.Npgsql
                 connection.Open();
                 using (var command = connection.CreateCommand())
                 {
-                    command.CommandText = $@"DROP DATABASE IF EXISTS ""{Database}"";";
+                    command.CommandText = $@"
+UPDATE pg_database SET datallowconn = 'false' WHERE datname = '{Database}';
+ALTER DATABASE ""{Database}"" CONNECTION LIMIT 1;
+
+SELECT pg_terminate_backend(pg_stat_activity.pid)
+FROM pg_stat_activity
+WHERE datname = '{Database}';
+
+DROP DATABASE IF EXISTS ""{Database}"";";
                     command.ExecuteNonQuery();
                 }
             }
