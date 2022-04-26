@@ -1711,6 +1711,10 @@ namespace Kuery
                         {
                             sqlCall = "( CHARINDEX(" + args[0].CommandText + "," + obj.Value.CommandText + ") > 0)";
                         }
+                        else if (Connection.IsPostgreSql())
+                        {
+                            sqlCall = "( strpos(" + obj.Value.CommandText + "," + args[0].CommandText + ") > 0)";
+                        }
                         else
                         {
                             sqlCall = "( instr(" + obj.Value.CommandText + "," + args[0].CommandText + ") > 0)";
@@ -2169,7 +2173,7 @@ namespace Kuery
             {
                 fastSetter = CreateNullableTypedSetterDelegate<T, DateTimeOffset>(column, (r, i) =>
                 {
-                    if(r is DbDataReader dbDataReader)
+                    if (r is DbDataReader dbDataReader)
                     {
                         return dbDataReader.GetFieldValue<DateTimeOffset>(i);
                     }
