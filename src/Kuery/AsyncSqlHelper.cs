@@ -539,9 +539,14 @@ namespace Kuery
                 command.CommandText = cmdText;
                 for (var i = 0; i < args.Count; i++)
                 {
+                    var a = args[i];
+                    if (a == null)
+                    {
+                        continue;
+                    }
                     var parameter = command.CreateParameter();
                     parameter.ParameterName = GetParameterName("p" + (i + 1).ToString());
-                    parameter.Value = args[i];
+                    parameter.Value = a;
                     command.Parameters.Add(parameter);
                 }
                 return await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);

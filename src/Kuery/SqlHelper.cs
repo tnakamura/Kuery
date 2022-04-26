@@ -1515,8 +1515,13 @@ namespace Kuery
             {
                 for (var i = 0; i < args.Count; i++)
                 {
+                    var a = args[i];
+                    if (a == null)
+                    {
+                        continue;
+                    }
                     var p = cmd.CreateParameter();
-                    p.Value = args[i];
+                    p.Value = a;
                     p.ParameterName = GetParameterName("p" + (i + 1).ToString());
                     cmd.Parameters.Add(p);
                 }
