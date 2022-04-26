@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Data.Common;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -2168,6 +2169,10 @@ namespace Kuery
             {
                 fastSetter = CreateNullableTypedSetterDelegate<T, DateTimeOffset>(column, (r, i) =>
                 {
+                    if(r is DbDataReader dbDataReader)
+                    {
+                        return dbDataReader.GetFieldValue<DateTimeOffset>(i);
+                    }
                     var value = r.GetValue(i);
                     if (value is string s)
                     {
