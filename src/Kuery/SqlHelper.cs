@@ -1372,7 +1372,7 @@ namespace Kuery
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private string EscapeLiteral(string literal) =>
-            Connection.GetIdentity(literal);
+            Connection.EscapeLiteral(literal);
 
         private IDbCommand GenerateCommandForPostgreSql(string selectionList)
         {

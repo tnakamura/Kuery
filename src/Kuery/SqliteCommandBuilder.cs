@@ -17,16 +17,16 @@ namespace Kuery
             if (map.PK != null)
             {
                 commandText = $"select * from " +
-                    connection.GetIdentity(map.TableName) +
+                    connection.EscapeLiteral(map.TableName) +
                     $" where " +
-                    connection.GetIdentity(map.PK.Name) +
+                    connection.EscapeLiteral(map.PK.Name) +
                     $" = " +
                     connection.GetParameterName(map.PK.Name);
             }
             else
             {
                 commandText = "select top 1 * from " +
-                    connection.GetIdentity(map.TableName);
+                    connection.EscapeLiteral(map.TableName);
             }
 
             command.CommandText = commandText;
@@ -70,7 +70,7 @@ namespace Kuery
             if (map.InsertColumns.Count == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
             {
                 command.CommandText = "insert into "
-                    + connection.GetIdentity(map.TableName)
+                    + connection.EscapeLiteral(map.TableName)
                     + " default values";
             }
             else
@@ -84,7 +84,7 @@ namespace Kuery
                     }
 
                     var col = map.InsertColumns[i];
-                    columns.Append(connection.GetIdentity(col.Name));
+                    columns.Append(connection.EscapeLiteral(col.Name));
 
                     var value = col.GetValue(item);
                     if (value is null && col.IsNullable)
@@ -95,9 +95,17 @@ namespace Kuery
                     {
                         var parameter = command.CreateParameter();
                         parameter.ParameterName = connection.GetParameterName(col.Name);
-                        if (col.ColumnType.IsEnum && col.StoreAsText)
+                        if (col.ColumnType.IsEnum)
                         {
-                            parameter.Value = value.ToString();
+                            if (col.StoreAsText)
+                            {
+                                parameter.Value = value.ToString();
+                            }
+                            else
+                            {
+                                var underlyingType = col.ColumnType.GetEnumUnderlyingType();
+                                parameter.Value = Convert.ChangeType(value, underlyingType);
+                            }
                         }
                         else
                         {
@@ -109,7 +117,7 @@ namespace Kuery
                 }
 
                 command.CommandText = "insert into "
-                    + connection.GetIdentity(map.TableName)
+                    + connection.EscapeLiteral(map.TableName)
                     + " ("
                     + columns.ToString()
                     + ") values ("
@@ -131,7 +139,7 @@ namespace Kuery
 
             var sql = new StringBuilder();
             sql.Append("update ");
-            sql.Append(connection.GetIdentity(mapping.TableName));
+            sql.Append(connection.EscapeLiteral(mapping.TableName));
             sql.Append(" ");
 
             var command = connection.CreateCommand();
@@ -158,13 +166,13 @@ namespace Kuery
                 {
                     sql.Append(",");
                 }
-                sql.Append(connection.GetIdentity(col.Name));
+                sql.Append(connection.EscapeLiteral(col.Name));
                 sql.Append(" = ");
                 sql.Append(parameter.ParameterName);
             }
 
             sql.Append(" where ");
-            sql.Append(connection.GetIdentity(mapping.PK.Name));
+            sql.Append(connection.EscapeLiteral(mapping.PK.Name));
             sql.Append(" = ");
             sql.Append(connection.GetParameterName(mapping.PK.Name));
 
@@ -181,7 +189,7 @@ namespace Kuery
             return command;
         }
 
-        internal static string GetIdentity(this IDbConnection connection, string name)
+        internal static string EscapeLiteral(this IDbConnection connection, string name)
         {
             if (connection.IsPostgreSql())
             {
@@ -264,7 +272,7 @@ namespace Kuery
             }
             var pkParamName = connection.GetParameterName("pk");
 
-            var query = $"DELETE FROM {connection.GetIdentity(map.TableName)} where {connection.GetIdentity(pk.Name)} = {pkParamName}";
+            var query = $"DELETE FROM {connection.EscapeLiteral(map.TableName)} where {connection.EscapeLiteral(pk.Name)} = {pkParamName}";
 
             var command = connection.CreateCommand();
             command.CommandText = query;
