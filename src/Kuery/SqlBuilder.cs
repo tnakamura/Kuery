@@ -7,7 +7,7 @@ using System.Text;
 
 namespace Kuery
 {
-    internal static class SqliteCommandBuilder
+    internal static class SqlBuilder
     {
         internal static IDbCommand CreateGetByPrimaryKeyCommand(this IDbConnection connection, TableMapping map, object pk)
         {
