@@ -4,9 +4,12 @@ Simple ORM for .NET
 
 ## Install
 
-Install [Kuery](https://www.nuget.org/packages/Kuery) from Nuget.
+Install [Kuery](https://www.nuget.org/packages/Kuery) from NuGet.
 
 ## Usage
+
+The library contains simple attributes that you can use to control the construction of tables.
+In a simple todo program, you might use:
 
 ```cs
 [Table("todo")]
@@ -40,6 +43,10 @@ public class Todo
 
 ### Synchronous API
 
+You can insrt rows in the database using `Insert`.
+If the table contains an auto-incremented primary key,
+then the value for that key will be available to you after the insert:
+
 ```cs
 var todo =new Todo()
 {
@@ -53,13 +60,25 @@ using SqliteConnection connection = new SqliteConnection("Your connection string
 connection.Open();
 
 connection.Insert(todo);
+```
 
+Similar methods exist for `Update` and `Delete`.
+
+The most straightforward way to query for data is using the `Table` method.
+This can take predicates for constraining via WHERE clauses and/or adding ORDER BY clauses:
+
+```cs
 List<Todo> todos = connection.Table<Todo>()
     .Where(x => x.Name == "Study English")
     .ToList();
 ```
 
+
 ### Asynchronous API
+
+You can insert rows in the database using `InsertAsync`.
+If the table contains an auto-incremented primary key,
+then the value for that key will be available to after the insert:
 
 ```cs
 var todo =new Todo()
@@ -74,7 +93,17 @@ using SqliteConnection connection = new SqliteConnection("Your connection string
 await connection.OpenAsync();
 
 await connection.InsertAsync(todo);
+```
 
+Simillar methods exist for `UpdateAsync` and `DeleteAsync`.
+
+Querying for data is most straightforwardly done using the `Table` method.
+This will return an `AsyncTableQuery` instance back,
+whererupon you can add predicates for constraining via WHERE clauses and/or adding ORDER BY.
+The database is not physically touched until one of the special retrieval
+methods - `ToListAsync`, `FirstAsync`, or `FirstOrDefaultAsync` - is called.
+
+```cs
 List<Todo> todos = await connection.Table<Todo>()
     .Where(x => x.Name == "Study English")
     .ToListAsync();
