@@ -9,8 +9,12 @@
     <Description>Simple ORM for .NET</Description>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>sql orm database</PackageTags>
+    <PackageTags>sql;orm;database</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/tnakamura/Kuery</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/tnakamura/Kuery</RepositoryUrl>
+    <IncludeSymbols>True</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>
