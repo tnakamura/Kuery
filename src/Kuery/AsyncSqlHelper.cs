@@ -14,19 +14,19 @@ namespace Kuery
     public static partial class SqlHelper
     {
         public static async Task<int> InsertAsync<T>(
-            this IDbConnection connection,
+            this DbConnection connection,
             T item,
-            IDbTransaction transaction = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             return await connection.InsertAsync(typeof(T), item, transaction, cancellationToken).ConfigureAwait(false);
         }
 
         public static async Task<int> InsertAsync(
-            this IDbConnection connection,
+            this DbConnection connection,
             Type type,
             object item,
-            IDbTransaction transaction = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
@@ -85,8 +85,8 @@ namespace Kuery
         }
 
         private static async Task<long> GetLastRowIdAsync(
-            this IDbConnection connection,
-            IDbTransaction transaction = null,
+            this DbConnection connection,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             using (var command = connection.CreateLastInsertRowIdCommand())
@@ -102,9 +102,9 @@ namespace Kuery
         }
 
         public static async Task<int> InsertAllAsync(
-            this IDbConnection connection,
+            this DbConnection connection,
             IEnumerable items,
-            IDbTransaction transaction = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
@@ -118,10 +118,10 @@ namespace Kuery
         }
 
         public static async Task<int> InsertAllAsync(
-            this IDbConnection connection,
+            this DbConnection connection,
             Type type,
             IEnumerable items,
-            IDbTransaction transaction = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
@@ -135,9 +135,9 @@ namespace Kuery
         }
 
         public static async Task<int> UpdateAsync<T>(
-            this IDbConnection connection,
+            this DbConnection connection,
             T item,
-            IDbTransaction transaction = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
@@ -146,9 +146,9 @@ namespace Kuery
         }
 
         public static async Task<int> UpdateAsync(
-            this IDbConnection connection, Type type,
+            this DbConnection connection, Type type,
             object item,
-            IDbTransaction transaction = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
@@ -162,9 +162,9 @@ namespace Kuery
         }
 
         public static async Task<int> UpdateAllAsync(
-            this IDbConnection connection,
+            this DbConnection connection,
             IEnumerable items,
-            IDbTransaction transaction = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
@@ -186,9 +186,9 @@ namespace Kuery
 
 
         public static async Task<int> InsertOrReplaceAsync(
-            this IDbConnection connection,
+            this DbConnection connection,
             object item,
-            IDbTransaction transaction = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             if (item == null)
@@ -199,10 +199,10 @@ namespace Kuery
         }
 
         public static async Task<int> InsertOrReplaceAsync(
-            this IDbConnection connection,
+            this DbConnection connection,
             Type type,
             object item,
-            IDbTransaction transaction = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             if (type == null)
@@ -221,9 +221,9 @@ namespace Kuery
         }
 
         public static async Task<int> DeleteAsync<T>(
-            this IDbConnection connection,
+            this DbConnection connection,
             T item,
-            IDbTransaction transaction = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
@@ -236,9 +236,9 @@ namespace Kuery
         }
 
         public static async Task<int> DeleteAsync<T>(
-            this IDbConnection connection,
+            this DbConnection connection,
             object primaryKey,
-            IDbTransaction transaction = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             var map = GetMapping<T>();
@@ -246,10 +246,10 @@ namespace Kuery
         }
 
         public static async Task<int> DeleteAsync(
-            this IDbConnection connection,
+            this DbConnection connection,
             Type type,
             object primaryKey,
-            IDbTransaction transaction = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             var map = GetMapping(type);
@@ -257,10 +257,10 @@ namespace Kuery
         }
 
         private static async Task<int> DeleteAsync(
-            this IDbConnection connection,
+            this DbConnection connection,
             TableMapping map,
             object primaryKey,
-            IDbTransaction transaction = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             if (map == null) throw new ArgumentNullException(nameof(map));
@@ -273,7 +273,7 @@ namespace Kuery
         }
 
         public static async Task<T> FindAsync<T>(
-            this IDbConnection connection,
+            this DbConnection connection,
             object pk,
             CancellationToken cancellationToken = default)
         {
@@ -284,7 +284,7 @@ namespace Kuery
         }
 
         private static async Task<T> FindAsync<T>(
-            this IDbConnection connection,
+            this DbConnection connection,
             TableMapping mapping,
             object pk,
             CancellationToken cancellationToken = default)
@@ -300,7 +300,7 @@ namespace Kuery
         }
 
         public static async Task<T> FindAsync<T>(
-            this IDbConnection connection,
+            this DbConnection connection,
             Expression<Func<T, bool>> predicate,
             CancellationToken cancellationToken = default)
         {
@@ -310,7 +310,7 @@ namespace Kuery
         }
 
         public static async Task<T> GetAsync<T>(
-            this IDbConnection connection,
+            this DbConnection connection,
             Expression<Func<T, bool>> predicate,
             CancellationToken cancellationToken = default)
         {
@@ -320,7 +320,7 @@ namespace Kuery
         }
 
         public static async Task<T> GetAsync<T>(
-            this IDbConnection connection,
+            this DbConnection connection,
             object pk,
             CancellationToken cancellationToken = default)
         {
@@ -331,7 +331,7 @@ namespace Kuery
         }
 
         private static async Task<T> GetAsync<T>(
-            this IDbConnection connection,
+            this DbConnection connection,
             TableMapping mapping,
             object pk,
             CancellationToken cancellationToken = default)
@@ -398,7 +398,7 @@ namespace Kuery
         }
 
         public static async Task<IEnumerable<T>> QueryAsync<T>(
-            this IDbConnection connection,
+            this DbConnection connection,
             string sql,
             object param = null,
             CancellationToken cancellationToken = default)
@@ -411,7 +411,7 @@ namespace Kuery
         }
 
         public static async Task<IEnumerable<object>> QueryAsync(
-            this IDbConnection connection,
+            this DbConnection connection,
             Type type,
             string sql,
             object param = null,
@@ -422,7 +422,7 @@ namespace Kuery
         }
 
         private static async Task<IEnumerable<object>> QueryAsync(
-            this IDbConnection connection,
+            this DbConnection connection,
             TableMapping mapping,
             string sql,
             object param = null,
@@ -437,7 +437,7 @@ namespace Kuery
         }
 
         public static async Task<T> FindWithQueryAsync<T>(
-            this IDbConnection connection,
+            this DbConnection connection,
             string sql,
             object param = null,
             CancellationToken cancellationToken = default)
@@ -450,7 +450,7 @@ namespace Kuery
         }
 
         public static async Task<object> FindWithQueryAsync(
-            this IDbConnection connection,
+            this DbConnection connection,
             Type type,
             string sql,
             object param = null,
@@ -461,7 +461,7 @@ namespace Kuery
         }
 
         private static async Task<object> FindWithQueryAsync(
-            this IDbConnection connection,
+            this DbConnection connection,
             TableMapping mapping,
             string sql,
             object param = null,
@@ -474,7 +474,7 @@ namespace Kuery
         }
 
         public static async Task<int> ExecuteAsync(
-            this IDbConnection connection,
+            this DbConnection connection,
             string sql,
             object param = null,
             CancellationToken cancellationToken = default)
@@ -486,7 +486,7 @@ namespace Kuery
         }
 
         public static async Task<T> ExecuteScalarAsync<T>(
-            this IDbConnection connection,
+            this DbConnection connection,
             string sql,
             object param = null,
             CancellationToken cancellationToken = default)
