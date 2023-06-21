@@ -48,7 +48,7 @@ If the table contains an auto-incremented primary key,
 then the value for that key will be available to you after the insert:
 
 ```cs
-var todo =new Todo()
+var todo = new Todo()
 {
     Name = "Study English",
     Description = "Study English Everyday",
@@ -56,7 +56,7 @@ var todo =new Todo()
     UpdatedAt = DateTimeOffset.Now,
 });
 
-using SqliteConnection connection = new SqliteConnection("Your connection string");
+using var connection = new Microsoft.Data.Sqlite.SqliteConnection("Your connection string");
 connection.Open();
 
 connection.Insert(todo);
@@ -81,7 +81,7 @@ If the table contains an auto-incremented primary key,
 then the value for that key will be available to after the insert:
 
 ```cs
-var todo =new Todo()
+var todo = new Todo()
 {
     Name = "Study English",
     Description = "Study English Everyday",
@@ -89,7 +89,7 @@ var todo =new Todo()
     UpdatedAt = DateTimeOffset.Now,
 });
 
-using SqliteConnection connection = new SqliteConnection("Your connection string");
+using var connection = new Microsoft.Data.Sqlite.SqliteConnection("Your connection string");
 await connection.OpenAsync();
 
 await connection.InsertAsync(todo);
@@ -112,7 +112,7 @@ List<Todo> todos = await connection.Table<Todo>()
 #### Manual SQL
 
 ```cs
-using SqliteConnection connection = new SqliteConnection("Your connection string");
+using var connection = new Microsoft.Data.Sqlite.SqliteConnection("Your connection string");
 connection.Open();
 
 IEnumerable<Todo> todos = connection.Query<Todo>(
