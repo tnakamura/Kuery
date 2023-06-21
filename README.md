@@ -98,7 +98,7 @@ await connection.InsertAsync(todo);
 Simillar methods exist for `UpdateAsync` and `DeleteAsync`.
 
 Querying for data is most straightforwardly done using the `Table` method.
-This will return an `AsyncTableQuery` instance back,
+This will return an `TableQuery` instance back,
 whererupon you can add predicates for constraining via WHERE clauses and/or adding ORDER BY.
 The database is not physically touched until one of the special retrieval
 methods - `ToListAsync`, `FirstAsync`, or `FirstOrDefaultAsync` - is called.
