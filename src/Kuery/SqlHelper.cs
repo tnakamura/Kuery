@@ -1269,17 +1269,17 @@ namespace Kuery
             return q;
         }
 
-        public TableQuery<T> OrderBy<U>(Expression<Func<T, U>> orderExpr)
+        public TableQuery<T> OrderBy<TKey>(Expression<Func<T, TKey>> orderExpr)
         {
             return AddOrderBy(orderExpr, true);
         }
 
-        public TableQuery<T> OrderByDescending<U>(Expression<Func<T, U>> orderExpr)
+        public TableQuery<T> OrderByDescending<TKey>(Expression<Func<T, TKey>> orderExpr)
         {
             return AddOrderBy(orderExpr, false);
         }
 
-        public TableQuery<T> ThenBy<U>(Expression<Func<T, U>> orderExpr)
+        public TableQuery<T> ThenBy<TKey>(Expression<Func<T, TKey>> orderExpr)
         {
             return AddOrderBy(orderExpr, true);
         }
@@ -1289,7 +1289,7 @@ namespace Kuery
             return AddOrderBy(orderExpr, false);
         }
 
-        TableQuery<T> AddOrderBy<U>(Expression<Func<T, U>> orderExpr, bool asc)
+        TableQuery<T> AddOrderBy<TKey>(Expression<Func<T, TKey>> orderExpr, bool asc)
         {
             if (orderExpr.NodeType == ExpressionType.Lambda)
             {
