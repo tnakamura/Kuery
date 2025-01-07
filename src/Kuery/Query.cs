@@ -159,16 +159,25 @@ namespace Kuery
     internal class QueryTranslator : ExpressionVisitor
     {
         private StringBuilder sb;
+        private ParameterExpression row;
+        private ColumnProjection projection;
 
         internal QueryTranslator()
         {
         }
 
-        internal string Translate(Expression expression)
+        internal TranslateResult Translate(Expression expression)
         {
             sb = new StringBuilder();
+            row = Expression.Parameter(typeof(ProjectionRow), nameof(row));
             Visit(expression);
-            return sb.ToString();
+            return new TranslateResult
+            {
+                CommandText = sb.ToString(),
+                Projector = projection != null
+                ? Expression.Lambda(projection.Selector, row)
+                : null,
+            };
         }
 
         private static Expression StripQuotes(Expression expression)
@@ -183,15 +192,30 @@ namespace Kuery
         /// <inheritdoc/>
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
-            if (node.Method.DeclaringType == typeof(Queryable) &&
-                node.Method.Name == nameof(Queryable.Where))
+            if (node.Method.DeclaringType == typeof(Queryable))
             {
-                sb.Append("SELECT * FROM (");
-                Visit(node.Arguments[0]);
-                sb.Append(") AS T WHERE ");
-                var lambda = (LambdaExpression)StripQuotes(node.Arguments[1]);
-                Visit(lambda.Body);
-                return node;
+                if (node.Method.Name == nameof(Queryable.Where))
+                {
+                    sb.Append("SELECT * FROM (");
+                    Visit(node.Arguments[0]);
+                    sb.Append(") AS T WHERE ");
+                    var lambda = (LambdaExpression)StripQuotes(node.Arguments[1]);
+                    Visit(lambda.Body);
+                    return node;
+                }
+                else if (node.Method.Name == nameof(Queryable.Select))
+                {
+                    var lambda = (LambdaExpression)StripQuotes(node.Arguments[1]);
+                    var projection = new ColumnProjector()
+                        .ProjectColumns(lambda.Body, row);
+                    sb.Append("SELECT ");
+                    sb.Append(projection.Columns);
+                    sb.Append(" FROM (");
+                    Visit(node.Arguments[0]);
+                    sb.Append(") AS T ");
+                    this.projection = projection;
+                    return node;
+                }
             }
 
             throw new NotSupportedException($"The method '{node.Method.Name}' is not supported");
@@ -421,24 +445,39 @@ namespace Kuery
 
         /// <inheritdoc/>
         public override string GetQueryText(Expression expression)
-            => Translate(expression);
+            => Translate(expression).CommandText;
 
         /// <inheritdoc/>
         public override object Execute(Expression expression)
         {
+            var result = Translate(expression);
             var cmd = connection.CreateCommand();
-            cmd.CommandText = Translate(expression);
+            cmd.CommandText = result.CommandText;
             var reader = cmd.ExecuteReader();
             var elementType = TypeSystem.GetElementType(expression.Type);
-            return Activator.CreateInstance(
-                type: typeof(ObjectReader<>).MakeGenericType(elementType),
-                bindingAttr: BindingFlags.Instance | BindingFlags.NonPublic,
-                binder: null,
-                args: new object[] { reader },
-                culture: null);
+
+            if (result.Projector != null)
+            {
+                var projector = result.Projector.Compile();
+                return Activator.CreateInstance(
+                    type: typeof(ProjectionReader<>).MakeGenericType(elementType),
+                    bindingAttr: BindingFlags.Instance | BindingFlags.NonPublic,
+                    binder: null,
+                    args: new object[] { reader, projector },
+                    culture: null);
+            }
+            else
+            {
+                return Activator.CreateInstance(
+                    type: typeof(ObjectReader<>).MakeGenericType(elementType),
+                    bindingAttr: BindingFlags.Instance | BindingFlags.NonPublic,
+                    binder: null,
+                    args: new object[] { reader },
+                    culture: null);
+            }
         }
 
-        private string Translate(Expression expression)
+        private TranslateResult Translate(Expression expression)
         {
             expression = Evaluator.PartialEval(expression);
             return new QueryTranslator().Translate(expression);
@@ -543,6 +582,145 @@ namespace Kuery
 
                 return node;
             }
+        }
+    }
+
+    public abstract class ProjectionRow
+    {
+        public abstract object GetValue(int index);
+    }
+
+    internal class ColumnProjection
+    {
+        internal string Columns;
+        internal Expression Selector;
+    }
+
+    internal class ColumnProjector : ExpressionVisitor
+    {
+        StringBuilder sb;
+        int iColumn;
+        ParameterExpression row;
+        static MethodInfo miGetValue;
+
+        internal ColumnProjector()
+        {
+            if (miGetValue == null)
+            {
+                miGetValue = typeof(ProjectionRow).GetMethod(nameof(ProjectionRow.GetValue));
+            }
+        }
+
+        internal ColumnProjection ProjectColumns(
+            Expression expression,
+            ParameterExpression row)
+        {
+            sb = new StringBuilder();
+            this.row = row;
+            var selector = Visit(expression);
+            return new ColumnProjection
+            {
+                Columns = sb.ToString(),
+                Selector = selector,
+            };
+        }
+
+        protected override Expression VisitMember(MemberExpression node)
+        {
+            if (node.Expression != null && node.Expression.NodeType == ExpressionType.Parameter)
+            {
+                if (sb.Length > 0)
+                {
+                    sb.Append(", ");
+                }
+                sb.Append(node.Member.Name);
+                return Expression.Convert(
+                    expression: Expression.Call(
+                        row,
+                        miGetValue,
+                        Expression.Constant(iColumn++)),
+                    type: node.Type);
+            }
+            else
+            {
+                return base.VisitMember(node);
+            }
+        }
+    }
+
+    internal class TranslateResult
+    {
+        internal string CommandText;
+        internal LambdaExpression Projector;
+    }
+
+    internal class ProjectionReader<T> : IEnumerable<T>, IEnumerable
+    {
+        Enumerator enumerator;
+
+        internal ProjectionReader(DbDataReader reader, Func<ProjectionRow, T> projector)
+        {
+            enumerator = new Enumerator(reader, projector);
+        }
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            var e = enumerator;
+            if (e == null)
+            {
+                throw new InvalidOperationException("Cannot enumerate more than once");
+            }
+            enumerator = null;
+            return e;
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        class Enumerator : ProjectionRow, IEnumerator<T>, IEnumerator, IDisposable
+        {
+            DbDataReader reader;
+            T current;
+            Func<ProjectionRow, T> projector;
+
+            internal Enumerator(DbDataReader reader, Func<ProjectionRow, T> projector)
+            {
+                this.reader = reader;
+                this.projector = projector;
+            }
+
+            public override object GetValue(int index)
+            {
+                if (index >= 0)
+                {
+                    if (reader.IsDBNull(index))
+                    {
+                        return null;
+                    }
+                    else
+                    {
+                        return reader.GetValue(index);
+                    }
+                }
+                throw new IndexOutOfRangeException();
+            }
+
+            public T Current => current;
+
+            object IEnumerator.Current => current;
+
+            public bool MoveNext()
+            {
+                if (reader.Read())
+                {
+                    current = projector(this);
+                    return true;
+                }
+                return false;
+            }
+
+            public void Reset() { }
+
+            public void Dispose() => reader.Dispose();
         }
     }
 }
