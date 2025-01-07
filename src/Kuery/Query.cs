@@ -2,12 +2,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Data.Common;
-using System.Dynamic;
-using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Security;
 using System.Text;
 
 namespace Kuery
@@ -442,6 +439,110 @@ namespace Kuery
         }
 
         private string Translate(Expression expression)
-            => new QueryTranslator().Translate(expression);
+        {
+            expression = Evaluator.PartialEval(expression);
+            return new QueryTranslator().Translate(expression);
+        }
+    }
+
+    internal static class Evaluator
+    {
+        internal static Expression PartialEval(
+            Expression expression,
+            Func<Expression, bool> fnCanBeEvaluated)
+        {
+            return new SubtreeEvaluator(new Nominator(fnCanBeEvaluated).Nominate(expression))
+                .Eval(expression);
+        }
+
+        internal static Expression PartialEval(Expression expression)
+            => PartialEval(expression, CanBeEvaluatedLocally);
+
+        private static bool CanBeEvaluatedLocally(Expression expression)
+            => expression.NodeType != ExpressionType.Parameter;
+
+        class SubtreeEvaluator : ExpressionVisitor
+        {
+            HashSet<Expression> candidates;
+
+            internal SubtreeEvaluator(HashSet<Expression> candidates)
+            {
+                this.candidates = candidates;
+            }
+
+            internal Expression Eval(Expression expression)
+            {
+                return Visit(expression);
+            }
+
+            public override Expression Visit(Expression node)
+            {
+                if (node == null)
+                {
+                    return null;
+                }
+                if (candidates.Contains(node))
+                {
+                    return Evaluate(node);
+                }
+                return base.Visit(node);
+            }
+
+            private Expression Evaluate(Expression node)
+            {
+                if (node.NodeType == ExpressionType.Constant)
+                {
+                    return node;
+                }
+                var lambda = Expression.Lambda(node);
+                var fn = lambda.Compile();
+                return Expression.Constant(fn.DynamicInvoke(null), node.Type);
+            }
+        }
+
+        class Nominator : ExpressionVisitor
+        {
+            Func<Expression, bool> fnCanBeEvaluated;
+            HashSet<Expression> candidates;
+            bool cannotBeEvaluated;
+
+            internal Nominator(Func<Expression, bool> fnCanBeEvaluated)
+            {
+                this.fnCanBeEvaluated = fnCanBeEvaluated;
+            }
+
+            internal HashSet<Expression> Nominate(Expression expression)
+            {
+                candidates = new HashSet<Expression>();
+                Visit(expression);
+                return candidates;
+            }
+
+            public override Expression Visit(Expression node)
+            {
+                if (node != null)
+                {
+                    var saveCannotBeEvaluated = cannotBeEvaluated;
+                    cannotBeEvaluated = false;
+                    Visit(node);
+
+                    if (!cannotBeEvaluated)
+                    {
+                        if (fnCanBeEvaluated(node))
+                        {
+                            candidates.Add(node);
+                        }
+                        else
+                        {
+                            cannotBeEvaluated = true;
+                        }
+                    }
+
+                    cannotBeEvaluated |= saveCannotBeEvaluated;
+                }
+
+                return node;
+            }
+        }
     }
 }
