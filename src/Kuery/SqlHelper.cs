@@ -26,8 +26,8 @@ namespace Kuery
 
         public static int Insert(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
         {
-            if (item == null) throw new ArgumentNullException(nameof(item));
-            if (type == null) throw new ArgumentNullException(nameof(type));
+            Requires.NotNull(item, nameof(item));
+            Requires.NotNull(type, nameof(type));
 
             var map = SqlMapper.GetMapping(type);
             if (map.PK != null &&
@@ -69,7 +69,7 @@ namespace Kuery
 
         public static int InsertAll(this IDbConnection connection, IEnumerable items, IDbTransaction transaction = null)
         {
-            if (items == null) throw new ArgumentNullException(nameof(items));
+            Requires.NotNull(items, nameof(items));
 
             var result = 0;
             foreach (var item in items)
@@ -81,8 +81,8 @@ namespace Kuery
 
         public static int InsertAll(this IDbConnection connection, Type type, IEnumerable items, IDbTransaction transaction = null)
         {
-            if (items == null) throw new ArgumentNullException(nameof(items));
-            if (type == null) throw new ArgumentNullException(nameof(type));
+            Requires.NotNull(items, nameof(items));
+            Requires.NotNull(type, nameof(type));
 
             var result = 0;
             foreach (var item in items)
@@ -95,15 +95,15 @@ namespace Kuery
 
         public static int Update<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
         {
-            if (item == null) throw new ArgumentNullException(nameof(item));
+            Requires.NotNull(item, nameof(item));
 
             return connection.Update(typeof(T), item, transaction);
         }
 
         public static int Update(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
         {
-            if (item == null) throw new ArgumentNullException(nameof(item));
-            if (type == null) throw new ArgumentNullException(nameof(type));
+            Requires.NotNull(item, nameof(item));
+            Requires.NotNull(type, nameof(type));
 
             using (var command = connection.CreateUpdateCommand(item, type))
             {
@@ -114,7 +114,7 @@ namespace Kuery
 
         public static int UpdateAll(this IDbConnection connection, IEnumerable items, IDbTransaction transaction = null)
         {
-            if (items == null) throw new ArgumentNullException(nameof(items));
+            Requires.NotNull(items, nameof(items));
 
             var result = 0;
             foreach (var item in items)
@@ -155,7 +155,7 @@ namespace Kuery
 
         public static int Delete<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
         {
-            if (item == null) throw new ArgumentNullException(nameof(item));
+            Requires.NotNull(item, nameof(item));
 
             using (var command = connection.CreateDeleteCommand(item, typeof(T)))
             {
@@ -178,7 +178,7 @@ namespace Kuery
 
         private static int Delete(this IDbConnection connection, TableMapping map, object primaryKey, IDbTransaction transaction = null)
         {
-            if (map == null) throw new ArgumentNullException(nameof(map));
+            Requires.NotNull(map, nameof(map));
 
             using (var command = connection.CreateDeleteCommand(primaryKey, map))
             {
@@ -190,7 +190,7 @@ namespace Kuery
 
         public static T Find<T>(this IDbConnection connection, object pk)
         {
-            if (pk == null) throw new ArgumentNullException(nameof(pk));
+            Requires.NotNull(pk, nameof(pk));
 
             var map = SqlMapper.GetMapping(typeof(T));
             return connection.Find<T>(map, pk);
@@ -198,8 +198,8 @@ namespace Kuery
 
         private static T Find<T>(this IDbConnection connection, TableMapping mapping, object pk)
         {
-            if (pk == null) throw new ArgumentNullException(nameof(pk));
-            if (mapping == null) throw new ArgumentNullException(nameof(mapping));
+            Requires.NotNull(pk, nameof(pk));
+            Requires.NotNull(mapping, nameof(mapping));
 
             using (var command = connection.CreateGetByPrimaryKeyCommand(mapping, pk))
             {
@@ -219,7 +219,7 @@ namespace Kuery
 
         public static T Get<T>(this IDbConnection connection, object pk)
         {
-            if (pk == null) throw new ArgumentNullException(nameof(pk));
+            Requires.NotNull(pk, nameof(pk));
 
             var map = SqlMapper.GetMapping(typeof(T));
             return connection.Get<T>(map, pk);
@@ -233,8 +233,8 @@ namespace Kuery
 
         private static T Get<T>(this IDbConnection connection, TableMapping mapping, object pk)
         {
-            if (pk == null) throw new ArgumentNullException(nameof(pk));
-            if (mapping == null) throw new ArgumentNullException(nameof(mapping));
+            Requires.NotNull(pk, nameof(pk));
+            Requires.NotNull(mapping, nameof(mapping));
 
             using (var command = connection.CreateGetByPrimaryKeyCommand(mapping, pk))
             {
@@ -276,7 +276,7 @@ namespace Kuery
 
         private static IEnumerable<object> Query(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
         {
-            if (mapping == null) throw new ArgumentNullException(nameof(mapping));
+            Requires.NotNull(mapping, nameof(mapping));
 
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {

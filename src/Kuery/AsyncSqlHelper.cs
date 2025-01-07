@@ -29,8 +29,8 @@ namespace Kuery
             DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
-            if (item == null) throw new ArgumentNullException(nameof(item));
-            if (type == null) throw new ArgumentNullException(nameof(type));
+            Requires.NotNull(item, nameof(item));
+            Requires.NotNull(type, nameof(type));
 
             var map = SqlMapper.GetMapping(type);
             if (map.PK != null &&
@@ -107,7 +107,7 @@ namespace Kuery
             DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
-            if (items == null) throw new ArgumentNullException(nameof(items));
+            Requires.NotNull(items, nameof(items));
 
             var result = 0;
             foreach (var item in items)
@@ -124,7 +124,7 @@ namespace Kuery
             DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
-            if (items == null) throw new ArgumentNullException(nameof(items));
+            Requires.NotNull(items, nameof(items));
 
             var result = 0;
             foreach (var item in items)
@@ -140,7 +140,7 @@ namespace Kuery
             DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
-            if (item == null) throw new ArgumentNullException(nameof(item));
+            Requires.NotNull(item, nameof(item));
 
             return await connection.UpdateAsync(typeof(T), item, transaction, cancellationToken).ConfigureAwait(false);
         }
@@ -151,8 +151,8 @@ namespace Kuery
             DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
-            if (item == null) throw new ArgumentNullException(nameof(item));
-            if (type == null) throw new ArgumentNullException(nameof(type));
+            Requires.NotNull(item, nameof(item));
+            Requires.NotNull(type, nameof(type));
 
             using (var command = connection.CreateUpdateCommand(item, type))
             {
@@ -167,7 +167,7 @@ namespace Kuery
             DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
-            if (items == null) throw new ArgumentNullException(nameof(items));
+            Requires.NotNull(items, nameof(items));
 
             var result = 0;
             foreach (var item in items)
@@ -205,10 +205,7 @@ namespace Kuery
             DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
-            if (type == null)
-            {
-                throw new ArgumentNullException(nameof(type));
-            }
+            Requires.NotNull(type, nameof(type));
             if (item == null)
             {
                 return 0;
@@ -226,7 +223,7 @@ namespace Kuery
             DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
-            if (item == null) throw new ArgumentNullException(nameof(item));
+            Requires.NotNull(item, nameof(item));
 
             using (var command = connection.CreateDeleteCommand(item, typeof(T)))
             {
@@ -263,7 +260,7 @@ namespace Kuery
             DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
-            if (map == null) throw new ArgumentNullException(nameof(map));
+            Requires.NotNull(map, nameof(map));
 
             using (var command = connection.CreateDeleteCommand(primaryKey, map))
             {
@@ -277,7 +274,7 @@ namespace Kuery
             object pk,
             CancellationToken cancellationToken = default)
         {
-            if (pk == null) throw new ArgumentNullException(nameof(pk));
+            Requires.NotNull(pk, nameof(pk));
 
             var map = SqlMapper.GetMapping(typeof(T));
             return await connection.FindAsync<T>(map, pk, cancellationToken).ConfigureAwait(false);
@@ -289,8 +286,8 @@ namespace Kuery
             object pk,
             CancellationToken cancellationToken = default)
         {
-            if (pk == null) throw new ArgumentNullException(nameof(pk));
-            if (mapping == null) throw new ArgumentNullException(nameof(mapping));
+            Requires.NotNull(pk, nameof(pk));
+            Requires.NotNull(mapping, nameof(mapping));
 
             using (var command = connection.CreateGetByPrimaryKeyCommand(mapping, pk))
             {
@@ -324,7 +321,7 @@ namespace Kuery
             object pk,
             CancellationToken cancellationToken = default)
         {
-            if (pk == null) throw new ArgumentNullException(nameof(pk));
+            Requires.NotNull(pk, nameof(pk));
 
             var map = SqlMapper.GetMapping(typeof(T));
             return await connection.GetAsync<T>(map, pk, cancellationToken).ConfigureAwait(false);
@@ -336,8 +333,8 @@ namespace Kuery
             object pk,
             CancellationToken cancellationToken = default)
         {
-            if (pk == null) throw new ArgumentNullException(nameof(pk));
-            if (mapping == null) throw new ArgumentNullException(nameof(mapping));
+            Requires.NotNull(pk, nameof(pk));
+            Requires.NotNull(mapping, nameof(mapping));
 
             using (var command = connection.CreateGetByPrimaryKeyCommand(mapping, pk))
             {
@@ -413,7 +410,7 @@ namespace Kuery
             object param = null,
             CancellationToken cancellationToken = default)
         {
-            if (mapping == null) throw new ArgumentNullException(nameof(mapping));
+            Requires.NotNull(mapping, nameof(mapping));
 
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
