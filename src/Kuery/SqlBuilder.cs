@@ -62,7 +62,7 @@ namespace Kuery
 
         internal static IDbCommand CreateInsertCommand(this IDbConnection connection, object item, Type type)
         {
-            var map = SqlHelper.GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             var columns = new StringBuilder();
             var values = new StringBuilder();
             var command = connection.CreateCommand();
@@ -130,7 +130,7 @@ namespace Kuery
 
         internal static IDbCommand CreateUpdateCommand(this IDbConnection connection, object item, Type type)
         {
-            var mapping = SqlHelper.GetMapping(type);
+            var mapping = SqlMapper.GetMapping(type);
             if (mapping.PK == null)
             {
                 throw new NotSupportedException(
@@ -252,7 +252,7 @@ namespace Kuery
 
         internal static IDbCommand CreateDeleteCommand(this IDbConnection connection, object item, Type type)
         {
-            var map = SqlHelper.GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             if (map.PK == null)
             {
                 throw new NotSupportedException(
@@ -303,7 +303,7 @@ namespace Kuery
 
         private static IDbCommand CreateMergeCommandForSqlServer(this IDbConnection connection, object item, Type type)
         {
-            var map = SqlHelper.GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             var command = connection.CreateCommand();
 
             if (map.InsertOrReplaceColumns.Count == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
@@ -381,7 +381,7 @@ WHEN NOT MATCHED THEN
 
         private static IDbCommand CreateInsertOrReplaceCommandForPostgreSql(this IDbConnection connection, object item, Type type)
         {
-            var map = SqlHelper.GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             var command = connection.CreateCommand();
 
             if (map.InsertOrReplaceColumns.Count == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
@@ -449,7 +449,7 @@ WHEN NOT MATCHED THEN
 
         private static IDbCommand CreateInsertOrReplaceCommandForSqlite(this IDbConnection connection, object item, Type type)
         {
-            var map = SqlHelper.GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             var command = connection.CreateCommand();
 
             if (map.InsertOrReplaceColumns.Count == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)

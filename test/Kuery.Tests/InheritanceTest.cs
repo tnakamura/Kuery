@@ -20,7 +20,7 @@ namespace Kuery.Tests
         [Fact]
         public void InheritanceWorks()
         {
-            var mapping = SqlHelper.GetMapping<Derived>();
+            var mapping = SqlMapper.GetMapping<Derived>();
 
             Assert.Equal(3, mapping.Columns.Count);
             Assert.Equal("Id", mapping.PK.Name);

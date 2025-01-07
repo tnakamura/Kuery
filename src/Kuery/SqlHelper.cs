@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Data.Common;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -15,7 +15,7 @@ namespace Kuery
     {
         public static TableQuery<T> Table<T>(this IDbConnection connection)
         {
-            var map = GetMapping<T>();
+            var map = SqlMapper.GetMapping<T>();
             return new TableQuery<T>(connection, map);
         }
 
@@ -29,7 +29,7 @@ namespace Kuery
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
 
-            var map = GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             if (map.PK != null &&
                 map.PK.IsAutoGuid &&
                 (Guid)map.PK.GetValue(item) == Guid.Empty)
@@ -166,13 +166,13 @@ namespace Kuery
 
         public static int Delete<T>(this IDbConnection connection, object primaryKey, IDbTransaction transaction = null)
         {
-            var map = GetMapping<T>();
+            var map = SqlMapper.GetMapping<T>();
             return connection.Delete(map, primaryKey, transaction);
         }
 
         public static int Delete(this IDbConnection connection, Type type, object primaryKey, IDbTransaction transaction = null)
         {
-            var map = GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             return connection.Delete(map, primaryKey, transaction);
         }
 
@@ -192,7 +192,7 @@ namespace Kuery
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
-            var map = GetMapping(typeof(T));
+            var map = SqlMapper.GetMapping(typeof(T));
             return connection.Find<T>(map, pk);
         }
 
@@ -221,13 +221,13 @@ namespace Kuery
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
-            var map = GetMapping(typeof(T));
+            var map = SqlMapper.GetMapping(typeof(T));
             return connection.Get<T>(map, pk);
         }
 
         public static T Get<T>(this IDbConnection connection, Type type, object pk)
         {
-            var map = GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             return connection.Get<T>(map, pk);
         }
 
@@ -243,93 +243,11 @@ namespace Kuery
             }
         }
 
-        private readonly struct Deserializer<T>
-        {
-            private readonly TableMapping _map;
-
-            private readonly MethodInfo _getSetter;
-
-            private readonly TableMapping.Column[] _columns;
-
-            private readonly Action<object, IDataRecord, int>[] _fastSetters;
-
-            public Deserializer(TableMapping map, IDataReader reader)
-            {
-                _map = map;
-
-                if (typeof(T) != map.MappedType)
-                {
-                    _getSetter = typeof(FastSetter)
-                        .GetMethod(
-                            nameof(FastSetter.GetFastSetter),
-                            BindingFlags.NonPublic | BindingFlags.Static)
-                        .MakeGenericMethod(map.MappedType);
-                }
-                else
-                {
-                    _getSetter = null;
-                }
-
-                _columns = new TableMapping.Column[reader.FieldCount];
-                _fastSetters = new Action<object, IDataRecord, int>[reader.FieldCount];
-                for (var i = 0; i < _columns.Length; i++)
-                {
-                    var name = reader.GetName(i);
-                    _columns[i] = map.FindColumn(name);
-                    if (_columns[i] != null)
-                    {
-                        if (_getSetter != null)
-                        {
-                            _fastSetters[i] = (Action<object, IDataRecord, int>)_getSetter.Invoke(
-                                null,
-                                new object[] { _columns[i] });
-                        }
-                        else
-                        {
-                            //_fastSetters[i] = FastColumnSetter.GetFastSetter<T>(_columns[i]);
-                            _fastSetters[i] = _columns[i].FastSetter;
-                        }
-                    }
-                }
-            }
-
-            public T Deserialize(IDataRecord record)
-            {
-                var obj = Activator.CreateInstance(_map.MappedType);
-                for (var i = 0; i < _columns.Length; i++)
-                {
-                    if (_columns[i] == null)
-                    {
-                        continue;
-                    }
-
-                    if (_fastSetters[i] != null)
-                    {
-                        _fastSetters[i].Invoke(obj, record, i);
-                    }
-                    else
-                    {
-                        var col = _columns[i];
-                        var val = record.GetValue(i);
-                        col.SetValue(obj, val);
-                    }
-                }
-                return (T)obj;
-            }
-        }
-
         internal static List<T> ExecuteQuery<T>(this IDbCommand command, TableMapping map)
         {
             using (var reader = command.ExecuteReader())
             {
-                var result = new List<T>();
-                var deserializer = new Deserializer<T>(map, reader);
-                while (reader.Read())
-                {
-                    var obj = deserializer.Deserialize(reader);
-                    result.Add(obj);
-                }
-                return result;
+                return reader.ToList<T>(map);
             }
         }
 
@@ -337,62 +255,22 @@ namespace Kuery
         {
             using (var reader = command.ExecuteReader())
             {
-                var deserializer = new Deserializer<T>(map, reader);
-                if (reader.Read())
-                {
-                    return deserializer.Deserialize(reader);
-                }
-                else
-                {
-                    return default(T);
-                }
+                return reader.FirstOrDefault<T>(map);
             }
-        }
-
-        private static readonly Dictionary<Type, TableMapping> _s_mappings = new Dictionary<Type, TableMapping>();
-
-        internal static TableMapping GetMapping<T>(CreateFlags createFlags = CreateFlags.None) =>
-            GetMapping(typeof(T), createFlags);
-
-        internal static TableMapping GetMapping(Type type, CreateFlags createFlags = CreateFlags.None)
-        {
-            var key = type;
-            TableMapping map;
-            lock (_s_mappings)
-            {
-                if (_s_mappings.TryGetValue(key, out map))
-                {
-                    if (createFlags != CreateFlags.None && createFlags != map.CreateFlags)
-                    {
-                        map = new TableMapping(
-                            type: type,
-                            createFlags: createFlags);
-                        _s_mappings[key] = map;
-                    }
-                }
-                else
-                {
-                    map = new TableMapping(
-                        type: type,
-                        createFlags: createFlags);
-                    _s_mappings.Add(key, map);
-                }
-            }
-            return map;
         }
 
         public static IEnumerable<T> Query<T>(this IDbConnection connection, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                var map = GetMapping<T>();
+                var map = SqlMapper.GetMapping<T>();
                 return ExecuteQuery<T>(command, map);
             }
         }
 
         public static IEnumerable<object> Query(this IDbConnection connection, Type type, string sql, object param = null)
         {
-            var map = GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             return connection.Query(map, sql, param);
         }
 
@@ -410,14 +288,14 @@ namespace Kuery
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                var map = GetMapping<T>();
+                var map = SqlMapper.GetMapping<T>();
                 return ExecuteQueryFirstOrDefault<T>(command, map);
             }
         }
 
         public static object FindWithQuery(this IDbConnection connection, Type type, string sql, object param = null)
         {
-            var map = GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             return connection.FindWithQuery(map, sql, param);
         }
 
@@ -1160,7 +1038,7 @@ namespace Kuery
         internal TableQuery(IDbConnection connection)
         {
             Connection = connection;
-            Table = SqlHelper.GetMapping(typeof(T));
+            Table = SqlMapper.GetMapping(typeof(T));
         }
 
         private TableQuery<TOther> Clone<TOther>()

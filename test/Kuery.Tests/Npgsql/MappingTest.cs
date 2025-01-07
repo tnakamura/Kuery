@@ -26,7 +26,7 @@ namespace Kuery.Tests.Npgsql
         [Fact]
         public void HasGoodNames()
         {
-            var mapping = SqlHelper.GetMapping<AFunnyTableName>();
+            var mapping = SqlMapper.GetMapping<AFunnyTableName>();
             Assert.Equal("AGoodTableName", mapping.TableName);
             Assert.Equal("Id", mapping.Columns[0].Name);
             Assert.Equal("AGoodColumnName", mapping.Columns[1].Name);

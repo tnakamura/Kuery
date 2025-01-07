@@ -32,7 +32,7 @@ namespace Kuery
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (type == null) throw new ArgumentNullException(nameof(type));
 
-            var map = GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             if (map.PK != null &&
                 map.PK.IsAutoGuid &&
                 (Guid)map.PK.GetValue(item) == Guid.Empty)
@@ -241,7 +241,7 @@ namespace Kuery
             DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
-            var map = GetMapping<T>();
+            var map = SqlMapper.GetMapping<T>();
             return await connection.DeleteAsync(map, primaryKey, transaction, cancellationToken).ConfigureAwait(false);
         }
 
@@ -252,7 +252,7 @@ namespace Kuery
             DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
-            var map = GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             return await connection.DeleteAsync(map, primaryKey, transaction, cancellationToken).ConfigureAwait(false);
         }
 
@@ -279,7 +279,7 @@ namespace Kuery
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
-            var map = GetMapping(typeof(T));
+            var map = SqlMapper.GetMapping(typeof(T));
             return await connection.FindAsync<T>(map, pk, cancellationToken).ConfigureAwait(false);
         }
 
@@ -326,7 +326,7 @@ namespace Kuery
         {
             if (pk == null) throw new ArgumentNullException(nameof(pk));
 
-            var map = GetMapping(typeof(T));
+            var map = SqlMapper.GetMapping(typeof(T));
             return await connection.GetAsync<T>(map, pk, cancellationToken).ConfigureAwait(false);
         }
 
@@ -367,14 +367,7 @@ namespace Kuery
         {
             using (var reader = await command.TryExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
-                var result = new List<T>();
-                var deserializer = new Deserializer<T>(map, reader);
-                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                {
-                    var obj = deserializer.Deserialize(reader);
-                    result.Add(obj);
-                }
-                return result;
+                return await reader.ToListAsync<T>(map, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -385,15 +378,7 @@ namespace Kuery
         {
             using (var reader = await command.TryExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
-                var deserializer = new Deserializer<T>(map, reader);
-                if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                {
-                    return deserializer.Deserialize(reader);
-                }
-                else
-                {
-                    return default(T);
-                }
+                return await reader.FirstOrDefaultAsync<T>(map, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -405,7 +390,7 @@ namespace Kuery
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                var map = GetMapping<T>();
+                var map = SqlMapper.GetMapping<T>();
                 return await ExecuteQueryAsync<T>(command, map, cancellationToken).ConfigureAwait(false);
             }
         }
@@ -417,7 +402,7 @@ namespace Kuery
             object param = null,
             CancellationToken cancellationToken = default)
         {
-            var map = GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             return await connection.QueryAsync(map, sql, param, cancellationToken).ConfigureAwait(false);
         }
 
@@ -444,7 +429,7 @@ namespace Kuery
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
-                var map = GetMapping<T>();
+                var map = SqlMapper.GetMapping<T>();
                 return await ExecuteQueryFirstOrDefaultAsync<T>(command, map, cancellationToken).ConfigureAwait(false);
             }
         }
@@ -456,7 +441,7 @@ namespace Kuery
             object param = null,
             CancellationToken cancellationToken = default)
         {
-            var map = GetMapping(type);
+            var map = SqlMapper.GetMapping(type);
             return await connection.FindWithQueryAsync(map, sql, param, cancellationToken).ConfigureAwait(false);
         }
 

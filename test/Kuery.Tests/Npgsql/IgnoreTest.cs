@@ -56,7 +56,7 @@ namespace Kuery.Tests.Npgsql
         [Fact]
         public void MappingIgnoreColumn()
         {
-            var m = SqlHelper.GetMapping<IgnoreTestObj>();
+            var m = SqlMapper.GetMapping<IgnoreTestObj>();
 
             Assert.Equal(2, m.Columns.Count);
         }
