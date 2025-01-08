@@ -96,60 +96,60 @@ namespace Kuery
 
     internal static class TypeSystem
     {
-        internal static Type GetElementType(Type seqType)
+        internal static Type GetElementType(Type sequenceType)
         {
-            var ienum = FindIEnumerable(seqType);
-            if (ienum == null)
+            var ienumerableType = FindIEnumerable(sequenceType);
+            if (ienumerableType == null)
             {
-                return seqType;
+                return sequenceType;
             }
             else
             {
-                return ienum.GetGenericArguments()[0];
+                return ienumerableType.GetGenericArguments()[0];
             }
         }
 
-        private static Type FindIEnumerable(Type seqType)
+        private static Type FindIEnumerable(Type sequenceType)
         {
-            if (seqType == null || seqType == typeof(string))
+            if (sequenceType == null || sequenceType == typeof(string))
             {
                 return null;
             }
 
-            if (seqType.IsArray)
+            if (sequenceType.IsArray)
             {
-                return typeof(IEnumerable<>).MakeGenericType(seqType.GetElementType());
+                return typeof(IEnumerable<>).MakeGenericType(sequenceType.GetElementType());
             }
 
-            if (seqType.IsGenericType)
+            if (sequenceType.IsGenericType)
             {
-                foreach (var arg in seqType.GetGenericArguments())
+                foreach (var arg in sequenceType.GetGenericArguments())
                 {
-                    var ienum = typeof(IEnumerable<>).MakeGenericType(arg);
-                    if (ienum.IsAssignableFrom(seqType))
+                    var ienumerableType = typeof(IEnumerable<>).MakeGenericType(arg);
+                    if (ienumerableType.IsAssignableFrom(sequenceType))
                     {
-                        return ienum;
+                        return ienumerableType;
                     }
                 }
             }
 
-            var ifaces = seqType.GetInterfaces();
+            var interfaceTypes = sequenceType.GetInterfaces();
 
-            if (ifaces != null && ifaces.Length > 0)
+            if (interfaceTypes != null && interfaceTypes.Length > 0)
             {
-                foreach (var iface in ifaces)
+                foreach (var interfaceType in interfaceTypes)
                 {
-                    var ienum = FindIEnumerable(iface);
-                    if (ienum != null)
+                    var ienumerableType = FindIEnumerable(interfaceType);
+                    if (ienumerableType != null)
                     {
-                        return ienum;
+                        return ienumerableType;
                     }
                 }
             }
 
-            if (seqType.BaseType != null && seqType.BaseType != typeof(object))
+            if (sequenceType.BaseType != null && sequenceType.BaseType != typeof(object))
             {
-                return FindIEnumerable(seqType.BaseType);
+                return FindIEnumerable(sequenceType.BaseType);
             }
 
             return null;
@@ -166,11 +166,11 @@ namespace Kuery
         {
         }
 
-        internal TranslateResult Translate(Expression expression)
+        internal TranslateResult Translate(Expression node)
         {
             sb = new StringBuilder();
             row = Expression.Parameter(typeof(ProjectionRow), nameof(row));
-            Visit(expression);
+            Visit(node);
             return new TranslateResult
             {
                 CommandText = sb.ToString(),
@@ -180,13 +180,13 @@ namespace Kuery
             };
         }
 
-        private static Expression StripQuotes(Expression expression)
+        private static Expression StripQuotes(Expression node)
         {
-            while (expression.NodeType == ExpressionType.Quote)
+            while (node.NodeType == ExpressionType.Quote)
             {
-                expression = ((UnaryExpression)expression).Operand;
+                node = ((UnaryExpression)node).Operand;
             }
-            return expression;
+            return node;
         }
 
         /// <inheritdoc/>
@@ -352,7 +352,6 @@ namespace Kuery
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-
         private class Enumerator : IEnumerator<T>, IEnumerator
         {
             DbDataReader reader;
@@ -451,9 +450,9 @@ namespace Kuery
         public override object Execute(Expression expression)
         {
             var result = Translate(expression);
-            var cmd = connection.CreateCommand();
-            cmd.CommandText = result.CommandText;
-            var reader = cmd.ExecuteReader();
+            var command = connection.CreateCommand();
+            command.CommandText = result.CommandText;
+            var reader = command.ExecuteReader();
             var elementType = TypeSystem.GetElementType(expression.Type);
 
             if (result.Projector != null)
@@ -563,7 +562,7 @@ namespace Kuery
                 {
                     var saveCannotBeEvaluated = cannotBeEvaluated;
                     cannotBeEvaluated = false;
-                    Visit(node);
+                    base.Visit(node);
 
                     if (!cannotBeEvaluated)
                     {
