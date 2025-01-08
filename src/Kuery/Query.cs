@@ -6,6 +6,7 @@ using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Kuery
@@ -921,6 +922,38 @@ namespace Kuery
             }
 
             return columns;
+        }
+    }
+
+    internal class ProjectionBuilder : DbExpressionVisitor
+    {
+        private ParameterExpression row;
+
+        private static MethodInfo miGetValue;
+
+        internal ProjectionBuilder() : base()
+        {
+            if (miGetValue == null)
+            {
+                miGetValue = typeof(ProjectionRow).GetMethod(nameof(ProjectionRow.GetValue));
+            }
+        }
+
+        internal LambdaExpression Build(Expression node)
+        {
+            row = Expression.Parameter(typeof(ProjectionRow), nameof(row));
+            var body = Visit(node);
+            return Expression.Lambda(body, row);
+        }
+
+        protected override Expression VisitColumn(ColumnExpression node)
+        {
+            return Expression.Convert(
+                expression: Expression.Call(
+                    instance: row,
+                    method: miGetValue,
+                    arguments: Expression.Constant(node.Ordinal)),
+                type: node.Type);
         }
     }
 }
