@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
@@ -721,5 +722,119 @@ namespace Kuery
 
             public void Dispose() => reader.Dispose();
         }
+    }
+
+    internal enum DbExpressionType
+    {
+        Table = 1000,
+        Column,
+        Select,
+        Projection,
+    }
+
+    internal class TableExpression : Expression
+    {
+        internal TableExpression(Type type, string alias, string name)
+            : base()
+        {
+            Type = type;
+            Alias = alias;
+            Name = name;
+        }
+
+        public override ExpressionType NodeType => (ExpressionType)DbExpressionType.Table;
+
+        public override Type Type { get; }
+
+        internal string Alias { get; }
+
+        internal string Name { get; }
+    }
+
+    internal class ColumnExpression : Expression
+    {
+        internal ColumnExpression(Type type, string alias, string name, int ordinal)
+            : base()
+        {
+            Type = type;
+            Alias = alias;
+            Name = name;
+            Ordinal = ordinal;
+        }
+
+        public override ExpressionType NodeType => (ExpressionType)DbExpressionType.Column;
+
+        public override Type Type { get; }
+
+        internal string Alias { get; }
+
+        internal string Name { get; }
+
+        internal int Ordinal { get; }
+    }
+
+    internal class ColumnDeclaration
+    {
+        internal ColumnDeclaration(string name, Expression expression)
+        {
+            Name = name;
+            Expression = expression;
+        }
+
+        internal string Name { get; }
+
+        internal Expression Expression { get; }
+    }
+
+    internal class SelectExpression : Expression
+    {
+        internal SelectExpression(
+            Type type,
+            string alias,
+            IEnumerable<ColumnDeclaration> columns,
+            Expression from,
+            Expression where)
+            : base()
+        {
+            Type = type;
+            Alias = alias;
+            Columns = columns as ReadOnlyCollection<ColumnDeclaration>;
+            if (Columns == null)
+            {
+                Columns = new List<ColumnDeclaration>(columns).AsReadOnly();
+            }
+            From = from;
+            Where = where;
+        }
+
+        public override ExpressionType NodeType => (ExpressionType)DbExpressionType.Select;
+
+        public override Type Type { get; }
+
+        internal string Alias { get; }
+
+        internal ReadOnlyCollection<ColumnDeclaration> Columns { get; }
+
+        internal Expression From { get; }
+
+        internal Expression Where { get; }
+    }
+
+    internal class ProjectionExpression : Expression
+    {
+        internal ProjectionExpression(SelectExpression source, Expression projector)
+        {
+            Type = projector.Type;
+            Source = source;
+            Projector = projector;
+        }
+
+        public override ExpressionType NodeType => (ExpressionType)DbExpressionType.Projection;
+
+        public override Type Type { get; }
+
+        internal SelectExpression Source { get; }
+
+        internal Expression Projector { get; }
     }
 }
