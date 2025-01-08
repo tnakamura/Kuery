@@ -1176,4 +1176,52 @@ namespace Kuery
 
         internal ReadOnlyCollection<ColumnDeclaration> Columns { get; }
     }
+
+    internal class ColumnProjector2 : DbExpressionVisitor
+    {
+        class Nominator : DbExpressionVisitor
+        {
+            Func<Expression, bool> fnCanBeColumn;
+            bool isBlocked;
+            HashSet<Expression> candidates;
+
+            internal Nominator(Func<Expression, bool> fnCanBeColumn)
+            {
+                this.fnCanBeColumn = fnCanBeColumn;
+            }
+
+            internal HashSet<Expression> Nominate(Expression node)
+            {
+                candidates = new HashSet<Expression>();
+                isBlocked = false;
+                Visit(node);
+                return candidates;
+            }
+
+            public override Expression Visit(Expression node)
+            {
+                if (node != null)
+                {
+                    var saveIsBlocked = isBlocked;
+                    isBlocked = false;
+                    base.Visit(node);
+
+                    if (!isBlocked)
+                    {
+                        if (fnCanBeColumn(node))
+                        {
+                            candidates.Add(node);
+                        }
+                        else
+                        {
+                            isBlocked = true;
+                        }
+                    }
+
+                    isBlocked |= saveIsBlocked;
+                }
+                return node;
+            }
+        }
+    }
 }
