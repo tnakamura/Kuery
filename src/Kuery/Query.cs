@@ -837,4 +837,90 @@ namespace Kuery
 
         internal Expression Projector { get; }
     }
+
+    internal class DbExpressionVisitor : ExpressionVisitor
+    {
+        public override Expression Visit(Expression node)
+        {
+            if (node == null)
+            {
+                return null;
+            }
+
+            switch ((DbExpressionType)node.NodeType)
+            {
+                case DbExpressionType.Table:
+                    return VisitTable((TableExpression)node);
+                case DbExpressionType.Column:
+                    return VisitColumn((ColumnExpression)node);
+                case DbExpressionType.Select:
+                    return VisitSelect((SelectExpression)node);
+                case DbExpressionType.Projection:
+                    return VisitProjection((ProjectionExpression)node);
+                default:
+                    return base.Visit(node);
+            }
+        }
+
+        protected virtual Expression VisitTable(TableExpression node) => node;
+
+        protected virtual Expression VisitColumn(ColumnExpression node) => node;
+
+        protected virtual Expression VisitSelect(SelectExpression node)
+        {
+            var from = VisitSource(node.From);
+            var where = Visit(node.Where);
+            var columns = VisitColumnDeclarations(node.Columns);
+
+            if (from != node.From || where != node.Where || columns != node.Columns)
+            {
+                return new SelectExpression(node.Type, node.Alias, columns, from, where);
+            }
+
+            return node;
+        }
+
+        protected virtual Expression VisitSource(Expression node) => Visit(node);
+
+        protected virtual Expression VisitProjection(ProjectionExpression node)
+        {
+            var source = (SelectExpression)Visit(node.Source);
+            var projector = Visit(node.Projector);
+
+            if (source != node.Source || projector != node.Projector)
+            {
+                return new ProjectionExpression(source, projector);
+            }
+
+            return node;
+        }
+
+        protected ReadOnlyCollection<ColumnDeclaration> VisitColumnDeclarations(ReadOnlyCollection<ColumnDeclaration> columns)
+        {
+            List<ColumnDeclaration> alternate = null;
+
+            for (var i = 0; i < columns.Count; i++)
+            {
+                var column = columns[i];
+                var e = Visit(column.Expression);
+
+                if (alternate == null && e != column.Expression)
+                {
+                    alternate = columns.Take(i).ToList();
+                }
+
+                if (alternate != null)
+                {
+                    alternate.Add(new ColumnDeclaration(column.Name, e));
+                }
+            }
+
+            if (alternate != null)
+            {
+                return alternate.AsReadOnly();
+            }
+
+            return columns;
+        }
+    }
 }
