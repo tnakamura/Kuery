@@ -452,36 +452,30 @@ namespace Kuery
         public override object Execute(Expression expression)
         {
             var result = Translate(expression);
+            var projector = result.Projector.Compile();
             var command = connection.CreateCommand();
             command.CommandText = result.CommandText;
             var reader = command.ExecuteReader();
             var elementType = TypeSystem.GetElementType(expression.Type);
-
-            if (result.Projector != null)
-            {
-                var projector = result.Projector.Compile();
-                return Activator.CreateInstance(
-                    type: typeof(ProjectionReader<>).MakeGenericType(elementType),
-                    bindingAttr: BindingFlags.Instance | BindingFlags.NonPublic,
-                    binder: null,
-                    args: new object[] { reader, projector },
-                    culture: null);
-            }
-            else
-            {
-                return Activator.CreateInstance(
-                    type: typeof(ObjectReader<>).MakeGenericType(elementType),
-                    bindingAttr: BindingFlags.Instance | BindingFlags.NonPublic,
-                    binder: null,
-                    args: new object[] { reader },
-                    culture: null);
-            }
+            return Activator.CreateInstance(
+                type: typeof(ProjectionReader<>).MakeGenericType(elementType),
+                bindingAttr: BindingFlags.Instance | BindingFlags.NonPublic,
+                binder: null,
+                args: new object[] { reader, projector },
+                culture: null);
         }
 
         private TranslateResult Translate(Expression expression)
         {
             expression = Evaluator.PartialEval(expression);
-            return new QueryTranslator().Translate(expression);
+            var proj = (ProjectionExpression)new QueryBinder().Bind(expression);
+            var commandText = new QueryFormatter().Format(proj.Source);
+            var projector = new ProjectionBuilder().Build(proj.Projector);
+            return new TranslateResult
+            {
+                CommandText = commandText,
+                Projector = projector,
+            };
         }
     }
 
@@ -1478,7 +1472,10 @@ namespace Kuery
         }
 
         private IEnumerable<MemberInfo> GetMappedMembers(Type rowType)
-            => rowType.GetFields().Cast<MemberInfo>();
+        {
+            return rowType.GetFields().Cast<MemberInfo>()
+                .Concat(rowType.GetProperties().Cast<MemberInfo>());
+        }
 
         private ProjectionExpression GetTableProjection(object value)
         {
