@@ -956,4 +956,211 @@ namespace Kuery
                 type: node.Type);
         }
     }
+
+    internal class QueryFormatter : DbExpressionVisitor
+    {
+        private StringBuilder sb;
+        private int indent = 2;
+        private int depth;
+
+        internal QueryFormatter() : base() { }
+
+        internal string Format(Expression node)
+        {
+            sb = new StringBuilder();
+            Visit(node);
+            return sb.ToString();
+        }
+
+        protected enum Indentation
+        {
+            Same,
+            Inner,
+            Outer,
+        }
+
+        internal int IndentationWidth { get; set; }
+
+        private void AppendNewLine(Indentation style)
+        {
+            sb.AppendLine();
+
+            if (style == Indentation.Inner)
+            {
+                this.depth++;
+            }
+            else if (style == Indentation.Outer)
+            {
+                depth--;
+            }
+
+            for (int i = 0, n = depth * indent; i < n; i++)
+            {
+                sb.Append(" ");
+            }
+        }
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+            => throw new NotSupportedException($"The method '{node.Method.Name}' is not supported");
+
+        protected override Expression VisitUnary(UnaryExpression node)
+        {
+            switch (node.NodeType)
+            {
+                case ExpressionType.Not:
+                    sb.Append(" NOT ");
+                    Visit(node.Operand);
+                    break;
+                default:
+                    throw new NotSupportedException($"The unary operator '{node.NodeType}' is not supported");
+            }
+            return node;
+        }
+
+        protected override Expression VisitBinary(BinaryExpression node)
+        {
+            sb.Append("(");
+            Visit(node.Left);
+
+            switch (node.NodeType)
+            {
+                case ExpressionType.And:
+                    sb.Append(" AND ");
+                    break;
+                case ExpressionType.Or:
+                    sb.Append(" OR ");
+                    break;
+                case ExpressionType.Equal:
+                    sb.Append(" = ");
+                    break;
+                case ExpressionType.NotEqual:
+                    sb.Append(" <> ");
+                    break;
+                case ExpressionType.LessThan:
+                    sb.Append(" < ");
+                    break;
+                case ExpressionType.LessThanOrEqual:
+                    sb.Append(" <= ");
+                    break;
+                case ExpressionType.GreaterThan:
+                    sb.Append(" > ");
+                    break;
+                case ExpressionType.GreaterThanOrEqual:
+                    sb.Append(" >= ");
+                    break;
+                default:
+                    throw new NotSupportedException($"The binary operator '{node.NodeType}' is not supported");
+            }
+
+            Visit(node.Right);
+            sb.Append(")");
+            return node;
+        }
+
+        protected override Expression VisitConstant(ConstantExpression node)
+        {
+            if (node.Value == null)
+            {
+                sb.Append("NULL");
+            }
+            else
+            {
+                switch (Type.GetTypeCode(node.Value.GetType()))
+                {
+                    case TypeCode.Boolean:
+                        sb.Append(((bool)node.Value) ? 1 : 0);
+                        break;
+                    case TypeCode.String:
+                        sb.Append("'");
+                        sb.Append(node.Value);
+                        sb.Append("'");
+                        break;
+                    case TypeCode.Object:
+                        throw new NotSupportedException($"The constant '{node.Value}' is not supported");
+                    default:
+                        sb.Append(node.Value);
+                        break;
+                }
+            }
+
+            return node;
+        }
+
+        protected override Expression VisitColumn(ColumnExpression node)
+        {
+            if (!string.IsNullOrEmpty(node.Alias))
+            {
+                sb.Append(node.Alias);
+                sb.Append(".");
+            }
+            sb.Append(node.Name);
+            return node;
+        }
+
+        protected override Expression VisitSelect(SelectExpression node)
+        {
+            sb.Append("SELECT ");
+
+            for (var i = 0; i < node.Columns.Count; i++)
+            {
+                var column = node.Columns[i];
+
+                if (i > 0)
+                {
+                    sb.Append(", ");
+                }
+
+                var c = Visit(column.Expression) as ColumnExpression;
+
+                if (c == null ||
+                    c.Name != column.Name)
+                {
+                    sb.Append(" AS ");
+                    sb.Append(column.Name);
+                }
+            }
+
+            if (node.From != null)
+            {
+                AppendNewLine(Indentation.Same);
+                sb.Append("FROM ");
+                VisitSource(node.From);
+            }
+
+            if (node.Where != null)
+            {
+                AppendNewLine(Indentation.Same);
+                sb.Append("WHERE ");
+                Visit(node.Where);
+            }
+
+            return node;
+        }
+
+        protected override Expression VisitSource(Expression node)
+        {
+            switch ((DbExpressionType)node.NodeType)
+            {
+                case DbExpressionType.Table:
+                    var table = (TableExpression)node;
+                    sb.Append(table.Name);
+                    sb.Append(" AS ");
+                    sb.Append(table.Alias);
+                    break;
+                case DbExpressionType.Select:
+                    var select = (SelectExpression)node;
+                    sb.Append("(");
+                    AppendNewLine(Indentation.Inner);
+                    Visit(select);
+                    AppendNewLine(Indentation.Outer);
+                    sb.Append(")");
+                    sb.Append(" AS ");
+                    sb.Append(select.Alias);
+                    break;
+                default:
+                    throw new InvalidOperationException("Select source is not valid type");
+            }
+            return node;
+        }
+    }
 }
