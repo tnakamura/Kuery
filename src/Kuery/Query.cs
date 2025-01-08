@@ -1179,6 +1179,103 @@ namespace Kuery
 
     internal class ColumnProjector2 : DbExpressionVisitor
     {
+        Nominator nominator;
+        Dictionary<ColumnExpression, ColumnExpression> map;
+        List<ColumnDeclaration> columns;
+        HashSet<string> columnNames;
+        HashSet<Expression> candidates;
+        string existingAlias;
+        string newAlias;
+        int iColumn;
+
+        internal ColumnProjector2(Func<Expression, bool> fnCanBeColumn)
+        {
+            nominator = new Nominator(fnCanBeColumn);
+        }
+
+        internal ProjectedColumns ProjectColumns(
+            Expression node,
+            string newAlias,
+            string existingAlias)
+        {
+            map = new Dictionary<ColumnExpression, ColumnExpression>();
+            columns = new List<ColumnDeclaration>();
+            columnNames = new HashSet<string>();
+            this.newAlias = newAlias;
+            this.existingAlias = existingAlias;
+            candidates = nominator.Nominate(node);
+            return new ProjectedColumns(
+                projector: Visit(node),
+                columns: columns.AsReadOnly());
+        }
+
+        public override Expression Visit(Expression node)
+        {
+            if (candidates.Contains(node))
+            {
+                if (node.NodeType == (ExpressionType)DbExpressionType.Column)
+                {
+                    var column = (ColumnExpression)node;
+
+                    if (map.TryGetValue(column, out var mapped))
+                    {
+                        return mapped;
+                    }
+
+                    if (existingAlias == column.Alias)
+                    {
+                        var ordinal = columns.Count;
+                        var columnName = GetUniqueColumnName(column.Name);
+                        columns.Add(new ColumnDeclaration(columnName, column));
+                        mapped = new ColumnExpression(
+                            type: column.Type,
+                            alias: newAlias,
+                            name: columnName,
+                            ordinal: ordinal);
+                        map[column] = mapped;
+                        columnNames.Add(columnName);
+                        return mapped;
+                    }
+
+                    return column;
+                }
+                else
+                {
+                    var columnName = GetNextColumnName();
+                    var ordinal = columns.Count;
+                    columns.Add(new ColumnDeclaration(columnName, node));
+                    return new ColumnExpression(
+                        type: node.Type,
+                        alias: newAlias,
+                        name: columnName,
+                        ordinal: ordinal);
+                }
+            }
+            else
+            {
+                return base.Visit(node);
+            }
+        }
+
+        private bool IsColumnNameInUse(string name)
+            => this.columnNames.Contains(name);
+
+        private string GetUniqueColumnName(string name)
+        {
+            var baseName = name;
+            var suffix = 1;
+
+            while (IsColumnNameInUse(name))
+            {
+                name = baseName + (suffix++);
+            }
+
+            return name;
+        }
+
+        private string GetNextColumnName()
+            => GetUniqueColumnName("c" + (iColumn++));
+
         class Nominator : DbExpressionVisitor
         {
             Func<Expression, bool> fnCanBeColumn;
