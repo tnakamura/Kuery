@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data.Common;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -444,6 +445,8 @@ namespace Kuery
             this.connection = connection;
         }
 
+        public TextWriter Log { get; set; }
+
         /// <inheritdoc/>
         public override string GetQueryText(Expression expression)
             => Translate(expression).CommandText;
@@ -451,26 +454,47 @@ namespace Kuery
         /// <inheritdoc/>
         public override object Execute(Expression expression)
         {
-            var result = Translate(expression);
-            var projector = result.Projector.Compile();
+            return Execute(Translate(expression));
+        }
+
+        private object Execute(TranslateResult query)
+        {
+            var projector = query.Projector.Compile();
+
+            if (Log != null)
+            {
+                Log.WriteLine(query.CommandText);
+                Log.WriteLine();
+            }
+
             var command = connection.CreateCommand();
-            command.CommandText = result.CommandText;
+            command.CommandText = query.CommandText;
             var reader = command.ExecuteReader();
-            var elementType = TypeSystem.GetElementType(expression.Type);
+            var elementType = TypeSystem.GetElementType(query.Projector.Body.Type);
             return Activator.CreateInstance(
                 type: typeof(ProjectionReader<>).MakeGenericType(elementType),
                 bindingAttr: BindingFlags.Instance | BindingFlags.NonPublic,
                 binder: null,
-                args: new object[] { reader, projector },
+                args: new object[] { reader, projector, this },
                 culture: null);
         }
 
         private TranslateResult Translate(Expression expression)
         {
-            expression = Evaluator.PartialEval(expression);
-            var proj = (ProjectionExpression)new QueryBinder().Bind(expression);
-            var commandText = new QueryFormatter().Format(proj.Source);
-            var projector = new ProjectionBuilder().Build(proj.Projector);
+            var projection = expression as ProjectionExpression;
+
+            if (projection == null)
+            {
+                expression = Evaluator.PartialEval(expression);
+                projection = (ProjectionExpression)new QueryBinder().Bind(expression);
+            }
+
+            var commandText = new QueryFormatter().Format(projection.Source);
+
+            var projector = new ProjectionBuilder().Build(
+                node: projection.Projector,
+                alias: projection.Source.Alias);
+
             return new TranslateResult
             {
                 CommandText = commandText,
@@ -583,6 +607,8 @@ namespace Kuery
     public abstract class ProjectionRow
     {
         public abstract object GetValue(int index);
+
+        public abstract IEnumerable<T> ExecuteSubQuery<T>(LambdaExpression query);
     }
 
     internal class ColumnProjection
@@ -653,9 +679,12 @@ namespace Kuery
     {
         Enumerator enumerator;
 
-        internal ProjectionReader(DbDataReader reader, Func<ProjectionRow, T> projector)
+        internal ProjectionReader(
+            DbDataReader reader,
+            Func<ProjectionRow, T> projector,
+            IQueryProvider provider)
         {
-            enumerator = new Enumerator(reader, projector);
+            enumerator = new Enumerator(reader, projector, provider);
         }
 
         public IEnumerator<T> GetEnumerator()
@@ -676,11 +705,16 @@ namespace Kuery
             DbDataReader reader;
             T current;
             Func<ProjectionRow, T> projector;
+            IQueryProvider provider;
 
-            internal Enumerator(DbDataReader reader, Func<ProjectionRow, T> projector)
+            internal Enumerator(
+                DbDataReader reader,
+                Func<ProjectionRow, T> projector,
+                IQueryProvider provider)
             {
                 this.reader = reader;
                 this.projector = projector;
+                this.provider = provider;
             }
 
             public override object GetValue(int index)
@@ -697,6 +731,38 @@ namespace Kuery
                     }
                 }
                 throw new IndexOutOfRangeException();
+            }
+
+            public override IEnumerable<T> ExecuteSubQuery<T>(LambdaExpression query)
+            {
+                var projection = (ProjectionExpression)new Replacer()
+                    .Replace(
+                        expression: query.Body,
+                        searchFor: query.Parameters[0],
+                        replaceWith: Expression.Constant(this));
+
+                projection = (ProjectionExpression)Evaluator.PartialEval(projection, CanEvaluateLocally);
+
+                var result = (IEnumerable<T>)provider.Execute(projection);
+
+                var list = new List<T>(result);
+
+                if (typeof(IQueryable<T>).IsAssignableFrom(query.Body.Type))
+                {
+                    return list.AsQueryable();
+                }
+
+                return list;
+            }
+
+            private static bool CanEvaluateLocally(Expression node)
+            {
+                if (node.NodeType == ExpressionType.Parameter ||
+                    node.NodeType.IsDbExpression())
+                {
+                    return false;
+                }
+                return true;
             }
 
             public T Current => current;
@@ -716,6 +782,28 @@ namespace Kuery
             public void Reset() { }
 
             public void Dispose() => reader.Dispose();
+        }
+    }
+
+    internal class Replacer : DbExpressionVisitor
+    {
+        Expression searchFor;
+        Expression replaceWith;
+
+        internal Expression Replace(Expression expression, Expression searchFor, Expression replaceWith)
+        {
+            this.searchFor = searchFor;
+            this.replaceWith = replaceWith;
+            return Visit(expression);
+        }
+
+        public override Expression Visit(Expression node)
+        {
+            if (node == searchFor)
+            {
+                return replaceWith;
+            }
+            return base.Visit(node);
         }
     }
 
@@ -833,6 +921,12 @@ namespace Kuery
         internal Expression Projector { get; }
     }
 
+    internal static class DbExpressionExtensions
+    {
+        public static bool IsDbExpression(this ExpressionType expressionType)
+            => (int)expressionType >= (int)DbExpressionType.Table;
+    }
+
     internal class DbExpressionVisitor : ExpressionVisitor
     {
         public override Expression Visit(Expression node)
@@ -922,31 +1016,53 @@ namespace Kuery
     internal class ProjectionBuilder : DbExpressionVisitor
     {
         private ParameterExpression row;
-
+        private string rowAlias;
         private static MethodInfo miGetValue;
+        private static MethodInfo miExecuteSubQuery;
 
         internal ProjectionBuilder() : base()
         {
             if (miGetValue == null)
             {
                 miGetValue = typeof(ProjectionRow).GetMethod(nameof(ProjectionRow.GetValue));
+                miExecuteSubQuery = typeof(ProjectionRow).GetMethod(nameof(ProjectionRow.ExecuteSubQuery));
             }
         }
 
-        internal LambdaExpression Build(Expression node)
+        internal LambdaExpression Build(Expression node, string alias)
         {
             row = Expression.Parameter(typeof(ProjectionRow), nameof(row));
+            rowAlias = alias;
             var body = Visit(node);
             return Expression.Lambda(body, row);
         }
 
         protected override Expression VisitColumn(ColumnExpression node)
         {
+            if (node.Alias == rowAlias)
+            {
+                return Expression.Convert(
+                    expression: Expression.Call(
+                        instance: row,
+                        method: miGetValue,
+                        arguments: Expression.Constant(node.Ordinal)),
+                    type: node.Type);
+            }
+            return node;
+        }
+
+        protected override Expression VisitProjection(ProjectionExpression node)
+        {
+            var subQuery = Expression.Lambda(
+                body: base.VisitProjection(node),
+                parameters: row);
+            var elementType = TypeSystem.GetElementType(subQuery.Body.Type);
+            var mi = miExecuteSubQuery.MakeGenericMethod(elementType);
             return Expression.Convert(
                 expression: Expression.Call(
                     instance: row,
-                    method: miGetValue,
-                    arguments: Expression.Constant(node.Ordinal)),
+                    method: mi,
+                    arguments: Expression.Constant(subQuery)),
                 type: node.Type);
         }
     }
