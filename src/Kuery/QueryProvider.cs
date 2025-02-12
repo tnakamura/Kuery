@@ -74,11 +74,8 @@ namespace Kuery
 
     internal abstract class QueryProvider : IQueryProvider
     {
-        private readonly DbConnection connection;
-
-        protected internal QueryProvider(DbConnection connection)
+        private protected QueryProvider()
         {
-            this.connection = connection;
         }
 
         /// <inheritdoc/>
@@ -116,8 +113,11 @@ namespace Kuery
 
     internal class DbQueryProvider : QueryProvider
     {
-        internal DbQueryProvider(DbConnection connection) : base(connection)
+        private readonly DbConnection connection;
+
+        internal DbQueryProvider(DbConnection connection) : base()
         {
+            this.connection = connection;
         }
 
         /// <inheritdoc/>

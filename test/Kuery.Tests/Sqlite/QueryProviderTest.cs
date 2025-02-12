@@ -29,7 +29,7 @@ namespace Kuery.Tests.Sqlite
 
             [NotNull]
             [Column("price")]
-            public decimal Price { get; set; }
+            public int Price { get; set; }
         }
 
         private readonly SqliteFixture fixture;
@@ -46,10 +46,30 @@ namespace Kuery.Tests.Sqlite
             this.fixture = fixture;
             connection = fixture.CreateConnection();
             provider = new DbQueryProvider(connection);
+
+            connection.Open();
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+                    create table if not exists [Books] (
+                        [Id] nvarchar(50) not null primary key,
+                        [Code] nvarchar(50) not null,
+                        [Title] nvarchar(100) not null,
+                        [Summary] nvarchar(100) not null,
+                        [Price] integer not null
+                    );";
+                command.ExecuteNonQuery();
+            }
         }
 
         public void Dispose()
         {
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = $@"
+                    drop table if exists Books;";
+                command.ExecuteNonQuery();
+            }
             connection.Dispose();
         }
 
@@ -59,7 +79,7 @@ namespace Kuery.Tests.Sqlite
             var query = new Query<Book>(provider)
                 .Where(x => x.Price >= 1000);
 
-            output.WriteLine(query.Expression.ToString());
+            output.WriteLine(query.ToString());
         }
 
         [Fact]
@@ -69,7 +89,7 @@ namespace Kuery.Tests.Sqlite
                 .Where(x => x.Price >= 1000)
                 .OrderBy(x => x.Code);
 
-            output.WriteLine(query.Expression.ToString());
+            output.WriteLine(query.ToString());
         }
     }
 }
