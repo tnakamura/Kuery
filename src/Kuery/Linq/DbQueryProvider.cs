@@ -30,7 +30,7 @@ namespace Kuery.Linq
 
             return Activator.CreateInstance(
                 type: typeof(ObjectReader<>).MakeGenericType(elementType),
-                bindingAttr: BindingFlags.Instance | BindingFlags.NonPublic,
+                bindingAttr: BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
                 binder: null,
                 args: new object[]
                 {
