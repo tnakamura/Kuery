@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
-using System.Text;
 
 namespace Kuery.Linq
 {
     internal static class Evaluator
     {
         /// <summary>
-        /// Performs evaluation & replacement of independent sub-trees
+        /// Performs evaluation and replacement of independent sub-trees
         /// </summary>
         /// <param name="expression">
         /// The root of the expression tree.
@@ -29,7 +28,7 @@ namespace Kuery.Linq
         }
 
         /// <summary>
-        /// Performs evaluation & replacement of independent sub-trees
+        /// Performs evaluation and replacement of independent sub-trees
         /// </summary>
         /// <param name="expression">
         /// The root of the expression tree.
@@ -48,7 +47,7 @@ namespace Kuery.Linq
         }
 
         /// <summary>
-        /// Evaluates & replaces sub-trees when first candidate is reached (top-down)
+        /// Evaluates and replaces sub-trees when first candidate is reached (top-down)
         /// </summary>
         class SubtreeEvaluator : ExpressionVisitor
         {
