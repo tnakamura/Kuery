@@ -142,5 +142,41 @@ namespace Kuery.Tests.Sqlite
             Assert.Equal(20, actual.Price);
             #endregion
         }
+
+        [Fact]
+        public void LocalVariableReferencesTest()
+        {
+            #region Arrange
+            using var con = fixture.OpenNewConnection();
+
+            CreateTables(con);
+
+            con.Insert(new Product
+            {
+                Name = "A",
+                Price = 20,
+            });
+            con.Insert(new Product
+            {
+                Name = "B",
+                Price = 10,
+            });
+            #endregion
+
+            #region Act
+            var provider = new DbQueryProvider(con);
+            var name = "A";
+            var query = new Query<Product>(provider).Where(x => x.Name == name);
+            var queryText = provider.GetQueryText(query.Expression);
+            #endregion
+
+            #region Assert
+            output.WriteLine(queryText);
+
+            Assert.Equal(
+                $"SELECT * FROM (SELECT * FROM Product) AS T WHERE (Name = 'A')",
+                actual: queryText);
+            #endregion
+        }
     }
 }
