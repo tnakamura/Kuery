@@ -42,7 +42,7 @@ namespace Kuery.Linq
         private string Translate(Expression expression)
         {
             expression = Evaluator.PartialEval(expression);
-            return new QueryTranslator().Translate(expression);
+            return new QueryTranslator().Translate(expression).CommandText;
         }
     }
 }

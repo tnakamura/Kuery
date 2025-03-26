@@ -1,25 +1,38 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
-using System.Xml.Linq;
 
 namespace Kuery.Linq
 {
+    internal class TranslateResult
+    {
+        internal string CommandText;
+        internal LambdaExpression Projector;
+    }
+
     internal class QueryTranslator : ExpressionVisitor
     {
         private StringBuilder sb;
+        private ParameterExpression row;
+        ColumnProjection projection;
 
         internal QueryTranslator()
         {
         }
 
-        internal string Translate(Expression expression)
+        internal TranslateResult Translate(Expression expression)
         {
             sb = new StringBuilder();
+            row = Expression.Parameter(typeof(ProjectionRow), nameof(row));
             Visit(expression);
-            return sb.ToString();
+            return new TranslateResult
+            {
+                CommandText = sb.ToString(),
+                Projector = projection != null
+                    ? Expression.Lambda(projection.Selector, row)
+                    : null,
+            };
         }
 
         private static Expression StripQuotes(Expression e)
@@ -34,15 +47,30 @@ namespace Kuery.Linq
         /// <inheritdoc/>
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
-            if (node.Method.DeclaringType == typeof(Queryable) &&
-                node.Method.Name == nameof(Queryable.Where))
+            if (node.Method.DeclaringType == typeof(Queryable))
             {
-                sb.Append("SELECT * FROM (");
-                Visit(node.Arguments[0]);
-                sb.Append(") AS T WHERE ");
-                var lambda = (LambdaExpression)StripQuotes(node.Arguments[1]);
-                Visit(lambda.Body);
-                return node;
+                if (node.Method.Name == nameof(Queryable.Where))
+                {
+                    sb.Append("SELECT * FROM (");
+                    Visit(node.Arguments[0]);
+                    sb.Append(") AS T WHERE ");
+                    var lambda = (LambdaExpression)StripQuotes(node.Arguments[1]);
+                    Visit(lambda.Body);
+                    return node;
+                }
+                else if (node.Method.Name == nameof(Queryable.Select))
+                {
+                    var lambda = (LambdaExpression)StripQuotes(node.Arguments[1]);
+                    var projection = new ColumnProjector()
+                        .ProjectColumns(lambda.Body, row);
+                    sb.Append("SELECT ");
+                    sb.Append(projection.Columns);
+                    sb.Append(" FROM (");
+                    Visit(node.Arguments[0]);
+                    sb.Append(") AS T");
+                    this.projection = projection;
+                    return node;
+                }
             }
             throw new NotSupportedException(
                 $"The method '{node.Method.Name}' is not supported");
