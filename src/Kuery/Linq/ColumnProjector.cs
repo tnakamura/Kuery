@@ -1,6 +1,7 @@
 ﻿using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using Kuery.Linq.Expressions;
 
 namespace Kuery.Linq
 {
@@ -10,7 +11,7 @@ namespace Kuery.Linq
         internal Expression Selector;
     }
 
-    internal class ColumnProjector : ExpressionVisitor
+    internal class ColumnProjector : DbExpressionVisitor
     {
         private StringBuilder sb;
         private int iColumn;
