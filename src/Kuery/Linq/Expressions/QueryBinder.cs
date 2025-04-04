@@ -13,7 +13,7 @@ namespace Kuery.Linq.Expressions
 
         internal QueryBinder()
         {
-            columnProjector = new ColumnProjector(/*CanBeColumn*/);
+            columnProjector = new ColumnProjector(CanBeColumn);
         }
 
         private bool CanBeColumn(Expression expression)

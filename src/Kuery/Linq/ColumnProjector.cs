@@ -1,67 +1,157 @@
-﻿using System.Linq.Expressions;
-using System.Reflection;
-using System.Text;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq.Expressions;
 using Kuery.Linq.Expressions;
 
 namespace Kuery.Linq
 {
-    internal class ColumnProjection
-    {
-        internal string Columns;
-        internal Expression Selector;
-    }
-
     internal class ColumnProjector : DbExpressionVisitor
     {
-        private StringBuilder sb;
+        private Nominator nominator;
+        private Dictionary<ColumnExpression, ColumnExpression> map;
+        private List<ColumnDeclaration> columns;
+        private HashSet<string> columnNames;
+        private HashSet<Expression> candidates;
+        private string existingAlias;
+        private string newAlias;
         private int iColumn;
-        private ParameterExpression row;
-        private static MethodInfo miGetValue;
 
-        static ColumnProjector()
+        internal ColumnProjector(Func<Expression, bool> fnCanBeColumn)
         {
-            miGetValue = typeof(ProjectionRow).GetMethod(
-                name: nameof(ProjectionRow.GetValue),
-                bindingAttr: BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            nominator = new Nominator(fnCanBeColumn);
         }
 
-        internal ColumnProjector() { }
-
-        internal ColumnProjection ProjectColumns(
+        internal ProjectedColumns ProjectedColumns(
             Expression expression,
-            ParameterExpression row)
+            string newAlias,
+            string existingAlias)
         {
-            sb = new StringBuilder();
-            this.row = row;
-            var selector = Visit(expression);
-            return new ColumnProjection
-            {
-                Columns = sb.ToString(),
-                Selector = selector,
-            };
+            map = new Dictionary<ColumnExpression, ColumnExpression>();
+            columns = new List<ColumnDeclaration>();
+            columnNames = new HashSet<string>();
+            this.newAlias = newAlias;
+            this.existingAlias = existingAlias;
+            candidates = nominator.Nominate(expression);
+            return new ProjectedColumns(
+                projection: Visit(expression),
+                columns: columns.AsReadOnly());
         }
 
         /// <inheritdoc/>
-        protected override Expression VisitMember(MemberExpression node)
+        public override Expression Visit(Expression node)
         {
-            if (node.Expression != null &&
-                node.Expression.NodeType == ExpressionType.Parameter)
+            if (candidates.Contains(node))
             {
-                if (sb.Length > 0)
+                if (node.NodeType == (ExpressionType)DbExpressionType.Column)
                 {
-                    sb.Append(", ");
+                    var column = (ColumnExpression)node;
+                    if (map.TryGetValue(column, out var mapped))
+                    {
+                        return mapped;
+                    }
+
+                    if (existingAlias == column.Alias)
+                    {
+                        var ordinal = columns.Count;
+                        var columnName = GetUniqueColumnName(column.Name);
+                        columns.Add(new ColumnDeclaration(columnName, column));
+                        mapped = new ColumnExpression(
+                            type: column.Type,
+                            alias: newAlias,
+                            name: columnName,
+                            ordinal: ordinal);
+                        map[column] = mapped;
+                        columnNames.Add(columnName);
+                        return mapped;
+                    }
+
+                    return column;
                 }
-                sb.Append(node.Member.Name);
-                return Expression.Convert(
-                    expression: Expression.Call(
-                        instance: row,
-                        method: miGetValue,
-                        arguments: Expression.Constant(iColumn++)),
-                    node.Type);
+                else
+                {
+                    var columnName = GetNextColumnName();
+                    var ordinal = columns.Count;
+                    columns.Add(new ColumnDeclaration(columnName, node));
+                    return new ColumnExpression(
+                        type: node.Type,
+                        alias: newAlias,
+                        name: columnName,
+                        ordinal: ordinal);
+                }
             }
             else
             {
-                return base.VisitMember(node);
+                return base.Visit(node);
+            }
+        }
+
+        private bool IsColumnNameInUse(string name)
+        {
+            return columnNames.Contains(name);
+        }
+
+        private string GetUniqueColumnName(string name)
+        {
+            var baseName = name;
+            var suffix = 1;
+
+            while (IsColumnNameInUse(name))
+            {
+                name = baseName + (suffix++);
+            }
+
+            return name;
+        }
+
+        private string GetNextColumnName()
+        {
+            return GetUniqueColumnName("c" + (iColumn++));
+        }
+
+        class Nominator : DbExpressionVisitor
+        {
+            private Func<Expression, bool> fnCanBeColumn;
+            private bool isBlocked;
+            private HashSet<Expression> candidates;
+
+            internal Nominator(Func<Expression, bool> fnCanBeColumn)
+            {
+                this.fnCanBeColumn = fnCanBeColumn;
+            }
+
+            internal HashSet<Expression> Nominate(Expression expression)
+            {
+                candidates = new HashSet<Expression>();
+                isBlocked = false;
+                Visit(expression);
+                return candidates;
+            }
+
+            /// <inheritdoc/>
+            public override Expression Visit(Expression node)
+            {
+                if (node != null)
+                {
+                    var saveIsBlocked = isBlocked;
+                    isBlocked = false;
+                    base.Visit(node);
+
+                    if (!isBlocked)
+                    {
+                        if (fnCanBeColumn(node))
+                        {
+                            candidates.Add(node);
+                        }
+                        else
+                        {
+                            isBlocked = true;
+                        }
+                    }
+
+                    isBlocked |= saveIsBlocked;
+                }
+
+                return node;
             }
         }
     }
