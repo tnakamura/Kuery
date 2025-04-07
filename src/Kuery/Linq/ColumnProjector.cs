@@ -21,7 +21,7 @@ namespace Kuery.Linq
             nominator = new Nominator(fnCanBeColumn);
         }
 
-        internal ProjectedColumns ProjectedColumns(
+        internal ProjectedColumns ProjectColumns(
             Expression expression,
             string newAlias,
             string existingAlias)
@@ -33,7 +33,7 @@ namespace Kuery.Linq
             this.existingAlias = existingAlias;
             candidates = nominator.Nominate(expression);
             return new ProjectedColumns(
-                projection: Visit(expression),
+                projector: Visit(expression),
                 columns: columns.AsReadOnly());
         }
 

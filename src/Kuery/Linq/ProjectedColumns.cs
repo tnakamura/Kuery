@@ -7,14 +7,14 @@ namespace Kuery.Linq
     internal sealed class ProjectedColumns
     {
         internal ProjectedColumns(
-            Expression projection,
+            Expression projector,
             ReadOnlyCollection<ColumnDeclaration> columns)
         {
-            Projection = projection;
+            Projector = projector;
             Columns = columns;
         }
 
-        internal Expression Projection { get; }
+        internal Expression Projector { get; }
 
         internal ReadOnlyCollection<ColumnDeclaration> Columns { get; }
     }
