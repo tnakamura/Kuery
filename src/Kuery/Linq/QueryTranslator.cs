@@ -5,12 +5,6 @@ using System.Text;
 
 namespace Kuery.Linq
 {
-    internal class TranslateResult
-    {
-        internal string CommandText;
-        internal LambdaExpression Projector;
-    }
-
     internal class QueryTranslator : ExpressionVisitor
     {
         private StringBuilder sb;
