@@ -172,7 +172,9 @@ namespace Kuery.Linq.Expressions
 
         private IEnumerable<MemberInfo> GetMappedMembers(Type rowType)
         {
-            return rowType.GetFields().Cast<MemberInfo>();
+            return rowType
+                .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Cast<MemberInfo>();
         }
 
         private ProjectionExpression GetTableProjection(object value)

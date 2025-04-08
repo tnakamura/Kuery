@@ -347,7 +347,7 @@ namespace Kuery
         }
     }
 
-    [AttributeUsage(AttributeTargets.Property)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public sealed class ColumnAttribute : Attribute
     {
         public string Name { get; }
@@ -358,17 +358,17 @@ namespace Kuery
         }
     }
 
-    [AttributeUsage(AttributeTargets.Property)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public sealed class PrimaryKeyAttribute : Attribute
     {
     }
 
-    [AttributeUsage(AttributeTargets.Property)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public sealed class AutoIncrementAttribute : Attribute
     {
     }
 
-    [AttributeUsage(AttributeTargets.Property)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public class IndexedAttribute : Attribute
     {
         public string Name { get; set; }
@@ -388,12 +388,12 @@ namespace Kuery
         }
     }
 
-    [AttributeUsage(AttributeTargets.Property)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public sealed class IgnoreAttribute : Attribute
     {
     }
 
-    [AttributeUsage(AttributeTargets.Property)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public sealed class UniqueAttribute : IndexedAttribute
     {
         public override bool Unique
@@ -403,7 +403,7 @@ namespace Kuery
         }
     }
 
-    [AttributeUsage(AttributeTargets.Property)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public sealed class MaxLengthAttribute : Attribute
     {
         public int Value { get; }
@@ -421,7 +421,7 @@ namespace Kuery
         public bool Conditional { get; set; }
     }
 
-    [AttributeUsage(AttributeTargets.Property)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public sealed class CollationAttribute : Attribute
     {
         public string Value { get; }
@@ -432,7 +432,7 @@ namespace Kuery
         }
     }
 
-    [AttributeUsage(AttributeTargets.Property)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public sealed class NotNullAttribute : Attribute
     {
     }
