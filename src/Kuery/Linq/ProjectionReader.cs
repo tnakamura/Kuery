@@ -11,7 +11,7 @@ namespace Kuery.Linq
 
         internal ProjectionReader(DbDataReader reader, Func<ProjectionRow, T> projector)
         {
-
+            enumerator = new Enumerator(reader, projector);
         }
 
         /// <inheritdoc/>
