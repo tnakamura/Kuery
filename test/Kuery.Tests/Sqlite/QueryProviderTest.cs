@@ -200,37 +200,43 @@ insert into {nameof(Customers)} (
 
             CreateTables(con);
 
-            con.Insert(new Product
+            InsertCustomers(con, new Customers
             {
-                Name = "A",
-                Price = 20,
+                CustomerID = Guid.CreateVersion7().ToString(),
+                ContactName = "Tomiyasu",
+                Country = "England",
+                Phone = "123-456-789",
+                City = "London",
             });
-            con.Insert(new Product
+            InsertCustomers(con, new Customers
             {
-                Name = "B",
-                Price = 10,
+                CustomerID = Guid.CreateVersion7().ToString(),
+                ContactName = "Endo",
+                Country = "England",
+                Phone = "123-456-789",
+                City = "Liverpool",
             });
             #endregion
 
             #region Act
-            var provider = new DbQueryProvider(con);
-            var name = "A";
-            var query = new Query<Product>(provider)
-                .Where(x => x.Name == name)
+            var city = "London";
+            var db = new Northwind(con);
+            var query = db.Customers
+                .Where(x => x.City == city)
                 .Select(x => new
                 {
-                    Name = x.Name,
-                    Price = x.Price,
+                    Name = x.ContactName,
+                    Phone = x.Phone,
                 });
-            var queryText = provider.GetQueryText(query.Expression);
+            var customers = query.ToList();
             #endregion
 
             #region Assert
-            output.WriteLine(queryText);
+            Assert.NotNull(customers);
+            Assert.Single(customers);
 
-            Assert.Equal(
-                $"SELECT Name, Price FROM (SELECT * FROM (SELECT * FROM Product) AS T WHERE (Name = 'A')) AS T",
-                actual: queryText);
+            var actual = customers[0];
+            Assert.Equal("Tomiyasu", actual.Name);
             #endregion
         }
 
@@ -242,49 +248,47 @@ insert into {nameof(Customers)} (
 
             CreateTables(con);
 
-            con.Insert(new Product
+            InsertCustomers(con, new Customers
             {
-                Name = "A",
-                Price = 20,
+                CustomerID = Guid.CreateVersion7().ToString(),
+                ContactName = "Tomiyasu",
+                Country = "England",
+                Phone = "123-456-789",
+                City = "London",
             });
-            con.Insert(new Product
+            InsertCustomers(con, new Customers
             {
-                Name = "B",
-                Price = 10,
+                CustomerID = Guid.CreateVersion7().ToString(),
+                ContactName = "Endo",
+                Country = "England",
+                Phone = "123-456-789",
+                City = "Liverpool",
             });
             #endregion
 
             #region Act
-            var provider = new DbQueryProvider(con);
-            var price = 20;
-            var query = new Query<Product>(provider)
+            var city = "London";
+            var db = new Northwind(con);
+            var query = db.Customers
                 .Select(x => new
                 {
-                    Name = x.Name,
-                    Info = new
+                    Name = x.ContactName,
+                    Location = new
                     {
-                        Price = x.Price,
-                        TotalSales = x.TotalSales,
+                        City = x.City,
+                        Country = x.Country,
                     },
                 })
-                .Where(x => x.Info.Price == price);
-            var queryText = provider.GetQueryText(query.Expression);
+                .Where(x => x.Location.City == city);
+            var customers = query.ToList();
             #endregion
 
             #region Assert
-            output.WriteLine(queryText);
+            Assert.NotNull(customers);
+            Assert.Single(customers);
 
-            Assert.Equal(
-                @"SELECT t2.Name, t2.Price, t2.TotalSales
-FROM (
-  SELECT t1.Name, t1.Price, t1.TotalSales
-  FROM (
-    SELECT t0.Name, t0.Price, t0.TotalSales
-    FROM Product AS t0
-  ) AS t1
-) AS t2
-WHERE (t2.Price = 20)",
-                actual: queryText);
+            var actual = customers[0];
+            Assert.Equal("Tomiyasu", actual.Name);
             #endregion
         }
     }
