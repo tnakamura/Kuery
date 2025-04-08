@@ -17,7 +17,7 @@ namespace Kuery.Linq.Expressions
         {
             NodeType = (ExpressionType)DbExpressionType.Select;
             Type = type;
-            Alias = Alias;
+            Alias = alias;
             From = from;
             Where = where;
             Columns = columns as ReadOnlyCollection<ColumnDeclaration>;

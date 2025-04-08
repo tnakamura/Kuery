@@ -10,7 +10,7 @@ namespace Kuery.Linq.Expressions
         {
             NodeType = (ExpressionType)DbExpressionType.Table;
             Type = type;
-            Alias = Alias;
+            Alias = alias;
             Name = name;
         }
 

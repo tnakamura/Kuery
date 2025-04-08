@@ -1,18 +1,15 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using Kuery.Linq;
 using Microsoft.Data.Sqlite;
 using Xunit;
 using Xunit.Abstractions;
-using Xunit.Sdk;
 
 namespace Kuery.Tests.Sqlite
 {
     public class Customers
     {
-        [PrimaryKey]
         public string CustomerID;
         public string ContactName;
         public string Phone;
