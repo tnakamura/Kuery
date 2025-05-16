@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/benchmark/">
+    <Project Path="benchmark/KueryBenchmark/KueryBenchmark.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Kuery/Kuery.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Kuery.Tests/Kuery.Tests.csproj" />
+  </Folder>
+</Solution>
