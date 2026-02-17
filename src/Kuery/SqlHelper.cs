@@ -19,6 +19,11 @@ namespace Kuery
             return new TableQuery<T>(connection, map);
         }
 
+        public static IQueryable<T> Query<T>(this IDbConnection connection)
+        {
+            return connection.Table<T>().AsQueryable();
+        }
+
         public static int Insert<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
         {
             return connection.Insert(typeof(T), item, transaction);
