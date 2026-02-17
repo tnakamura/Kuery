@@ -499,13 +499,12 @@ namespace Kuery
         private static bool TryGetTableQuery<T>(IQueryable<T> query, out TableQuery<T> tableQuery)
         {
             tableQuery = null;
-            if (!(query.Provider is KueryQueryProvider provider))
+            if (!(query.Provider is KueryQueryProvider))
             {
                 return false;
             }
 
-            tableQuery = provider.BuildTableQuery(query.Expression) as TableQuery<T>;
-            return tableQuery != null;
+            return false;
         }
 
         public static async Task<IEnumerable<object>> QueryAsync(
