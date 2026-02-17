@@ -32,7 +32,8 @@ namespace Kuery.Linq
                 case ExpressionType.Not:
                     return "not (" + TranslateCore(((UnaryExpression)expression).Operand, table, dialect, parameters) + ")";
                 default:
-                    throw new NotSupportedException($"Unsupported predicate node: {expression.NodeType}");
+                    throw new NotSupportedException(
+                        $"Unsupported predicate node: {expression.NodeType}. Supported nodes: AndAlso, OrElse, Equal, NotEqual, GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual, Not.");
             }
         }
 
@@ -66,7 +67,7 @@ namespace Kuery.Linq
                 return "(" + left + " " + ToSqlOperator(expressionType) + " " + right + ")";
             }
 
-            throw new NotSupportedException($"Unsupported binary expression: {expression}");
+            throw new NotSupportedException($"Unsupported binary expression: {expression}. At least one side must resolve to a mapped property.");
         }
 
         private static string BuildColumnValueComparison(string columnSql, ExpressionType nodeType, object value, ISqlDialect dialect, List<object> parameters)

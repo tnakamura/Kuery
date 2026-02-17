@@ -83,7 +83,8 @@ namespace Kuery.Linq
                     }
                     break;
                 default:
-                    throw new NotSupportedException($"Unsupported Queryable method: {name}");
+                    throw new NotSupportedException(
+                        $"Unsupported Queryable method: {name}. Supported methods: Where, OrderBy, OrderByDescending, ThenBy, ThenByDescending, Skip, Take, Count, First, FirstOrDefault.");
             }
         }
 
@@ -97,7 +98,7 @@ namespace Kuery.Linq
 
             if (!(body is MemberExpression member) || member.Expression?.NodeType != ExpressionType.Parameter)
             {
-                throw new NotSupportedException($"Unsupported ordering expression: {lambda}");
+                throw new NotSupportedException($"Unsupported ordering expression: {lambda}. Only direct member access is supported.");
             }
 
             var column = model.Table.FindColumnWithPropertyName(member.Member.Name);
