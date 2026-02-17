@@ -21,7 +21,8 @@ namespace Kuery
 
         public static IQueryable<T> Query<T>(this IDbConnection connection)
         {
-            return connection.Table<T>().AsQueryable();
+            var provider = new KueryQueryProvider(connection);
+            return new KueryQueryable<T>(provider);
         }
 
         public static int Insert<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
