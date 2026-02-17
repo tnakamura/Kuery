@@ -21,6 +21,7 @@ namespace Kuery
 
         public static IQueryable<T> Query<T>(this IDbConnection connection)
         {
+            Requires.NotNull(connection, nameof(connection));
             var provider = new KueryQueryProvider(connection);
             return new KueryQueryable<T>(provider);
         }
