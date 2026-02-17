@@ -398,9 +398,9 @@ namespace Kuery
         {
             Requires.NotNull(query, nameof(query));
 
-            if (TryGetTableQuery(query, out var tableQuery))
+            if (TryGetKueryProvider(query, out var provider))
             {
-                return await tableQuery.ToListAsync(cancellationToken).ConfigureAwait(false);
+                return await provider.ExecuteAsync<List<T>>(query.Expression, cancellationToken).ConfigureAwait(false);
             }
 
             return query.ToList();
@@ -412,9 +412,9 @@ namespace Kuery
         {
             Requires.NotNull(query, nameof(query));
 
-            if (TryGetTableQuery(query, out var tableQuery))
+            if (TryGetKueryProvider(query, out var provider))
             {
-                return await tableQuery.CountAsync(cancellationToken).ConfigureAwait(false);
+                return await provider.ExecuteAsync<int>(query.Expression, cancellationToken).ConfigureAwait(false);
             }
 
             return query.Count();
@@ -428,12 +428,7 @@ namespace Kuery
             Requires.NotNull(query, nameof(query));
             Requires.NotNull(predicate, nameof(predicate));
 
-            if (TryGetTableQuery(query, out var tableQuery))
-            {
-                return await tableQuery.Where(predicate).CountAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            return query.Count(predicate);
+            return await query.Where(predicate).CountAsync(cancellationToken).ConfigureAwait(false);
         }
 
         public static async Task<T> FirstAsync<T>(
@@ -442,9 +437,9 @@ namespace Kuery
         {
             Requires.NotNull(query, nameof(query));
 
-            if (TryGetTableQuery(query, out var tableQuery))
+            if (TryGetKueryProvider(query, out var provider))
             {
-                return await tableQuery.FirstAsync(cancellationToken).ConfigureAwait(false);
+                return await provider.ExecuteAsync<T>(query.Expression, cancellationToken).ConfigureAwait(false);
             }
 
             return query.First();
@@ -458,12 +453,7 @@ namespace Kuery
             Requires.NotNull(query, nameof(query));
             Requires.NotNull(predicate, nameof(predicate));
 
-            if (TryGetTableQuery(query, out var tableQuery))
-            {
-                return await tableQuery.Where(predicate).FirstAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            return query.First(predicate);
+            return await query.Where(predicate).FirstAsync(cancellationToken).ConfigureAwait(false);
         }
 
         public static async Task<T> FirstOrDefaultAsync<T>(
@@ -472,9 +462,9 @@ namespace Kuery
         {
             Requires.NotNull(query, nameof(query));
 
-            if (TryGetTableQuery(query, out var tableQuery))
+            if (TryGetKueryProvider(query, out var provider))
             {
-                return await tableQuery.FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+                return await provider.ExecuteAsync<T>(query.Expression, cancellationToken).ConfigureAwait(false);
             }
 
             return query.FirstOrDefault();
@@ -488,23 +478,18 @@ namespace Kuery
             Requires.NotNull(query, nameof(query));
             Requires.NotNull(predicate, nameof(predicate));
 
-            if (TryGetTableQuery(query, out var tableQuery))
-            {
-                return await tableQuery.Where(predicate).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            return query.FirstOrDefault(predicate);
+            return await query.Where(predicate).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        private static bool TryGetTableQuery<T>(IQueryable<T> query, out TableQuery<T> tableQuery)
+        private static bool TryGetKueryProvider<T>(IQueryable<T> query, out KueryQueryProvider provider)
         {
-            tableQuery = null;
-            if (!(query.Provider is KueryQueryProvider))
+            provider = query.Provider as KueryQueryProvider;
+            if (provider == null)
             {
                 return false;
             }
 
-            return false;
+            return true;
         }
 
         public static async Task<IEnumerable<object>> QueryAsync(

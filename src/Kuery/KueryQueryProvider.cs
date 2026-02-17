@@ -2,6 +2,8 @@ using System;
 using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 using Kuery.Linq;
 
 namespace Kuery
@@ -60,6 +62,19 @@ namespace Kuery
         {
             Requires.NotNull(expression, nameof(expression));
             return _executor.ExecuteTerminal(_context, expression);
+        }
+
+        internal async Task<TResult> ExecuteAsync<TResult>(Expression expression, CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(expression, nameof(expression));
+            var result = await _executor.ExecuteAsync(_context, expression, typeof(TResult), cancellationToken).ConfigureAwait(false);
+            return (TResult)result;
+        }
+
+        internal Task<object> ExecuteTerminalAsync(Expression expression, CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(expression, nameof(expression));
+            return _executor.ExecuteTerminalAsync(_context, expression, cancellationToken);
         }
 
         static Type GetElementType(Type sequenceType)
