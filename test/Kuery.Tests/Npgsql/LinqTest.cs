@@ -281,5 +281,25 @@ namespace Kuery.Tests.Npgsql
             Assert.Equal("B", list[0].Name);
             Assert.Equal("A", list[1].Name);
         }
+
+        [Fact]
+        public void QueryEntryPointThrowsForUnsupportedSelect()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateTables(con);
+
+            con.Insert(new Product
+            {
+                Name = "A",
+                Price = 20,
+            });
+
+            Assert.Throws<NotSupportedException>(() =>
+            {
+                var values = con.Query<Product>()
+                    .Select(x => x.Name)
+                    .ToList();
+            });
+        }
     }
 }
