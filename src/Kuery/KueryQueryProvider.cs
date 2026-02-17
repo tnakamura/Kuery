@@ -56,26 +56,33 @@ namespace Kuery
 
         private TResult ExecuteCore<TResult>(Expression expression)
         {
-            object result;
-
-            if (expression is MethodCallExpression methodCall &&
-                methodCall.Method.DeclaringType == typeof(Queryable) &&
-                IsTerminalMethod(methodCall.Method.Name))
+            try
             {
-                var query = BuildTableQuery(methodCall.Arguments[0]);
-                result = ExecuteTerminal(methodCall, query);
-            }
-            else
-            {
-                result = BuildTableQuery(expression);
-            }
+                object result;
 
-            if (result is TResult typed)
-            {
-                return typed;
-            }
+                if (expression is MethodCallExpression methodCall &&
+                    methodCall.Method.DeclaringType == typeof(Queryable) &&
+                    IsTerminalMethod(methodCall.Method.Name))
+                {
+                    var query = BuildTableQuery(methodCall.Arguments[0]);
+                    result = ExecuteTerminal(methodCall, query);
+                }
+                else
+                {
+                    result = BuildTableQuery(expression);
+                }
 
-            return (TResult)Convert.ChangeType(result, typeof(TResult), CultureInfo.InvariantCulture);
+                if (result is TResult typed)
+                {
+                    return typed;
+                }
+
+                return (TResult)Convert.ChangeType(result, typeof(TResult), CultureInfo.InvariantCulture);
+            }
+            catch (NotSupportedException)
+            {
+                return EvaluateOnClient<TResult>(expression);
+            }
         }
 
         internal object ExecuteTerminal(Expression expression)
@@ -98,13 +105,7 @@ namespace Kuery
             {
                 if (constantExpression.Value is IQueryable queryable && queryable.Provider == this)
                 {
-                    var tableQueryType = typeof(TableQuery<>).MakeGenericType(queryable.ElementType);
-                    return Activator.CreateInstance(
-                        tableQueryType,
-                        BindingFlags.Instance | BindingFlags.NonPublic,
-                        binder: null,
-                        args: new object[] { Connection },
-                        culture: CultureInfo.InvariantCulture);
+                    return CreateTableQuery(queryable.ElementType);
                 }
             }
 
@@ -175,6 +176,25 @@ namespace Kuery
             return lambda.Compile().DynamicInvoke();
         }
 
+        private object CreateTableQuery(Type elementType)
+        {
+            var tableQueryType = typeof(TableQuery<>).MakeGenericType(elementType);
+            return Activator.CreateInstance(
+                tableQueryType,
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                binder: null,
+                args: new object[] { Connection },
+                culture: CultureInfo.InvariantCulture);
+        }
+
+        private TResult EvaluateOnClient<TResult>(Expression expression)
+        {
+            var visitor = new ClientFallbackVisitor(this);
+            var rewritten = visitor.Visit(expression);
+            var lambda = Expression.Lambda<Func<TResult>>(Expression.Convert(rewritten, typeof(TResult)));
+            return lambda.Compile().Invoke();
+        }
+
         private static Expression StripQuotes(Expression expression)
         {
             while (expression.NodeType == ExpressionType.Quote)
@@ -243,6 +263,34 @@ namespace Kuery
             }
 
             return method.Invoke(source, new[] { argument });
+        }
+
+        sealed class ClientFallbackVisitor : ExpressionVisitor
+        {
+            private readonly KueryQueryProvider _provider;
+
+            internal ClientFallbackVisitor(KueryQueryProvider provider)
+            {
+                _provider = provider;
+            }
+
+            protected override Expression VisitConstant(ConstantExpression node)
+            {
+                if (node.Value is IQueryable queryable && queryable.Provider == _provider)
+                {
+                    var tableQuery = _provider.CreateTableQuery(queryable.ElementType);
+                    var toList = tableQuery.GetType().GetMethod(nameof(TableQuery<int>.ToList), Type.EmptyTypes);
+                    var enumerable = toList.Invoke(tableQuery, null);
+                    var asQueryable = typeof(Queryable)
+                        .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                        .First(x => x.Name == nameof(Queryable.AsQueryable) && x.IsGenericMethodDefinition)
+                        .MakeGenericMethod(queryable.ElementType);
+                    var inMemoryQueryable = asQueryable.Invoke(null, new[] { enumerable });
+                    return Expression.Constant(inMemoryQueryable, node.Type);
+                }
+
+                return base.VisitConstant(node);
+            }
         }
     }
 }
