@@ -5,9 +5,13 @@ namespace Kuery.Linq
 {
     internal sealed class KueryLinqExecutor : IKueryLinqExecutor
     {
+        readonly QueryableModelTranslator _translator = new QueryableModelTranslator();
+
         public object BuildQueryModel(KueryQueryContext context, Expression expression)
         {
-            throw new NotSupportedException("LINQ query model builder is not implemented yet.");
+            Requires.NotNull(context, nameof(context));
+            Requires.NotNull(expression, nameof(expression));
+            return _translator.Translate(expression);
         }
 
         public object Execute(KueryQueryContext context, Expression expression, Type resultType)
