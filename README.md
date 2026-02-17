@@ -109,6 +109,27 @@ List<Todo> todos = await connection.Table<Todo>()
     .ToListAsync();
 ```
 
+### IQueryable API (`Query<T>()`)
+
+You can also compose SQL `SELECT` queries through LINQ by using `Query<T>()`.
+
+```cs
+var products = await connection.Query<Product>()
+    .Where(p => p.Code == "0001")
+    .OrderBy(p => p.Code)
+    .ToListAsync();
+```
+
+In the current implementation, SQL translation supports:
+
+- `Where`
+- `OrderBy` / `ThenBy`
+- `Skip` / `Take`
+- `Count`
+- `First` / `FirstOrDefault`
+
+Unsupported LINQ operators are evaluated on the client side when possible.
+
 #### Manual SQL
 
 ```cs
