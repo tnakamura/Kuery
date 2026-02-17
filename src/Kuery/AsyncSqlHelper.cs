@@ -392,6 +392,122 @@ namespace Kuery
             }
         }
 
+        public static async Task<List<T>> ToListAsync<T>(
+            this IQueryable<T> query,
+            CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(query, nameof(query));
+
+            if (TryGetTableQuery(query, out var tableQuery))
+            {
+                return await tableQuery.ToListAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            return query.ToList();
+        }
+
+        public static async Task<int> CountAsync<T>(
+            this IQueryable<T> query,
+            CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(query, nameof(query));
+
+            if (TryGetTableQuery(query, out var tableQuery))
+            {
+                return await tableQuery.CountAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            return query.Count();
+        }
+
+        public static async Task<int> CountAsync<T>(
+            this IQueryable<T> query,
+            Expression<Func<T, bool>> predicate,
+            CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(query, nameof(query));
+            Requires.NotNull(predicate, nameof(predicate));
+
+            if (TryGetTableQuery(query, out var tableQuery))
+            {
+                return await tableQuery.Where(predicate).CountAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            return query.Count(predicate);
+        }
+
+        public static async Task<T> FirstAsync<T>(
+            this IQueryable<T> query,
+            CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(query, nameof(query));
+
+            if (TryGetTableQuery(query, out var tableQuery))
+            {
+                return await tableQuery.FirstAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            return query.First();
+        }
+
+        public static async Task<T> FirstAsync<T>(
+            this IQueryable<T> query,
+            Expression<Func<T, bool>> predicate,
+            CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(query, nameof(query));
+            Requires.NotNull(predicate, nameof(predicate));
+
+            if (TryGetTableQuery(query, out var tableQuery))
+            {
+                return await tableQuery.Where(predicate).FirstAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            return query.First(predicate);
+        }
+
+        public static async Task<T> FirstOrDefaultAsync<T>(
+            this IQueryable<T> query,
+            CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(query, nameof(query));
+
+            if (TryGetTableQuery(query, out var tableQuery))
+            {
+                return await tableQuery.FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            return query.FirstOrDefault();
+        }
+
+        public static async Task<T> FirstOrDefaultAsync<T>(
+            this IQueryable<T> query,
+            Expression<Func<T, bool>> predicate,
+            CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(query, nameof(query));
+            Requires.NotNull(predicate, nameof(predicate));
+
+            if (TryGetTableQuery(query, out var tableQuery))
+            {
+                return await tableQuery.Where(predicate).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            return query.FirstOrDefault(predicate);
+        }
+
+        private static bool TryGetTableQuery<T>(IQueryable<T> query, out TableQuery<T> tableQuery)
+        {
+            tableQuery = null;
+            if (!(query.Provider is KueryQueryProvider provider))
+            {
+                return false;
+            }
+
+            tableQuery = provider.BuildTableQuery(query.Expression) as TableQuery<T>;
+            return tableQuery != null;
+        }
+
         public static async Task<IEnumerable<object>> QueryAsync(
             this DbConnection connection,
             Type type,
