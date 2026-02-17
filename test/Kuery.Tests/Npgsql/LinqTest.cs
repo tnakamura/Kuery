@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Kuery.Tests.Npgsql
@@ -242,6 +243,43 @@ namespace Kuery.Tests.Npgsql
 
             Assert.Equal(2, cl.Id);
             Assert.Equal("I am B O B", cl.Name);
+        }
+
+        [Fact]
+        public async Task QueryEntryPointSupportsQueryableOperators()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateTables(con);
+
+            con.Insert(new Product
+            {
+                Name = "A",
+                Price = 20,
+            });
+
+            con.Insert(new Product
+            {
+                Name = "B",
+                Price = 10,
+            });
+
+            con.Insert(new Product
+            {
+                Name = "C",
+                Price = 5,
+            });
+
+            var query = con.Query<Product>()
+                .Where(p => p.Price >= 10)
+                .OrderBy(p => p.Price);
+
+            Assert.Equal(2, query.Count());
+            Assert.Equal("B", query.First().Name);
+
+            var list = await query.ToListAsync();
+            Assert.Equal(2, list.Count);
+            Assert.Equal("B", list[0].Name);
+            Assert.Equal("A", list[1].Name);
         }
     }
 }
