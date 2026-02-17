@@ -128,7 +128,7 @@ In the current implementation, SQL translation supports:
 - `Count`
 - `First` / `FirstOrDefault`
 
-Unsupported LINQ operators are evaluated on the client side when possible.
+Unsupported LINQ operators throw `NotSupportedException`.
 
 #### Manual SQL
 
