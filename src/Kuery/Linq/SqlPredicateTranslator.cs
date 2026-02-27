@@ -204,6 +204,70 @@ namespace Kuery.Linq
                         return "replace(" + inner + ", '" + oldVal?.ToString()?.Replace("'", "''") + "', '" + newVal?.ToString()?.Replace("'", "''") + "')";
                     }
                 }
+                if (innerCall.Method.Name == nameof(string.Trim) && innerCall.Arguments.Count == 0)
+                {
+                    var inner = TranslateToColumnSql(innerCall.Object, table, dialect, parameters);
+                    if (inner != null) return "trim(" + inner + ")";
+                }
+                if (innerCall.Method.Name == nameof(string.TrimStart) && innerCall.Arguments.Count == 0)
+                {
+                    var inner = TranslateToColumnSql(innerCall.Object, table, dialect, parameters);
+                    if (inner != null) return "ltrim(" + inner + ")";
+                }
+                if (innerCall.Method.Name == nameof(string.TrimEnd) && innerCall.Arguments.Count == 0)
+                {
+                    var inner = TranslateToColumnSql(innerCall.Object, table, dialect, parameters);
+                    if (inner != null) return "rtrim(" + inner + ")";
+                }
+                if (innerCall.Method.Name == nameof(string.Substring) && innerCall.Object != null)
+                {
+                    var inner = TranslateToColumnSql(innerCall.Object, table, dialect, parameters);
+                    if (inner != null)
+                    {
+                        if (innerCall.Arguments.Count == 1)
+                        {
+                            var startIndex = EvaluateExpression(innerCall.Arguments[0]);
+                            var start = Convert.ToInt32(startIndex) + 1;
+                            if (dialect.Kind == SqlDialectKind.SqlServer)
+                            {
+                                return "SUBSTRING(" + inner + ", " + start + ", LEN(" + inner + "))";
+                            }
+                            return "substr(" + inner + ", " + start + ")";
+                        }
+                        if (innerCall.Arguments.Count == 2)
+                        {
+                            var startIndex = EvaluateExpression(innerCall.Arguments[0]);
+                            var length = EvaluateExpression(innerCall.Arguments[1]);
+                            var start = Convert.ToInt32(startIndex) + 1;
+                            if (dialect.Kind == SqlDialectKind.SqlServer)
+                            {
+                                return "SUBSTRING(" + inner + ", " + start + ", " + length + ")";
+                            }
+                            return "substr(" + inner + ", " + start + ", " + length + ")";
+                        }
+                    }
+                }
+            }
+
+            // Handle string.Length property
+            if (expression is MemberExpression memberExpr
+                && memberExpr.Member.Name == nameof(string.Length)
+                && memberExpr.Member.DeclaringType == typeof(string)
+                && memberExpr.Expression != null)
+            {
+                var inner = TranslateToColumnSql(memberExpr.Expression, table, dialect, parameters);
+                if (inner == null && TryGetColumnExpression(memberExpr.Expression, table, dialect, out var colSql))
+                {
+                    inner = colSql;
+                }
+                if (inner != null)
+                {
+                    if (dialect.Kind == SqlDialectKind.SqlServer)
+                    {
+                        return "LEN(" + inner + ")";
+                    }
+                    return "length(" + inner + ")";
+                }
             }
 
             if (TryGetColumnExpression(expression, table, dialect, out var columnSql))
@@ -320,6 +384,12 @@ namespace Kuery.Linq
                 return TryTranslateArithmeticSql(unary.Operand, table, dialect, parameters);
             }
 
+            if (expression is UnaryExpression negate && negate.NodeType == ExpressionType.Negate)
+            {
+                var operand = TryTranslateArithmeticSql(negate.Operand, table, dialect, parameters);
+                if (operand != null) return "(-" + operand + ")";
+            }
+
             if (TryGetColumnExpression(expression, table, dialect, out var columnSql))
             {
                 return columnSql;
@@ -376,7 +446,8 @@ namespace Kuery.Linq
                     leftColumn = leftTransformed;
                     leftIsColumn = true;
                 }
-                else if (expression.Left is BinaryExpression leftBin && IsArithmeticOperator(leftBin.NodeType))
+                else if (expression.Left is BinaryExpression leftBin && IsArithmeticOperator(leftBin.NodeType)
+                    || expression.Left is UnaryExpression leftUn && leftUn.NodeType == ExpressionType.Negate)
                 {
                     var arith = TryTranslateArithmeticSql(expression.Left, table, dialect, parameters);
                     if (arith != null)
@@ -394,7 +465,8 @@ namespace Kuery.Linq
                     rightColumn = rightTransformed;
                     rightIsColumn = true;
                 }
-                else if (expression.Right is BinaryExpression rightBin && IsArithmeticOperator(rightBin.NodeType))
+                else if (expression.Right is BinaryExpression rightBin && IsArithmeticOperator(rightBin.NodeType)
+                    || expression.Right is UnaryExpression rightUn && rightUn.NodeType == ExpressionType.Negate)
                 {
                     var arith = TryTranslateArithmeticSql(expression.Right, table, dialect, parameters);
                     if (arith != null)
