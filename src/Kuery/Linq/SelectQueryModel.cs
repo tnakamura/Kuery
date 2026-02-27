@@ -11,6 +11,7 @@ namespace Kuery.Linq
         Count,
         LongCount,
         Any,
+        All,
         First,
         FirstOrDefault,
         Last,
@@ -62,6 +63,13 @@ namespace Kuery.Linq
         internal QueryTerminalKind Terminal { get; private set; }
 
         internal LambdaExpression AggregateSelector { get; private set; }
+
+        internal Expression AllPredicate { get; private set; }
+
+        internal void SetAllPredicate(Expression predicate)
+        {
+            AllPredicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
+        }
 
         internal void SetAggregateSelector(LambdaExpression selector)
         {

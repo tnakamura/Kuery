@@ -27,7 +27,8 @@ namespace Kuery.Linq
             }
 
             sql.Append("select ");
-            if (model.Terminal == QueryTerminalKind.Count || model.Terminal == QueryTerminalKind.LongCount || model.Terminal == QueryTerminalKind.Any)
+            if (model.Terminal == QueryTerminalKind.Count || model.Terminal == QueryTerminalKind.LongCount
+                || model.Terminal == QueryTerminalKind.Any || model.Terminal == QueryTerminalKind.All)
             {
                 sql.Append("count(*)");
             }
@@ -75,7 +76,16 @@ namespace Kuery.Linq
             sql.Append(" from ");
             sql.Append(dialect.EscapeIdentifier(model.Table.TableName));
 
-            if (model.Predicate != null)
+            if (model.Terminal == QueryTerminalKind.All && model.AllPredicate != null)
+            {
+                var negated = Expression.Not(model.AllPredicate);
+                var allWhere = model.Predicate != null
+                    ? Expression.AndAlso(model.Predicate, negated)
+                    : (Expression)negated;
+                sql.Append(" where ");
+                sql.Append(_predicateTranslator.Translate(allWhere, model.Table, dialect, parameters));
+            }
+            else if (model.Predicate != null)
             {
                 sql.Append(" where ");
                 sql.Append(_predicateTranslator.Translate(model.Predicate, model.Table, dialect, parameters));

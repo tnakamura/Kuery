@@ -83,6 +83,10 @@ namespace Kuery.Linq
                         model.AddPredicate(GetLambda(methodCall.Arguments[1]).Body);
                     }
                     break;
+                case nameof(Queryable.All):
+                    model.SetTerminal(QueryTerminalKind.All);
+                    model.SetAllPredicate(GetLambda(methodCall.Arguments[1]).Body);
+                    break;
                 case nameof(Queryable.First):
                     model.SetTerminal(QueryTerminalKind.First);
                     if (methodCall.Arguments.Count == 2)
