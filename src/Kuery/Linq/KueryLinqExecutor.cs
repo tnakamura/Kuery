@@ -64,10 +64,19 @@ namespace Kuery.Linq
                 {
                     case QueryTerminalKind.Count:
                         return ExecuteCount(command);
+                    case QueryTerminalKind.Sum:
+                    case QueryTerminalKind.Min:
+                    case QueryTerminalKind.Max:
+                    case QueryTerminalKind.Average:
+                        return ExecuteAggregate(command, resultType);
                     case QueryTerminalKind.First:
                         return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: true);
                     case QueryTerminalKind.FirstOrDefault:
                         return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: false);
+                    case QueryTerminalKind.Single:
+                        return ExecuteSingle(command, model.Table, model.Projection, throwIfEmpty: true);
+                    case QueryTerminalKind.SingleOrDefault:
+                        return ExecuteSingle(command, model.Table, model.Projection, throwIfEmpty: false);
                     case QueryTerminalKind.Sequence:
                     default:
                         return ExecuteSequence(command, model.Table, model.Projection, resultType);
@@ -88,10 +97,19 @@ namespace Kuery.Linq
                 {
                     case QueryTerminalKind.Count:
                         return await ExecuteCountAsync(command, cancellationToken).ConfigureAwait(false);
+                    case QueryTerminalKind.Sum:
+                    case QueryTerminalKind.Min:
+                    case QueryTerminalKind.Max:
+                    case QueryTerminalKind.Average:
+                        return await ExecuteAggregateAsync(command, resultType, cancellationToken).ConfigureAwait(false);
                     case QueryTerminalKind.First:
                         return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
                     case QueryTerminalKind.FirstOrDefault:
                         return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: false, cancellationToken).ConfigureAwait(false);
+                    case QueryTerminalKind.Single:
+                        return await ExecuteSingleAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
+                    case QueryTerminalKind.SingleOrDefault:
+                        return await ExecuteSingleAsync(command, model.Table, model.Projection, throwIfEmpty: false, cancellationToken).ConfigureAwait(false);
                     case QueryTerminalKind.Sequence:
                     default:
                         return await ExecuteSequenceAsync(command, model.Table, model.Projection, resultType, cancellationToken).ConfigureAwait(false);
@@ -259,6 +277,94 @@ namespace Kuery.Linq
             }
 
             return typedList;
+        }
+
+        private static object ExecuteSingle(IDbCommand command, TableMapping table, LambdaExpression projection, bool throwIfEmpty)
+        {
+            var method = typeof(SqlHelper)
+                .GetMethod(nameof(SqlHelper.ExecuteQuery), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+                .MakeGenericMethod(table.MappedType);
+            var list = ((IEnumerable)method.Invoke(null, new object[] { command, table })).Cast<object>().ToList();
+
+            if (list.Count > 1)
+            {
+                throw new InvalidOperationException("Sequence contains more than one element");
+            }
+
+            var item = list.Count == 1 ? list[0] : null;
+            if (item == null && throwIfEmpty)
+            {
+                throw new InvalidOperationException("Sequence contains no elements");
+            }
+
+            if (item != null && projection != null)
+            {
+                var compiled = projection.Compile();
+                return compiled.DynamicInvoke(item);
+            }
+
+            return item;
+        }
+
+        private static async Task<object> ExecuteSingleAsync(IDbCommand command, TableMapping table, LambdaExpression projection, bool throwIfEmpty, CancellationToken cancellationToken)
+        {
+            var method = typeof(SqlHelper)
+                .GetMethod("ExecuteQueryAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+                .MakeGenericMethod(table.MappedType);
+            var task = (Task)method.Invoke(null, new object[] { command, table, cancellationToken });
+            await task.ConfigureAwait(false);
+            var list = ((IEnumerable)task.GetType().GetProperty("Result").GetValue(task)).Cast<object>().ToList();
+
+            if (list.Count > 1)
+            {
+                throw new InvalidOperationException("Sequence contains more than one element");
+            }
+
+            var item = list.Count == 1 ? list[0] : null;
+            if (item == null && throwIfEmpty)
+            {
+                throw new InvalidOperationException("Sequence contains no elements");
+            }
+
+            if (item != null && projection != null)
+            {
+                var compiled = projection.Compile();
+                return compiled.DynamicInvoke(item);
+            }
+
+            return item;
+        }
+
+        private static object ExecuteAggregate(IDbCommand command, Type resultType)
+        {
+            var result = command.ExecuteScalar();
+            return ConvertScalar(result, resultType);
+        }
+
+        private static async Task<object> ExecuteAggregateAsync(IDbCommand command, Type resultType, CancellationToken cancellationToken)
+        {
+            var result = await command.TryExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            return ConvertScalar(result, resultType);
+        }
+
+        private static object ConvertScalar(object result, Type resultType)
+        {
+            if (result is null || result is DBNull)
+            {
+                if (resultType.IsValueType)
+                {
+                    return Activator.CreateInstance(resultType);
+                }
+                return null;
+            }
+
+            var targetType = resultType;
+            if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                targetType = targetType.GetGenericArguments()[0];
+            }
+
+            return Convert.ChangeType(result, targetType);
         }
     }
 }

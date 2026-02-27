@@ -86,9 +86,54 @@ namespace Kuery.Linq
                 case nameof(Queryable.Select):
                     ApplySelect(model, GetLambda(methodCall.Arguments[1]));
                     break;
+                case nameof(Queryable.Distinct):
+                    model.IsDistinct = true;
+                    break;
+                case nameof(Queryable.Single):
+                    model.SetTerminal(QueryTerminalKind.Single);
+                    if (methodCall.Arguments.Count == 2)
+                    {
+                        model.AddPredicate(GetLambda(methodCall.Arguments[1]).Body);
+                    }
+                    break;
+                case nameof(Queryable.SingleOrDefault):
+                    model.SetTerminal(QueryTerminalKind.SingleOrDefault);
+                    if (methodCall.Arguments.Count == 2)
+                    {
+                        model.AddPredicate(GetLambda(methodCall.Arguments[1]).Body);
+                    }
+                    break;
+                case nameof(Queryable.Sum):
+                    model.SetTerminal(QueryTerminalKind.Sum);
+                    if (methodCall.Arguments.Count == 2)
+                    {
+                        model.SetAggregateSelector(GetLambda(methodCall.Arguments[1]));
+                    }
+                    break;
+                case nameof(Queryable.Min):
+                    model.SetTerminal(QueryTerminalKind.Min);
+                    if (methodCall.Arguments.Count == 2)
+                    {
+                        model.SetAggregateSelector(GetLambda(methodCall.Arguments[1]));
+                    }
+                    break;
+                case nameof(Queryable.Max):
+                    model.SetTerminal(QueryTerminalKind.Max);
+                    if (methodCall.Arguments.Count == 2)
+                    {
+                        model.SetAggregateSelector(GetLambda(methodCall.Arguments[1]));
+                    }
+                    break;
+                case nameof(Queryable.Average):
+                    model.SetTerminal(QueryTerminalKind.Average);
+                    if (methodCall.Arguments.Count == 2)
+                    {
+                        model.SetAggregateSelector(GetLambda(methodCall.Arguments[1]));
+                    }
+                    break;
                 default:
                     throw new NotSupportedException(
-                        $"Unsupported Queryable method: {name}. Supported methods: Where, OrderBy, OrderByDescending, ThenBy, ThenByDescending, Skip, Take, Count, First, FirstOrDefault, Select.");
+                        $"Unsupported Queryable method: {name}.");
             }
         }
 

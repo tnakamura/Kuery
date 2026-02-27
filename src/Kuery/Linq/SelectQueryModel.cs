@@ -11,6 +11,12 @@ namespace Kuery.Linq
         Count,
         First,
         FirstOrDefault,
+        Single,
+        SingleOrDefault,
+        Sum,
+        Min,
+        Max,
+        Average,
     }
 
     internal sealed class QueryOrdering
@@ -45,7 +51,16 @@ namespace Kuery.Linq
 
         internal int? Take { get; set; }
 
+        internal bool IsDistinct { get; set; }
+
         internal QueryTerminalKind Terminal { get; private set; }
+
+        internal LambdaExpression AggregateSelector { get; private set; }
+
+        internal void SetAggregateSelector(LambdaExpression selector)
+        {
+            AggregateSelector = selector;
+        }
 
         internal LambdaExpression Projection { get; private set; }
 

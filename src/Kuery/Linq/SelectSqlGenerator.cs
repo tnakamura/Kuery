@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Text;
 
 namespace Kuery.Linq
@@ -17,15 +18,26 @@ namespace Kuery.Linq
             var sql = new StringBuilder();
 
             var effectiveTake = model.Take;
-            if ((model.Terminal == QueryTerminalKind.First || model.Terminal == QueryTerminalKind.FirstOrDefault) && !effectiveTake.HasValue)
+            if ((model.Terminal == QueryTerminalKind.First || model.Terminal == QueryTerminalKind.FirstOrDefault
+                || model.Terminal == QueryTerminalKind.Single || model.Terminal == QueryTerminalKind.SingleOrDefault) && !effectiveTake.HasValue)
             {
-                effectiveTake = 1;
+                effectiveTake = model.Terminal == QueryTerminalKind.Single || model.Terminal == QueryTerminalKind.SingleOrDefault ? 2 : 1;
             }
 
             sql.Append("select ");
             if (model.Terminal == QueryTerminalKind.Count)
             {
                 sql.Append("count(*)");
+            }
+            else if (model.Terminal == QueryTerminalKind.Sum || model.Terminal == QueryTerminalKind.Min
+                || model.Terminal == QueryTerminalKind.Max || model.Terminal == QueryTerminalKind.Average)
+            {
+                var funcName = model.Terminal == QueryTerminalKind.Average ? "avg" : model.Terminal.ToString().ToLower();
+                var columnExpr = GetAggregateColumn(model, dialect);
+                sql.Append(funcName);
+                sql.Append("(");
+                sql.Append(columnExpr);
+                sql.Append(")");
             }
             else
             {
@@ -34,6 +46,11 @@ namespace Kuery.Linq
                     sql.Append("TOP (");
                     sql.Append(effectiveTake.Value);
                     sql.Append(") ");
+                }
+
+                if (model.IsDistinct)
+                {
+                    sql.Append("distinct ");
                 }
 
                 if (model.ProjectedColumns != null && model.ProjectedColumns.Count > 0)
@@ -140,6 +157,36 @@ namespace Kuery.Linq
                 sql.Append(" offset ");
                 sql.Append(model.Skip.Value);
             }
+        }
+
+        private static string GetAggregateColumn(SelectQueryModel model, ISqlDialect dialect)
+        {
+            if (model.AggregateSelector != null)
+            {
+                var body = model.AggregateSelector.Body;
+                if (body is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+                {
+                    body = unary.Operand;
+                }
+
+                if (body is MemberExpression member && member.Expression?.NodeType == ExpressionType.Parameter)
+                {
+                    var col = model.Table.FindColumnWithPropertyName(member.Member.Name);
+                    if (col != null)
+                    {
+                        return dialect.EscapeIdentifier(col.Name);
+                    }
+                }
+
+                throw new NotSupportedException($"Unsupported aggregate selector: {model.AggregateSelector}. Only direct member access is supported.");
+            }
+
+            if (model.ProjectedColumns != null && model.ProjectedColumns.Count == 1)
+            {
+                return dialect.EscapeIdentifier(model.ProjectedColumns[0].SourceColumn.Name);
+            }
+
+            return "*";
         }
     }
 }

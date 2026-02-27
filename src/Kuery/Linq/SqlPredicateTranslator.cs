@@ -1,6 +1,9 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
+using System.Text;
 
 namespace Kuery.Linq
 {
@@ -31,10 +34,191 @@ namespace Kuery.Linq
                     return TranslateBinary((BinaryExpression)expression, table, dialect, parameters);
                 case ExpressionType.Not:
                     return "not (" + TranslateCore(((UnaryExpression)expression).Operand, table, dialect, parameters) + ")";
+                case ExpressionType.Call:
+                    return TranslateMethodCall((MethodCallExpression)expression, table, dialect, parameters);
                 default:
                     throw new NotSupportedException(
-                        $"Unsupported predicate node: {expression.NodeType}. Supported nodes: AndAlso, OrElse, Equal, NotEqual, GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual, Not.");
+                        $"Unsupported predicate node: {expression.NodeType}.");
             }
+        }
+
+        private static string TranslateMethodCall(MethodCallExpression call, TableMapping table, ISqlDialect dialect, List<object> parameters)
+        {
+            var methodName = call.Method.Name;
+
+            // string.Contains(value)
+            if (methodName == nameof(string.Contains) && call.Object != null && call.Object.Type == typeof(string) && call.Arguments.Count == 1)
+            {
+                var columnSql = TranslateToColumnSql(call.Object, table, dialect);
+                if (columnSql != null)
+                {
+                    var value = EvaluateExpression(call.Arguments[0]);
+                    var paramName = AddParameter(dialect, parameters, value);
+                    return BuildStringContains(columnSql, paramName, dialect);
+                }
+            }
+
+            // string.StartsWith(value) / string.StartsWith(value, StringComparison)
+            if (methodName == nameof(string.StartsWith) && call.Object != null && call.Arguments.Count >= 1)
+            {
+                var columnSql = TranslateToColumnSql(call.Object, table, dialect);
+                if (columnSql != null)
+                {
+                    var value = EvaluateExpression(call.Arguments[0]);
+                    var paramName = AddParameter(dialect, parameters, value);
+                    var comparison = call.Arguments.Count == 2
+                        ? (StringComparison)EvaluateExpression(call.Arguments[1])
+                        : StringComparison.CurrentCulture;
+                    return BuildStartsWith(columnSql, paramName, value?.ToString()?.Length ?? 0, comparison, dialect);
+                }
+            }
+
+            // string.EndsWith(value) / string.EndsWith(value, StringComparison)
+            if (methodName == nameof(string.EndsWith) && call.Object != null && call.Arguments.Count >= 1)
+            {
+                var columnSql = TranslateToColumnSql(call.Object, table, dialect);
+                if (columnSql != null)
+                {
+                    var value = EvaluateExpression(call.Arguments[0]);
+                    var paramName = AddParameter(dialect, parameters, value);
+                    var comparison = call.Arguments.Count == 2
+                        ? (StringComparison)EvaluateExpression(call.Arguments[1])
+                        : StringComparison.CurrentCulture;
+                    return BuildEndsWith(columnSql, paramName, value?.ToString()?.Length ?? 0, comparison, dialect);
+                }
+            }
+
+            // Enumerable.Contains(source, value) or span-based Contains - static 2-arg form
+            if (methodName == nameof(Enumerable.Contains) && call.Object == null && call.Arguments.Count == 2)
+            {
+                if (TryGetColumnExpression(call.Arguments[1], table, dialect, out var columnSql))
+                {
+                    var collection = EvaluateCollectionExpression(call.Arguments[0]);
+                    return BuildInClause(columnSql, (IEnumerable)collection, dialect, parameters);
+                }
+            }
+
+            // collection.Contains(value) - instance 1-arg form
+            if (methodName == nameof(Enumerable.Contains) && call.Object != null && call.Arguments.Count == 1)
+            {
+                // string.Contains is handled above; this handles IEnumerable<T>.Contains
+                if (call.Object.Type != typeof(string) && TryGetColumnExpression(call.Arguments[0], table, dialect, out var columnSql))
+                {
+                    var collection = EvaluateExpression(call.Object);
+                    return BuildInClause(columnSql, (IEnumerable)collection, dialect, parameters);
+                }
+            }
+
+            throw new NotSupportedException($"Unsupported method call: {call.Method.DeclaringType?.Name}.{methodName}.");
+        }
+
+        private static string TranslateToColumnSql(Expression expression, TableMapping table, ISqlDialect dialect)
+        {
+            // Handle x.Prop.ToLower() / x.Prop.ToUpper() wrapping
+            if (expression is MethodCallExpression innerCall && innerCall.Object != null)
+            {
+                if (innerCall.Method.Name == nameof(string.ToLower) && innerCall.Arguments.Count == 0)
+                {
+                    var inner = TranslateToColumnSql(innerCall.Object, table, dialect);
+                    if (inner != null) return "lower(" + inner + ")";
+                }
+                if (innerCall.Method.Name == nameof(string.ToUpper) && innerCall.Arguments.Count == 0)
+                {
+                    var inner = TranslateToColumnSql(innerCall.Object, table, dialect);
+                    if (inner != null) return "upper(" + inner + ")";
+                }
+            }
+
+            if (TryGetColumnExpression(expression, table, dialect, out var columnSql))
+            {
+                return columnSql;
+            }
+
+            return null;
+        }
+
+        private static string BuildStringContains(string columnSql, string paramName, ISqlDialect dialect)
+        {
+            if (dialect.Kind == SqlDialectKind.SqlServer)
+            {
+                return "(CHARINDEX(" + paramName + ", " + columnSql + ") > 0)";
+            }
+            if (dialect.Kind == SqlDialectKind.PostgreSql)
+            {
+                return "(strpos(" + columnSql + ", " + paramName + ") > 0)";
+            }
+            return "(instr(" + columnSql + ", " + paramName + ") > 0)";
+        }
+
+        private static string BuildStartsWith(string columnSql, string paramName, int valueLength, StringComparison comparison, ISqlDialect dialect)
+        {
+            switch (comparison)
+            {
+                case StringComparison.Ordinal:
+                case StringComparison.CurrentCulture:
+                    if (dialect.Kind == SqlDialectKind.SqlServer)
+                    {
+                        return "(SUBSTRING(" + columnSql + ", 1, " + valueLength + ") = " + paramName + ")";
+                    }
+                    return "(substr(" + columnSql + ", 1, " + valueLength + ") = " + paramName + ")";
+                case StringComparison.OrdinalIgnoreCase:
+                case StringComparison.CurrentCultureIgnoreCase:
+                    if (dialect.Kind == SqlDialectKind.SqlServer)
+                    {
+                        return "(" + columnSql + " like (" + paramName + " + N'%'))";
+                    }
+                    return "(" + columnSql + " like (" + paramName + " || '%'))";
+                default:
+                    throw new NotSupportedException($"Unsupported StringComparison: {comparison}");
+            }
+        }
+
+        private static string BuildEndsWith(string columnSql, string paramName, int valueLength, StringComparison comparison, ISqlDialect dialect)
+        {
+            switch (comparison)
+            {
+                case StringComparison.Ordinal:
+                case StringComparison.CurrentCulture:
+                    if (dialect.Kind == SqlDialectKind.SqlServer)
+                    {
+                        return "(SUBSTRING(" + columnSql + ", LEN(" + columnSql + ") - " + valueLength + " + 1, " + valueLength + ") = " + paramName + ")";
+                    }
+                    return "(substr(" + columnSql + ", length(" + columnSql + ") - " + valueLength + " + 1, " + valueLength + ") = " + paramName + ")";
+                case StringComparison.OrdinalIgnoreCase:
+                case StringComparison.CurrentCultureIgnoreCase:
+                    if (dialect.Kind == SqlDialectKind.SqlServer)
+                    {
+                        return "(" + columnSql + " like (N'%' + " + paramName + "))";
+                    }
+                    return "(" + columnSql + " like ('%' || " + paramName + "))";
+                default:
+                    throw new NotSupportedException($"Unsupported StringComparison: {comparison}");
+            }
+        }
+
+        private static string BuildInClause(string columnSql, IEnumerable collection, ISqlDialect dialect, List<object> parameters)
+        {
+            var sb = new StringBuilder();
+            sb.Append("(");
+            sb.Append(columnSql);
+            sb.Append(" in (");
+            var first = true;
+            foreach (var item in collection)
+            {
+                if (!first) sb.Append(", ");
+                sb.Append(AddParameter(dialect, parameters, item));
+                first = false;
+            }
+            sb.Append("))");
+            return sb.ToString();
+        }
+
+        private static string AddParameter(ISqlDialect dialect, List<object> parameters, object value)
+        {
+            var paramBaseName = "p" + (parameters.Count + 1).ToString();
+            var parameterName = dialect.FormatParameterName(paramBaseName);
+            parameters.Add(value);
+            return parameterName;
         }
 
         private static string TranslateBinary(BinaryExpression expression, TableMapping table, ISqlDialect dialect, List<object> parameters)
@@ -87,9 +271,7 @@ namespace Kuery.Linq
                 throw new NotSupportedException($"Null comparison is not supported for operator: {nodeType}");
             }
 
-            var paramBaseName = "p" + (parameters.Count + 1).ToString();
-            var parameterName = dialect.FormatParameterName(paramBaseName);
-            parameters.Add(value);
+            var parameterName = AddParameter(dialect, parameters, value);
             return "(" + columnSql + " " + ToSqlOperator(nodeType) + " " + parameterName + ")";
         }
 
@@ -114,10 +296,68 @@ namespace Kuery.Linq
             return false;
         }
 
+        private static object EvaluateCollectionExpression(Expression expression)
+        {
+            // In .NET 10+, the C# compiler may resolve array.Contains() to a
+            // ReadOnlySpan<T>-based overload, wrapping the array in a method call
+            // that returns ReadOnlySpan<T>. Expression trees cannot compile ref structs,
+            // so we unwrap the conversion to get the underlying array/collection.
+            if (expression is MethodCallExpression methodCall)
+            {
+                if (methodCall.Arguments.Count > 0)
+                {
+                    return EvaluateCollectionExpression(methodCall.Arguments[0]);
+                }
+                if (methodCall.Object != null)
+                {
+                    return EvaluateCollectionExpression(methodCall.Object);
+                }
+            }
+
+            return EvaluateExpression(expression);
+        }
+
         private static object EvaluateExpression(Expression expression)
         {
+            switch (expression)
+            {
+                case ConstantExpression constant:
+                    return constant.Value;
+                case MemberExpression member when member.Expression != null:
+                    var obj = EvaluateExpression(member.Expression);
+                    if (member.Member is System.Reflection.FieldInfo field)
+                        return field.GetValue(obj);
+                    if (member.Member is System.Reflection.PropertyInfo prop)
+                        return prop.GetValue(obj);
+                    break;
+                case UnaryExpression unary when unary.NodeType == ExpressionType.Convert:
+                    return EvaluateExpression(unary.Operand);
+                case NewArrayExpression newArray:
+                    var elementType = newArray.Type.GetElementType();
+                    var array = Array.CreateInstance(elementType, newArray.Expressions.Count);
+                    for (var i = 0; i < newArray.Expressions.Count; i++)
+                    {
+                        array.SetValue(EvaluateExpression(newArray.Expressions[i]), i);
+                    }
+                    return array;
+            }
+
+            // Generic fallback: compile with interpretation if available
             var lambda = Expression.Lambda(expression);
-            return lambda.Compile().DynamicInvoke();
+            var compileWithInterp = typeof(LambdaExpression).GetMethod(
+                "Compile", new[] { typeof(bool) });
+            Delegate compiled;
+            if (compileWithInterp != null)
+            {
+                compiled = (Delegate)compileWithInterp.Invoke(
+                    lambda, new object[] { true });
+            }
+            else
+            {
+                compiled = lambda.Compile();
+            }
+            var invokeMethod = compiled.GetType().GetMethod("Invoke");
+            return invokeMethod.Invoke(compiled, null);
         }
 
         private static string ToSqlOperator(ExpressionType expressionType)
