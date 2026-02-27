@@ -38,13 +38,40 @@ namespace Kuery.Linq
                 case ExpressionType.Modulo:
                     return TranslateBinary((BinaryExpression)expression, table, dialect, parameters);
                 case ExpressionType.Not:
-                    return "not (" + TranslateCore(((UnaryExpression)expression).Operand, table, dialect, parameters) + ")";
+                    {
+                        var operand = ((UnaryExpression)expression).Operand;
+                        // !Nullable<T>.HasValue → IS NULL
+                        if (operand is MemberExpression notHasValue
+                            && notHasValue.Member.Name == "HasValue"
+                            && notHasValue.Expression != null
+                            && Nullable.GetUnderlyingType(notHasValue.Expression.Type) != null)
+                        {
+                            if (TryGetColumnExpression(notHasValue.Expression, table, dialect, out var nullableIsNullSql))
+                            {
+                                return "(" + nullableIsNullSql + " is null)";
+                            }
+                        }
+                        return "not (" + TranslateCore(operand, table, dialect, parameters) + ")";
+                    }
                 case ExpressionType.Call:
                     return TranslateMethodCall((MethodCallExpression)expression, table, dialect, parameters);
+                case ExpressionType.Conditional:
+                    return TranslateConditional((ConditionalExpression)expression, table, dialect, parameters);
                 case ExpressionType.MemberAccess:
                     if (TryGetColumnExpression(expression, table, dialect, out var boolColumnSql))
                     {
                         return "(" + boolColumnSql + " = 1)";
+                    }
+                    // Nullable<T>.HasValue → IS NOT NULL
+                    if (expression is MemberExpression hasValueMember
+                        && hasValueMember.Member.Name == "HasValue"
+                        && hasValueMember.Expression != null
+                        && Nullable.GetUnderlyingType(hasValueMember.Expression.Type) != null)
+                    {
+                        if (TryGetColumnExpression(hasValueMember.Expression, table, dialect, out var nullableColSql))
+                        {
+                            return "(" + nullableColSql + " is not null)";
+                        }
                     }
                     goto default;
                 default:
@@ -165,7 +192,63 @@ namespace Kuery.Linq
                 }
             }
 
+            // string.IndexOf(value)
+            if (methodName == nameof(string.IndexOf) && call.Object != null && call.Arguments.Count == 1
+                && call.Object.Type == typeof(string))
+            {
+                var columnSql = TranslateToColumnSql(call.Object, table, dialect, parameters);
+                if (columnSql != null)
+                {
+                    var value = EvaluateExpression(call.Arguments[0]);
+                    var paramName = AddParameter(dialect, parameters, value);
+                    return BuildIndexOf(columnSql, paramName, dialect);
+                }
+            }
+
+            // Math.Abs(value)
+            if (methodName == nameof(Math.Abs) && call.Object == null && call.Arguments.Count == 1
+                && call.Method.DeclaringType == typeof(Math))
+            {
+                var inner = TranslateToColumnSql(call.Arguments[0], table, dialect, parameters);
+                if (inner == null)
+                {
+                    inner = TryTranslateArithmeticSql(call.Arguments[0], table, dialect, parameters);
+                }
+                if (inner != null)
+                {
+                    return "abs(" + inner + ")";
+                }
+            }
+
             throw new NotSupportedException($"Unsupported method call: {call.Method.DeclaringType?.Name}.{methodName}.");
+        }
+
+        private static string TranslateConditional(ConditionalExpression expression, TableMapping table, ISqlDialect dialect, List<object> parameters)
+        {
+            var test = TranslateCore(expression.Test, table, dialect, parameters);
+            var ifTrue = TranslateColumnOrValue(expression.IfTrue, table, dialect, parameters);
+            var ifFalse = TranslateColumnOrValue(expression.IfFalse, table, dialect, parameters);
+            return "(case when " + test + " then " + ifTrue + " else " + ifFalse + " end)";
+        }
+
+        private static string TranslateColumnOrValue(Expression expression, TableMapping table, ISqlDialect dialect, List<object> parameters)
+        {
+            if (TryGetColumnExpression(expression, table, dialect, out var colSql))
+            {
+                return colSql;
+            }
+            var transformed = TranslateToColumnSql(expression, table, dialect, parameters);
+            if (transformed != null)
+            {
+                return transformed;
+            }
+            var arith = TryTranslateArithmeticSql(expression, table, dialect, parameters);
+            if (arith != null)
+            {
+                return arith;
+            }
+            var value = EvaluateExpression(expression);
+            return AddParameter(dialect, parameters, value);
         }
 
         private static string TranslateToColumnSql(Expression expression, TableMapping table, ISqlDialect dialect)
@@ -247,6 +330,38 @@ namespace Kuery.Linq
                         }
                     }
                 }
+                if (innerCall.Method.Name == nameof(string.IndexOf) && innerCall.Arguments.Count == 1)
+                {
+                    var inner = TranslateToColumnSql(innerCall.Object, table, dialect, parameters);
+                    if (inner == null && TryGetColumnExpression(innerCall.Object, table, dialect, out var idxColSql))
+                    {
+                        inner = idxColSql;
+                    }
+                    if (inner != null && parameters != null)
+                    {
+                        var value = EvaluateExpression(innerCall.Arguments[0]);
+                        var paramName = AddParameter(dialect, parameters, value);
+                        return BuildIndexOf(inner, paramName, dialect);
+                    }
+                }
+            }
+
+            // Handle static method calls (e.g. Math.Abs)
+            if (expression is MethodCallExpression staticCall && staticCall.Object == null)
+            {
+                if (staticCall.Method.Name == nameof(Math.Abs) && staticCall.Arguments.Count == 1
+                    && staticCall.Method.DeclaringType == typeof(Math))
+                {
+                    var inner = TranslateToColumnSql(staticCall.Arguments[0], table, dialect, parameters);
+                    if (inner == null)
+                    {
+                        inner = TryTranslateArithmeticSql(staticCall.Arguments[0], table, dialect, parameters);
+                    }
+                    if (inner != null)
+                    {
+                        return "abs(" + inner + ")";
+                    }
+                }
             }
 
             // Handle string.Length property
@@ -270,11 +385,70 @@ namespace Kuery.Linq
                 }
             }
 
+            // Handle string concatenation (string + string → || or +)
+            if (expression is BinaryExpression concatBinary
+                && concatBinary.NodeType == ExpressionType.Add
+                && concatBinary.Type == typeof(string))
+            {
+                var concatResult = TryTranslateStringConcat(concatBinary.Left, concatBinary.Right, table, dialect, parameters);
+                if (concatResult != null) return concatResult;
+            }
+
+            // Handle string.Concat(a, b)
+            if (expression is MethodCallExpression concatCall
+                && concatCall.Method.Name == nameof(string.Concat)
+                && concatCall.Method.DeclaringType == typeof(string)
+                && concatCall.Arguments.Count == 2)
+            {
+                var concatResult = TryTranslateStringConcat(concatCall.Arguments[0], concatCall.Arguments[1], table, dialect, parameters);
+                if (concatResult != null) return concatResult;
+            }
+
+            // Handle conditional (ternary) expression as a column-like expression
+            if (expression is ConditionalExpression conditional && parameters != null)
+            {
+                return TranslateConditional(conditional, table, dialect, parameters);
+            }
+
             if (TryGetColumnExpression(expression, table, dialect, out var columnSql))
             {
                 return columnSql;
             }
 
+            return null;
+        }
+
+        private static string TryTranslateStringConcat(Expression left, Expression right, TableMapping table, ISqlDialect dialect, List<object> parameters)
+        {
+            var leftSql = TranslateToColumnSql(left, table, dialect, parameters);
+            if (leftSql == null)
+            {
+                if (left is ConstantExpression || left is MemberExpression)
+                {
+                    var val = EvaluateExpression(left);
+                    if (parameters != null)
+                    {
+                        leftSql = AddParameter(dialect, parameters, val);
+                    }
+                }
+            }
+            var rightSql = TranslateToColumnSql(right, table, dialect, parameters);
+            if (rightSql == null)
+            {
+                if (right is ConstantExpression || right is MemberExpression)
+                {
+                    var val = EvaluateExpression(right);
+                    if (parameters != null)
+                    {
+                        rightSql = AddParameter(dialect, parameters, val);
+                    }
+                }
+            }
+            if (leftSql != null && rightSql != null)
+            {
+                var concatOp = dialect.Kind == SqlDialectKind.SqlServer ? " + " : " || ";
+                return "(" + leftSql + concatOp + rightSql + ")";
+            }
             return null;
         }
 
@@ -289,6 +463,22 @@ namespace Kuery.Linq
                 return "(strpos(" + columnSql + ", " + paramName + ") > 0)";
             }
             return "(instr(" + columnSql + ", " + paramName + ") > 0)";
+        }
+
+        private static string BuildIndexOf(string columnSql, string paramName, ISqlDialect dialect)
+        {
+            // C# string.IndexOf returns 0-based index (-1 if not found).
+            // SQL functions return 1-based position (0 if not found).
+            // Result: sql_func(...) - 1
+            if (dialect.Kind == SqlDialectKind.SqlServer)
+            {
+                return "(CHARINDEX(" + paramName + ", " + columnSql + ") - 1)";
+            }
+            if (dialect.Kind == SqlDialectKind.PostgreSql)
+            {
+                return "(strpos(" + columnSql + ", " + paramName + ") - 1)";
+            }
+            return "(instr(" + columnSql + ", " + paramName + ") - 1)";
         }
 
         private static string BuildStartsWith(string columnSql, string paramName, int valueLength, StringComparison comparison, ISqlDialect dialect)
