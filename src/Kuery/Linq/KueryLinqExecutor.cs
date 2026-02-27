@@ -81,6 +81,10 @@ namespace Kuery.Linq
                         return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: true);
                     case QueryTerminalKind.LastOrDefault:
                         return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: false);
+                    case QueryTerminalKind.ElementAt:
+                        return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: true);
+                    case QueryTerminalKind.ElementAtOrDefault:
+                        return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: false);
                     case QueryTerminalKind.Single:
                         return ExecuteSingle(command, model.Table, model.Projection, throwIfEmpty: true);
                     case QueryTerminalKind.SingleOrDefault:
@@ -121,6 +125,10 @@ namespace Kuery.Linq
                     case QueryTerminalKind.Last:
                         return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
                     case QueryTerminalKind.LastOrDefault:
+                        return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: false, cancellationToken).ConfigureAwait(false);
+                    case QueryTerminalKind.ElementAt:
+                        return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
+                    case QueryTerminalKind.ElementAtOrDefault:
                         return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: false, cancellationToken).ConfigureAwait(false);
                     case QueryTerminalKind.Single:
                         return await ExecuteSingleAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);

@@ -31,6 +31,11 @@ namespace Kuery.Linq
                 case ExpressionType.GreaterThanOrEqual:
                 case ExpressionType.LessThan:
                 case ExpressionType.LessThanOrEqual:
+                case ExpressionType.Add:
+                case ExpressionType.Subtract:
+                case ExpressionType.Multiply:
+                case ExpressionType.Divide:
+                case ExpressionType.Modulo:
                     return TranslateBinary((BinaryExpression)expression, table, dialect, parameters);
                 case ExpressionType.Not:
                     return "not (" + TranslateCore(((UnaryExpression)expression).Operand, table, dialect, parameters) + ")";
@@ -142,6 +147,21 @@ namespace Kuery.Linq
                 {
                     var value = EvaluateExpression(call.Arguments[0]);
                     return BuildColumnValueComparison(transformed, ExpressionType.Equal, value, dialect, parameters);
+                }
+            }
+
+            // string.IsNullOrEmpty(value) - static 1-arg form
+            if (methodName == nameof(string.IsNullOrEmpty) && call.Object == null && call.Arguments.Count == 1
+                && call.Method.DeclaringType == typeof(string))
+            {
+                if (TryGetColumnExpression(call.Arguments[0], table, dialect, out var columnSql))
+                {
+                    return "(" + columnSql + " is null or " + columnSql + " = '')";
+                }
+                var transformed2 = TranslateToColumnSql(call.Arguments[0], table, dialect, parameters);
+                if (transformed2 != null)
+                {
+                    return "(" + transformed2 + " is null or " + transformed2 + " = '')";
                 }
             }
 
@@ -278,12 +298,76 @@ namespace Kuery.Linq
             return parameterName;
         }
 
+        private static bool IsArithmeticOperator(ExpressionType nodeType)
+        {
+            switch (nodeType)
+            {
+                case ExpressionType.Add:
+                case ExpressionType.Subtract:
+                case ExpressionType.Multiply:
+                case ExpressionType.Divide:
+                case ExpressionType.Modulo:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static string TryTranslateArithmeticSql(Expression expression, TableMapping table, ISqlDialect dialect, List<object> parameters)
+        {
+            if (expression is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+            {
+                return TryTranslateArithmeticSql(unary.Operand, table, dialect, parameters);
+            }
+
+            if (TryGetColumnExpression(expression, table, dialect, out var columnSql))
+            {
+                return columnSql;
+            }
+
+            var transformed = TranslateToColumnSql(expression, table, dialect, parameters);
+            if (transformed != null)
+            {
+                return transformed;
+            }
+
+            if (expression is BinaryExpression binary && IsArithmeticOperator(binary.NodeType))
+            {
+                var left = TryTranslateArithmeticSql(binary.Left, table, dialect, parameters);
+                var right = TryTranslateArithmeticSql(binary.Right, table, dialect, parameters);
+                if (left != null && right != null)
+                {
+                    return "(" + left + " " + ToSqlOperator(binary.NodeType) + " " + right + ")";
+                }
+            }
+
+            if (expression is ConstantExpression || expression is MemberExpression)
+            {
+                var value = EvaluateExpression(expression);
+                return AddParameter(dialect, parameters, value);
+            }
+
+            return null;
+        }
+
         private static string TranslateBinary(BinaryExpression expression, TableMapping table, ISqlDialect dialect, List<object> parameters)
         {
+            // Handle arithmetic sub-expressions (e.g. x.Price * x.Qty > 100)
+            if (IsArithmeticOperator(expression.NodeType))
+            {
+                var arithLeft = TryTranslateArithmeticSql(expression.Left, table, dialect, parameters);
+                var arithRight = TryTranslateArithmeticSql(expression.Right, table, dialect, parameters);
+                if (arithLeft != null && arithRight != null)
+                {
+                    return "(" + arithLeft + " " + ToSqlOperator(expression.NodeType) + " " + arithRight + ")";
+                }
+            }
+
             var leftIsColumn = TryGetColumnExpression(expression.Left, table, dialect, out var leftColumn);
             var rightIsColumn = TryGetColumnExpression(expression.Right, table, dialect, out var rightColumn);
 
             // Also try column-transforming expressions (Replace, ToLower, ToUpper)
+            // and arithmetic sub-expressions
             if (!leftIsColumn)
             {
                 var leftTransformed = TranslateToColumnSql(expression.Left, table, dialect, parameters);
@@ -291,6 +375,15 @@ namespace Kuery.Linq
                 {
                     leftColumn = leftTransformed;
                     leftIsColumn = true;
+                }
+                else if (expression.Left is BinaryExpression leftBin && IsArithmeticOperator(leftBin.NodeType))
+                {
+                    var arith = TryTranslateArithmeticSql(expression.Left, table, dialect, parameters);
+                    if (arith != null)
+                    {
+                        leftColumn = arith;
+                        leftIsColumn = true;
+                    }
                 }
             }
             if (!rightIsColumn)
@@ -300,6 +393,15 @@ namespace Kuery.Linq
                 {
                     rightColumn = rightTransformed;
                     rightIsColumn = true;
+                }
+                else if (expression.Right is BinaryExpression rightBin && IsArithmeticOperator(rightBin.NodeType))
+                {
+                    var arith = TryTranslateArithmeticSql(expression.Right, table, dialect, parameters);
+                    if (arith != null)
+                    {
+                        rightColumn = arith;
+                        rightIsColumn = true;
+                    }
                 }
             }
 
@@ -457,6 +559,16 @@ namespace Kuery.Linq
                     return "<";
                 case ExpressionType.LessThanOrEqual:
                     return "<=";
+                case ExpressionType.Add:
+                    return "+";
+                case ExpressionType.Subtract:
+                    return "-";
+                case ExpressionType.Multiply:
+                    return "*";
+                case ExpressionType.Divide:
+                    return "/";
+                case ExpressionType.Modulo:
+                    return "%";
                 default:
                     throw new NotSupportedException($"Unsupported expression type: {expressionType}");
             }

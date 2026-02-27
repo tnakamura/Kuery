@@ -852,5 +852,245 @@ namespace Kuery.Tests.Sqlite
                 Assert.Equal(3, result.Id);
             }
         }
+
+        // --- Arithmetic in predicates ---
+
+        [Fact]
+        public void ArithmeticMultiplyGreaterThanTest()
+        {
+            SeedNumItems();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                // Value * 2 > 50 → only Id=3 (Value=30, 30*2=60)
+                var result = connection.Query<NumItem>()
+                    .Where(x => x.Value * 2 > 50)
+                    .ToList();
+
+                Assert.Single(result);
+                Assert.Equal(3, result[0].Id);
+            }
+        }
+
+        [Fact]
+        public void ArithmeticAddEqualTest()
+        {
+            SeedNumItems();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                // Value + 5 == 25 → Id=2 (Value=20)
+                var result = connection.Query<NumItem>()
+                    .Where(x => x.Value + 5 == 25)
+                    .ToList();
+
+                Assert.Single(result);
+                Assert.Equal(2, result[0].Id);
+            }
+        }
+
+        [Fact]
+        public void ArithmeticSubtractTest()
+        {
+            SeedNumItems();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                // Value - 10 > 0 → Id=2 (Value=20) and Id=3 (Value=30)
+                var result = connection.Query<NumItem>()
+                    .Where(x => x.Value - 10 > 0)
+                    .OrderBy(x => x.Id)
+                    .ToList();
+
+                Assert.Equal(2, result.Count);
+                Assert.Equal(2, result[0].Id);
+                Assert.Equal(3, result[1].Id);
+            }
+        }
+
+        [Fact]
+        public void ArithmeticDivideTest()
+        {
+            SeedNumItems();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                // Value / 10 >= 2 → Id=2 (20/10=2) and Id=3 (30/10=3)
+                var result = connection.Query<NumItem>()
+                    .Where(x => x.Value / 10 >= 2)
+                    .OrderBy(x => x.Id)
+                    .ToList();
+
+                Assert.Equal(2, result.Count);
+                Assert.Equal(2, result[0].Id);
+                Assert.Equal(3, result[1].Id);
+            }
+        }
+
+        [Fact]
+        public void ArithmeticModuloTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                // Id % 2 == 0 → Id=2
+                var result = connection.Query<Customer>()
+                    .Where(x => x.Id % 2 == 0)
+                    .ToList();
+
+                Assert.Single(result);
+                Assert.Equal(2, result[0].Id);
+            }
+        }
+
+        [Fact]
+        public void ArithmeticColumnTimesColumnTest()
+        {
+            SeedNumItems();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                // Id * Value > 50 → Id=3 (3*30=90)
+                var result = connection.Query<NumItem>()
+                    .Where(x => x.Id * x.Value > 50)
+                    .ToList();
+
+                Assert.Single(result);
+                Assert.Equal(3, result[0].Id);
+            }
+        }
+
+        // --- string.IsNullOrEmpty ---
+
+        [Fact]
+        public void StringIsNullOrEmptyTest()
+        {
+            SeedProducts();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<StringProduct>()
+                    .Where(x => !string.IsNullOrEmpty(x.Name))
+                    .ToList();
+
+                Assert.Equal(3, result.Count);
+            }
+        }
+
+        [Fact]
+        public void StringIsNullOrEmptyMatchesEmptyTest()
+        {
+            CreateProductTable();
+            using (var connection = fixture.OpenNewConnection())
+            {
+                // Insert directly with empty string via raw SQL
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "INSERT INTO Product (Name) VALUES ('hello'), ('')";
+                    cmd.ExecuteNonQuery();
+                }
+
+                var result = connection.Query<StringProduct>()
+                    .Where(x => string.IsNullOrEmpty(x.Name))
+                    .ToList();
+
+                Assert.Single(result);
+                Assert.Equal("", result[0].Name);
+            }
+        }
+
+        // --- ElementAt / ElementAtOrDefault ---
+
+        [Fact]
+        public void ElementAtTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .OrderBy(x => x.Id)
+                    .ElementAt(1);
+
+                Assert.Equal(2, result.Id);
+                Assert.Equal("bbb", result.Name);
+            }
+        }
+
+        [Fact]
+        public void ElementAtFirstTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .OrderBy(x => x.Id)
+                    .ElementAt(0);
+
+                Assert.Equal(1, result.Id);
+            }
+        }
+
+        [Fact]
+        public void ElementAtLastTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .OrderBy(x => x.Id)
+                    .ElementAt(2);
+
+                Assert.Equal(3, result.Id);
+            }
+        }
+
+        [Fact]
+        public void ElementAtThrowsWhenOutOfRangeTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                Assert.Throws<InvalidOperationException>(() =>
+                    connection.Query<Customer>()
+                        .OrderBy(x => x.Id)
+                        .ElementAt(10));
+            }
+        }
+
+        [Fact]
+        public void ElementAtOrDefaultTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .OrderBy(x => x.Id)
+                    .ElementAtOrDefault(1);
+
+                Assert.NotNull(result);
+                Assert.Equal(2, result.Id);
+            }
+        }
+
+        [Fact]
+        public void ElementAtOrDefaultReturnsNullWhenOutOfRangeTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .OrderBy(x => x.Id)
+                    .ElementAtOrDefault(10);
+
+                Assert.Null(result);
+            }
+        }
     }
 }

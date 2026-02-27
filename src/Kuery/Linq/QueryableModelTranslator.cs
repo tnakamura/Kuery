@@ -117,6 +117,14 @@ namespace Kuery.Linq
                 case nameof(Queryable.Distinct):
                     model.IsDistinct = true;
                     break;
+                case "ElementAt":
+                    model.SetTerminal(QueryTerminalKind.ElementAt);
+                    model.Skip = (model.Skip ?? 0) + GetIntValue(methodCall.Arguments[1]);
+                    break;
+                case "ElementAtOrDefault":
+                    model.SetTerminal(QueryTerminalKind.ElementAtOrDefault);
+                    model.Skip = (model.Skip ?? 0) + GetIntValue(methodCall.Arguments[1]);
+                    break;
                 case nameof(Queryable.Single):
                     model.SetTerminal(QueryTerminalKind.Single);
                     if (methodCall.Arguments.Count == 2)

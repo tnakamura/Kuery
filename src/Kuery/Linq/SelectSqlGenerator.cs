@@ -20,6 +20,7 @@ namespace Kuery.Linq
             var effectiveTake = model.Take;
             if ((model.Terminal == QueryTerminalKind.First || model.Terminal == QueryTerminalKind.FirstOrDefault
                 || model.Terminal == QueryTerminalKind.Last || model.Terminal == QueryTerminalKind.LastOrDefault
+                || model.Terminal == QueryTerminalKind.ElementAt || model.Terminal == QueryTerminalKind.ElementAtOrDefault
                 || model.Terminal == QueryTerminalKind.Single || model.Terminal == QueryTerminalKind.SingleOrDefault) && !effectiveTake.HasValue)
             {
                 effectiveTake = model.Terminal == QueryTerminalKind.Single || model.Terminal == QueryTerminalKind.SingleOrDefault ? 2 : 1;

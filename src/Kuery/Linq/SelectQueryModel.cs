@@ -17,6 +17,8 @@ namespace Kuery.Linq
         LastOrDefault,
         Single,
         SingleOrDefault,
+        ElementAt,
+        ElementAtOrDefault,
         Sum,
         Min,
         Max,
