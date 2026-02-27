@@ -220,6 +220,99 @@ namespace Kuery.Linq
                 }
             }
 
+            // Math.Round(value) / Math.Round(value, digits)
+            if (methodName == nameof(Math.Round) && call.Object == null
+                && call.Method.DeclaringType == typeof(Math)
+                && (call.Arguments.Count == 1 || call.Arguments.Count == 2))
+            {
+                var inner = TranslateToColumnSql(call.Arguments[0], table, dialect, parameters);
+                if (inner == null)
+                {
+                    inner = TryTranslateArithmeticSql(call.Arguments[0], table, dialect, parameters);
+                }
+                if (inner != null)
+                {
+                    if (call.Arguments.Count == 2)
+                    {
+                        var digits = EvaluateExpression(call.Arguments[1]);
+                        return "round(" + inner + ", " + Convert.ToInt32(digits) + ")";
+                    }
+                    return "round(" + inner + ")";
+                }
+            }
+
+            // Math.Floor(value)
+            if (methodName == nameof(Math.Floor) && call.Object == null && call.Arguments.Count == 1
+                && call.Method.DeclaringType == typeof(Math))
+            {
+                var inner = TranslateToColumnSql(call.Arguments[0], table, dialect, parameters);
+                if (inner == null)
+                {
+                    inner = TryTranslateArithmeticSql(call.Arguments[0], table, dialect, parameters);
+                }
+                if (inner != null)
+                {
+                    if (dialect.Kind == SqlDialectKind.SqlServer)
+                    {
+                        return "FLOOR(" + inner + ")";
+                    }
+                    if (dialect.Kind == SqlDialectKind.PostgreSql)
+                    {
+                        return "floor(" + inner + ")";
+                    }
+                    // SQLite: use cast + adjustment for negative values
+                    return "(case when " + inner + " = cast(" + inner + " as integer) then cast(" + inner + " as integer) when " + inner + " < 0 then cast(" + inner + " as integer) - 1 else cast(" + inner + " as integer) end)";
+                }
+            }
+
+            // Math.Ceiling(value)
+            if (methodName == nameof(Math.Ceiling) && call.Object == null && call.Arguments.Count == 1
+                && call.Method.DeclaringType == typeof(Math))
+            {
+                var inner = TranslateToColumnSql(call.Arguments[0], table, dialect, parameters);
+                if (inner == null)
+                {
+                    inner = TryTranslateArithmeticSql(call.Arguments[0], table, dialect, parameters);
+                }
+                if (inner != null)
+                {
+                    if (dialect.Kind == SqlDialectKind.SqlServer)
+                    {
+                        return "CEILING(" + inner + ")";
+                    }
+                    if (dialect.Kind == SqlDialectKind.PostgreSql)
+                    {
+                        return "ceil(" + inner + ")";
+                    }
+                    // SQLite: use cast + adjustment for positive non-integer values
+                    return "(case when " + inner + " = cast(" + inner + " as integer) then cast(" + inner + " as integer) when " + inner + " > 0 then cast(" + inner + " as integer) + 1 else cast(" + inner + " as integer) end)";
+                }
+            }
+
+            // Math.Max(a, b) / Math.Min(a, b) - 2-arg static versions
+            if ((methodName == nameof(Math.Max) || methodName == nameof(Math.Min))
+                && call.Object == null && call.Arguments.Count == 2
+                && call.Method.DeclaringType == typeof(Math))
+            {
+                var left = TranslateToColumnSql(call.Arguments[0], table, dialect, parameters)
+                    ?? TryTranslateArithmeticSql(call.Arguments[0], table, dialect, parameters);
+                var right = TranslateToColumnSql(call.Arguments[1], table, dialect, parameters)
+                    ?? TryTranslateArithmeticSql(call.Arguments[1], table, dialect, parameters);
+                if (left == null && (call.Arguments[0] is ConstantExpression || call.Arguments[0] is MemberExpression))
+                {
+                    left = AddParameter(dialect, parameters, EvaluateExpression(call.Arguments[0]));
+                }
+                if (right == null && (call.Arguments[1] is ConstantExpression || call.Arguments[1] is MemberExpression))
+                {
+                    right = AddParameter(dialect, parameters, EvaluateExpression(call.Arguments[1]));
+                }
+                if (left != null && right != null)
+                {
+                    var funcName = methodName == nameof(Math.Max) ? "max" : "min";
+                    return funcName + "(" + left + ", " + right + ")";
+                }
+            }
+
             throw new NotSupportedException($"Unsupported method call: {call.Method.DeclaringType?.Name}.{methodName}.");
         }
 
@@ -346,11 +439,11 @@ namespace Kuery.Linq
                 }
             }
 
-            // Handle static method calls (e.g. Math.Abs)
-            if (expression is MethodCallExpression staticCall && staticCall.Object == null)
+            // Handle static method calls (e.g. Math.Abs, Math.Round, Math.Floor, Math.Ceiling, Math.Max, Math.Min)
+            if (expression is MethodCallExpression staticCall && staticCall.Object == null
+                && staticCall.Method.DeclaringType == typeof(Math))
             {
-                if (staticCall.Method.Name == nameof(Math.Abs) && staticCall.Arguments.Count == 1
-                    && staticCall.Method.DeclaringType == typeof(Math))
+                if (staticCall.Method.Name == nameof(Math.Abs) && staticCall.Arguments.Count == 1)
                 {
                     var inner = TranslateToColumnSql(staticCall.Arguments[0], table, dialect, parameters);
                     if (inner == null)
@@ -360,6 +453,99 @@ namespace Kuery.Linq
                     if (inner != null)
                     {
                         return "abs(" + inner + ")";
+                    }
+                }
+                if (staticCall.Method.Name == nameof(Math.Round)
+                    && (staticCall.Arguments.Count == 1 || staticCall.Arguments.Count == 2))
+                {
+                    var inner = TranslateToColumnSql(staticCall.Arguments[0], table, dialect, parameters);
+                    if (inner == null)
+                    {
+                        inner = TryTranslateArithmeticSql(staticCall.Arguments[0], table, dialect, parameters);
+                    }
+                    if (inner != null)
+                    {
+                        if (staticCall.Arguments.Count == 2)
+                        {
+                            var digits = EvaluateExpression(staticCall.Arguments[1]);
+                            return "round(" + inner + ", " + Convert.ToInt32(digits) + ")";
+                        }
+                        return "round(" + inner + ")";
+                    }
+                }
+                if (staticCall.Method.Name == nameof(Math.Floor) && staticCall.Arguments.Count == 1)
+                {
+                    var inner = TranslateToColumnSql(staticCall.Arguments[0], table, dialect, parameters);
+                    if (inner == null)
+                    {
+                        inner = TryTranslateArithmeticSql(staticCall.Arguments[0], table, dialect, parameters);
+                    }
+                    if (inner != null)
+                    {
+                        if (dialect.Kind == SqlDialectKind.SqlServer) return "FLOOR(" + inner + ")";
+                        if (dialect.Kind == SqlDialectKind.PostgreSql) return "floor(" + inner + ")";
+                        return "(case when " + inner + " = cast(" + inner + " as integer) then cast(" + inner + " as integer) when " + inner + " < 0 then cast(" + inner + " as integer) - 1 else cast(" + inner + " as integer) end)";
+                    }
+                }
+                if (staticCall.Method.Name == nameof(Math.Ceiling) && staticCall.Arguments.Count == 1)
+                {
+                    var inner = TranslateToColumnSql(staticCall.Arguments[0], table, dialect, parameters);
+                    if (inner == null)
+                    {
+                        inner = TryTranslateArithmeticSql(staticCall.Arguments[0], table, dialect, parameters);
+                    }
+                    if (inner != null)
+                    {
+                        if (dialect.Kind == SqlDialectKind.SqlServer) return "CEILING(" + inner + ")";
+                        if (dialect.Kind == SqlDialectKind.PostgreSql) return "ceil(" + inner + ")";
+                        return "(case when " + inner + " = cast(" + inner + " as integer) then cast(" + inner + " as integer) when " + inner + " > 0 then cast(" + inner + " as integer) + 1 else cast(" + inner + " as integer) end)";
+                    }
+                }
+                if ((staticCall.Method.Name == nameof(Math.Max) || staticCall.Method.Name == nameof(Math.Min))
+                    && staticCall.Arguments.Count == 2)
+                {
+                    var left = TranslateToColumnSql(staticCall.Arguments[0], table, dialect, parameters)
+                        ?? TryTranslateArithmeticSql(staticCall.Arguments[0], table, dialect, parameters);
+                    var right = TranslateToColumnSql(staticCall.Arguments[1], table, dialect, parameters)
+                        ?? TryTranslateArithmeticSql(staticCall.Arguments[1], table, dialect, parameters);
+                    if (left == null && (staticCall.Arguments[0] is ConstantExpression || staticCall.Arguments[0] is MemberExpression) && parameters != null)
+                    {
+                        left = AddParameter(dialect, parameters, EvaluateExpression(staticCall.Arguments[0]));
+                    }
+                    if (right == null && (staticCall.Arguments[1] is ConstantExpression || staticCall.Arguments[1] is MemberExpression) && parameters != null)
+                    {
+                        right = AddParameter(dialect, parameters, EvaluateExpression(staticCall.Arguments[1]));
+                    }
+                    if (left != null && right != null)
+                    {
+                        var funcName = staticCall.Method.Name == nameof(Math.Max) ? "max" : "min";
+                        return funcName + "(" + left + ", " + right + ")";
+                    }
+                }
+            }
+
+            // Handle DateTime properties (Year, Month, Day, Hour, Minute, Second)
+            if (expression is MemberExpression dtMember
+                && dtMember.Expression != null
+                && (dtMember.Expression.Type == typeof(DateTime) || dtMember.Expression.Type == typeof(DateTime?)))
+            {
+                var inner = TranslateToColumnSql(dtMember.Expression, table, dialect, parameters);
+                if (inner == null && TryGetColumnExpression(dtMember.Expression, table, dialect, out var dtColSql))
+                {
+                    inner = dtColSql;
+                }
+                if (inner != null)
+                {
+                    var partName = dtMember.Member.Name;
+                    switch (partName)
+                    {
+                        case nameof(DateTime.Year):
+                        case nameof(DateTime.Month):
+                        case nameof(DateTime.Day):
+                        case nameof(DateTime.Hour):
+                        case nameof(DateTime.Minute):
+                        case nameof(DateTime.Second):
+                            return BuildDatePart(partName, inner, dialect);
                     }
                 }
             }
@@ -479,6 +665,33 @@ namespace Kuery.Linq
                 return "(strpos(" + columnSql + ", " + paramName + ") - 1)";
             }
             return "(instr(" + columnSql + ", " + paramName + ") - 1)";
+        }
+
+        private static string BuildDatePart(string partName, string columnSql, ISqlDialect dialect)
+        {
+            if (dialect.Kind == SqlDialectKind.SqlServer)
+            {
+                var sqlPart = partName.ToLower();
+                return "DATEPART(" + sqlPart + ", " + columnSql + ")";
+            }
+            if (dialect.Kind == SqlDialectKind.PostgreSql)
+            {
+                var sqlPart = partName.ToLower();
+                return "cast(EXTRACT(" + sqlPart + " from " + columnSql + ") as integer)";
+            }
+            // SQLite: use strftime
+            string format;
+            switch (partName)
+            {
+                case nameof(DateTime.Year): format = "%Y"; break;
+                case nameof(DateTime.Month): format = "%m"; break;
+                case nameof(DateTime.Day): format = "%d"; break;
+                case nameof(DateTime.Hour): format = "%H"; break;
+                case nameof(DateTime.Minute): format = "%M"; break;
+                case nameof(DateTime.Second): format = "%S"; break;
+                default: throw new NotSupportedException($"Unsupported DateTime part: {partName}");
+            }
+            return "cast(strftime('" + format + "', " + columnSql + ") as integer)";
         }
 
         private static string BuildStartsWith(string columnSql, string paramName, int valueLength, StringComparison comparison, ISqlDialect dialect)
