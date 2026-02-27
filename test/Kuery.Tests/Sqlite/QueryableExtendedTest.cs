@@ -664,5 +664,193 @@ namespace Kuery.Tests.Sqlite
                 Assert.Equal("Bar", result[0].Name);
             }
         }
+
+        // --- LongCount ---
+
+        [Fact]
+        public void LongCountTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>().LongCount();
+
+                Assert.Equal(3L, result);
+            }
+        }
+
+        [Fact]
+        public void LongCountWithPredicateTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>().LongCount(x => x.Id > 1);
+
+                Assert.Equal(2L, result);
+            }
+        }
+
+        [Fact]
+        public void LongCountEmptyTest()
+        {
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>().LongCount();
+
+                Assert.Equal(0L, result);
+            }
+        }
+
+        // --- Equals method ---
+
+        [Fact]
+        public void EqualsMethodTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .Where(x => x.Name.Equals("bbb"))
+                    .ToList();
+
+                Assert.Single(result);
+                Assert.Equal(2, result[0].Id);
+            }
+        }
+
+        [Fact]
+        public void EqualsMethodNoMatchTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .Where(x => x.Name.Equals("zzz"))
+                    .ToList();
+
+                Assert.Empty(result);
+            }
+        }
+
+        [Fact]
+        public void EqualsMethodWithIntTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .Where(x => x.Id.Equals(2))
+                    .ToList();
+
+                Assert.Single(result);
+                Assert.Equal("bbb", result[0].Name);
+            }
+        }
+
+        // --- Last / LastOrDefault ---
+
+        [Fact]
+        public void LastWithOrderByTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .OrderBy(x => x.Id)
+                    .Last();
+
+                Assert.Equal(3, result.Id);
+                Assert.Equal("ccc", result.Name);
+            }
+        }
+
+        [Fact]
+        public void LastWithOrderByDescendingTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .OrderByDescending(x => x.Id)
+                    .Last();
+
+                Assert.Equal(1, result.Id);
+                Assert.Equal("aaa", result.Name);
+            }
+        }
+
+        [Fact]
+        public void LastWithPredicateTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .OrderBy(x => x.Id)
+                    .Last(x => x.Id <= 2);
+
+                Assert.Equal(2, result.Id);
+            }
+        }
+
+        [Fact]
+        public void LastThrowsWhenEmptyTest()
+        {
+            using (var connection = fixture.OpenNewConnection())
+            {
+                Assert.Throws<InvalidOperationException>(() =>
+                    connection.Query<Customer>().Last());
+            }
+        }
+
+        [Fact]
+        public void LastOrDefaultWithOrderByTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .OrderBy(x => x.Id)
+                    .LastOrDefault();
+
+                Assert.NotNull(result);
+                Assert.Equal(3, result.Id);
+            }
+        }
+
+        [Fact]
+        public void LastOrDefaultReturnsNullWhenEmptyTest()
+        {
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .LastOrDefault();
+
+                Assert.Null(result);
+            }
+        }
+
+        [Fact]
+        public void LastWithNoOrderByUsesDefaultPkTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>().Last();
+
+                Assert.Equal(3, result.Id);
+            }
+        }
     }
 }

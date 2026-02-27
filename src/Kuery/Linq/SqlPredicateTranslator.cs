@@ -129,6 +129,22 @@ namespace Kuery.Linq
                 }
             }
 
+            // object.Equals(value) - instance 1-arg form
+            if (methodName == nameof(object.Equals) && call.Object != null && call.Arguments.Count == 1)
+            {
+                if (TryGetColumnExpression(call.Object, table, dialect, out var columnSql))
+                {
+                    var value = EvaluateExpression(call.Arguments[0]);
+                    return BuildColumnValueComparison(columnSql, ExpressionType.Equal, value, dialect, parameters);
+                }
+                var transformed = TranslateToColumnSql(call.Object, table, dialect, parameters);
+                if (transformed != null)
+                {
+                    var value = EvaluateExpression(call.Arguments[0]);
+                    return BuildColumnValueComparison(transformed, ExpressionType.Equal, value, dialect, parameters);
+                }
+            }
+
             throw new NotSupportedException($"Unsupported method call: {call.Method.DeclaringType?.Name}.{methodName}.");
         }
 

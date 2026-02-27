@@ -69,6 +69,13 @@ namespace Kuery.Linq
                         model.AddPredicate(GetLambda(methodCall.Arguments[1]).Body);
                     }
                     break;
+                case nameof(Queryable.LongCount):
+                    model.SetTerminal(QueryTerminalKind.LongCount);
+                    if (methodCall.Arguments.Count == 2)
+                    {
+                        model.AddPredicate(GetLambda(methodCall.Arguments[1]).Body);
+                    }
+                    break;
                 case nameof(Queryable.Any):
                     model.SetTerminal(QueryTerminalKind.Any);
                     if (methodCall.Arguments.Count == 2)
@@ -85,6 +92,20 @@ namespace Kuery.Linq
                     break;
                 case nameof(Queryable.FirstOrDefault):
                     model.SetTerminal(QueryTerminalKind.FirstOrDefault);
+                    if (methodCall.Arguments.Count == 2)
+                    {
+                        model.AddPredicate(GetLambda(methodCall.Arguments[1]).Body);
+                    }
+                    break;
+                case nameof(Queryable.Last):
+                    model.SetTerminal(QueryTerminalKind.Last);
+                    if (methodCall.Arguments.Count == 2)
+                    {
+                        model.AddPredicate(GetLambda(methodCall.Arguments[1]).Body);
+                    }
+                    break;
+                case nameof(Queryable.LastOrDefault):
+                    model.SetTerminal(QueryTerminalKind.LastOrDefault);
                     if (methodCall.Arguments.Count == 2)
                     {
                         model.AddPredicate(GetLambda(methodCall.Arguments[1]).Body);

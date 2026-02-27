@@ -19,13 +19,14 @@ namespace Kuery.Linq
 
             var effectiveTake = model.Take;
             if ((model.Terminal == QueryTerminalKind.First || model.Terminal == QueryTerminalKind.FirstOrDefault
+                || model.Terminal == QueryTerminalKind.Last || model.Terminal == QueryTerminalKind.LastOrDefault
                 || model.Terminal == QueryTerminalKind.Single || model.Terminal == QueryTerminalKind.SingleOrDefault) && !effectiveTake.HasValue)
             {
                 effectiveTake = model.Terminal == QueryTerminalKind.Single || model.Terminal == QueryTerminalKind.SingleOrDefault ? 2 : 1;
             }
 
             sql.Append("select ");
-            if (model.Terminal == QueryTerminalKind.Count || model.Terminal == QueryTerminalKind.Any)
+            if (model.Terminal == QueryTerminalKind.Count || model.Terminal == QueryTerminalKind.LongCount || model.Terminal == QueryTerminalKind.Any)
             {
                 sql.Append("count(*)");
             }
@@ -87,12 +88,18 @@ namespace Kuery.Linq
 
         private static void AppendOrderBy(StringBuilder sql, SelectQueryModel model, ISqlDialect dialect)
         {
+            var isLast = model.Terminal == QueryTerminalKind.Last || model.Terminal == QueryTerminalKind.LastOrDefault;
+
             if (model.Orderings.Count == 0)
             {
-                if (model.Skip.HasValue && model.Table.PK != null)
+                if ((model.Skip.HasValue || isLast) && model.Table.PK != null)
                 {
                     sql.Append(" order by ");
                     sql.Append(dialect.EscapeIdentifier(model.Table.PK.Name));
+                    if (isLast)
+                    {
+                        sql.Append(" desc");
+                    }
                 }
                 return;
             }
@@ -107,7 +114,9 @@ namespace Kuery.Linq
 
                 var ordering = model.Orderings[i];
                 sql.Append(dialect.EscapeIdentifier(ordering.Column.Name));
-                if (!ordering.Ascending)
+                // For Last/LastOrDefault, reverse the sort direction
+                var ascending = isLast ? !ordering.Ascending : ordering.Ascending;
+                if (!ascending)
                 {
                     sql.Append(" desc");
                 }

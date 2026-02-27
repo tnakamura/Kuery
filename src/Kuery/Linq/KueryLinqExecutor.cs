@@ -64,6 +64,8 @@ namespace Kuery.Linq
                 {
                     case QueryTerminalKind.Count:
                         return ExecuteCount(command);
+                    case QueryTerminalKind.LongCount:
+                        return ExecuteLongCount(command);
                     case QueryTerminalKind.Any:
                         return ExecuteCount(command) > 0;
                     case QueryTerminalKind.Sum:
@@ -74,6 +76,10 @@ namespace Kuery.Linq
                     case QueryTerminalKind.First:
                         return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: true);
                     case QueryTerminalKind.FirstOrDefault:
+                        return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: false);
+                    case QueryTerminalKind.Last:
+                        return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: true);
+                    case QueryTerminalKind.LastOrDefault:
                         return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: false);
                     case QueryTerminalKind.Single:
                         return ExecuteSingle(command, model.Table, model.Projection, throwIfEmpty: true);
@@ -99,6 +105,8 @@ namespace Kuery.Linq
                 {
                     case QueryTerminalKind.Count:
                         return await ExecuteCountAsync(command, cancellationToken).ConfigureAwait(false);
+                    case QueryTerminalKind.LongCount:
+                        return await ExecuteLongCountAsync(command, cancellationToken).ConfigureAwait(false);
                     case QueryTerminalKind.Any:
                         return await ExecuteCountAsync(command, cancellationToken).ConfigureAwait(false) > 0;
                     case QueryTerminalKind.Sum:
@@ -109,6 +117,10 @@ namespace Kuery.Linq
                     case QueryTerminalKind.First:
                         return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
                     case QueryTerminalKind.FirstOrDefault:
+                        return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: false, cancellationToken).ConfigureAwait(false);
+                    case QueryTerminalKind.Last:
+                        return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
+                    case QueryTerminalKind.LastOrDefault:
                         return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: false, cancellationToken).ConfigureAwait(false);
                     case QueryTerminalKind.Single:
                         return await ExecuteSingleAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
@@ -199,6 +211,17 @@ namespace Kuery.Linq
             return (int)result;
         }
 
+        private static long ExecuteLongCount(IDbCommand command)
+        {
+            var result = command.ExecuteScalar();
+            if (result is int i)
+            {
+                return i;
+            }
+
+            return (long)result;
+        }
+
         private static async Task<int> ExecuteCountAsync(IDbCommand command, CancellationToken cancellationToken)
         {
             var result = await command.TryExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
@@ -208,6 +231,17 @@ namespace Kuery.Linq
             }
 
             return (int)result;
+        }
+
+        private static async Task<long> ExecuteLongCountAsync(IDbCommand command, CancellationToken cancellationToken)
+        {
+            var result = await command.TryExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            if (result is int i)
+            {
+                return i;
+            }
+
+            return (long)result;
         }
 
         private static object ExecuteFirst(IDbCommand command, TableMapping table, LambdaExpression projection, bool throwIfEmpty)
