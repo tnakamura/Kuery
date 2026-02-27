@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 
@@ -82,10 +83,89 @@ namespace Kuery.Linq
                         model.AddPredicate(GetLambda(methodCall.Arguments[1]).Body);
                     }
                     break;
+                case nameof(Queryable.Select):
+                    ApplySelect(model, GetLambda(methodCall.Arguments[1]));
+                    break;
                 default:
                     throw new NotSupportedException(
-                        $"Unsupported Queryable method: {name}. Supported methods: Where, OrderBy, OrderByDescending, ThenBy, ThenByDescending, Skip, Take, Count, First, FirstOrDefault.");
+                        $"Unsupported Queryable method: {name}. Supported methods: Where, OrderBy, OrderByDescending, ThenBy, ThenByDescending, Skip, Take, Count, First, FirstOrDefault, Select.");
             }
+        }
+
+        private static void ApplySelect(SelectQueryModel model, LambdaExpression lambda)
+        {
+            var body = lambda.Body;
+            var columns = new List<ProjectedColumn>();
+
+            if (body is MemberExpression singleMember && singleMember.Expression?.NodeType == ExpressionType.Parameter)
+            {
+                var col = model.Table.FindColumnWithPropertyName(singleMember.Member.Name);
+                if (col == null)
+                {
+                    throw new NotSupportedException($"Unknown property '{singleMember.Member.Name}' in Select.");
+                }
+                columns.Add(new ProjectedColumn(col, singleMember.Member.Name));
+            }
+            else if (body is NewExpression newExpr)
+            {
+                for (var i = 0; i < newExpr.Arguments.Count; i++)
+                {
+                    var arg = newExpr.Arguments[i];
+                    if (arg is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+                    {
+                        arg = unary.Operand;
+                    }
+
+                    if (!(arg is MemberExpression member) || member.Expression?.NodeType != ExpressionType.Parameter)
+                    {
+                        throw new NotSupportedException($"Unsupported Select expression: {arg}. Only direct member access is supported.");
+                    }
+
+                    var col = model.Table.FindColumnWithPropertyName(member.Member.Name);
+                    if (col == null)
+                    {
+                        throw new NotSupportedException($"Unknown property '{member.Member.Name}' in Select.");
+                    }
+
+                    var targetName = newExpr.Members != null ? newExpr.Members[i].Name : member.Member.Name;
+                    columns.Add(new ProjectedColumn(col, targetName));
+                }
+            }
+            else if (body is MemberInitExpression memberInit)
+            {
+                foreach (var binding in memberInit.Bindings)
+                {
+                    if (!(binding is MemberAssignment assignment))
+                    {
+                        throw new NotSupportedException($"Unsupported binding in Select: {binding.BindingType}. Only MemberAssignment is supported.");
+                    }
+
+                    var arg = assignment.Expression;
+                    if (arg is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+                    {
+                        arg = unary.Operand;
+                    }
+
+                    if (!(arg is MemberExpression member) || member.Expression?.NodeType != ExpressionType.Parameter)
+                    {
+                        throw new NotSupportedException($"Unsupported Select expression: {arg}. Only direct member access is supported.");
+                    }
+
+                    var col = model.Table.FindColumnWithPropertyName(member.Member.Name);
+                    if (col == null)
+                    {
+                        throw new NotSupportedException($"Unknown property '{member.Member.Name}' in Select.");
+                    }
+
+                    columns.Add(new ProjectedColumn(col, assignment.Member.Name));
+                }
+            }
+            else
+            {
+                throw new NotSupportedException($"Unsupported Select body: {body.NodeType}. Only new {{ }}, member init, and single member access are supported.");
+            }
+
+            model.SetProjection(lambda, columns);
         }
 
         private static void AddOrdering(SelectQueryModel model, LambdaExpression lambda, bool ascending)

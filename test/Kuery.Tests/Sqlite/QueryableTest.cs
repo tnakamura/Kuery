@@ -363,5 +363,113 @@ namespace Kuery.Tests.Sqlite
                 Assert.Equal(3, result[0].Id);
             }
         }
+
+        [Fact]
+        public void SelectAnonymousTypeTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .OrderBy(x => x.Id)
+                    .Select(x => new { x.Id, x.Name })
+                    .ToList();
+
+                Assert.Equal(3, result.Count);
+                Assert.Equal(1, result[0].Id);
+                Assert.Equal("aaa", result[0].Name);
+                Assert.Equal(2, result[1].Id);
+                Assert.Equal("bbb", result[1].Name);
+                Assert.Equal(3, result[2].Id);
+                Assert.Equal("ccc", result[2].Name);
+            }
+        }
+
+        [Fact]
+        public void SelectWithWhereTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .Where(x => x.Id > 1)
+                    .Select(x => new { x.Code })
+                    .ToList();
+
+                Assert.Equal(2, result.Count);
+                Assert.Equal("2", result[0].Code);
+                Assert.Equal("3", result[1].Code);
+            }
+        }
+
+        [Fact]
+        public void SelectSinglePropertyTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .OrderBy(x => x.Id)
+                    .Select(x => x.Name)
+                    .ToList();
+
+                Assert.Equal(3, result.Count);
+                Assert.Equal("aaa", result[0]);
+                Assert.Equal("bbb", result[1]);
+                Assert.Equal("ccc", result[2]);
+            }
+        }
+
+        [Fact]
+        public void SelectWithTakeTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .OrderBy(x => x.Id)
+                    .Select(x => new { x.Id, x.Name })
+                    .Take(2)
+                    .ToList();
+
+                Assert.Equal(2, result.Count);
+                Assert.Equal(1, result[0].Id);
+                Assert.Equal(2, result[1].Id);
+            }
+        }
+
+        [Fact]
+        public void SelectFirstTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .OrderBy(x => x.Id)
+                    .Select(x => new { x.Id, x.Name })
+                    .First();
+
+                Assert.Equal(1, result.Id);
+                Assert.Equal("aaa", result.Name);
+            }
+        }
+
+        [Fact]
+        public void SelectFirstOrDefaultEmptyTest()
+        {
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>()
+                    .Select(x => new { x.Id, x.Name })
+                    .FirstOrDefault();
+
+                Assert.Null(result);
+            }
+        }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace Kuery.Linq
 {
@@ -46,6 +47,16 @@ namespace Kuery.Linq
 
         internal QueryTerminalKind Terminal { get; private set; }
 
+        internal LambdaExpression Projection { get; private set; }
+
+        internal IReadOnlyList<ProjectedColumn> ProjectedColumns { get; private set; }
+
+        internal void SetProjection(LambdaExpression projection, IReadOnlyList<ProjectedColumn> columns)
+        {
+            Projection = projection ?? throw new ArgumentNullException(nameof(projection));
+            ProjectedColumns = columns ?? throw new ArgumentNullException(nameof(columns));
+        }
+
         internal void AddPredicate(Expression predicate)
         {
             if (predicate == null)
@@ -65,5 +76,18 @@ namespace Kuery.Linq
         {
             Terminal = terminal;
         }
+    }
+
+    internal sealed class ProjectedColumn
+    {
+        internal ProjectedColumn(TableMapping.Column sourceColumn, string targetMemberName)
+        {
+            SourceColumn = sourceColumn ?? throw new ArgumentNullException(nameof(sourceColumn));
+            TargetMemberName = targetMemberName ?? throw new ArgumentNullException(nameof(targetMemberName));
+        }
+
+        internal TableMapping.Column SourceColumn { get; }
+
+        internal string TargetMemberName { get; }
     }
 }

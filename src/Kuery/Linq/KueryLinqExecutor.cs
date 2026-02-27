@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
@@ -64,12 +65,12 @@ namespace Kuery.Linq
                     case QueryTerminalKind.Count:
                         return ExecuteCount(command);
                     case QueryTerminalKind.First:
-                        return ExecuteFirst(command, model.Table, throwIfEmpty: true);
+                        return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: true);
                     case QueryTerminalKind.FirstOrDefault:
-                        return ExecuteFirst(command, model.Table, throwIfEmpty: false);
+                        return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: false);
                     case QueryTerminalKind.Sequence:
                     default:
-                        return ExecuteSequence(command, model.Table, resultType);
+                        return ExecuteSequence(command, model.Table, model.Projection, resultType);
                 }
             }
         }
@@ -88,12 +89,12 @@ namespace Kuery.Linq
                     case QueryTerminalKind.Count:
                         return await ExecuteCountAsync(command, cancellationToken).ConfigureAwait(false);
                     case QueryTerminalKind.First:
-                        return await ExecuteFirstAsync(command, model.Table, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
+                        return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
                     case QueryTerminalKind.FirstOrDefault:
-                        return await ExecuteFirstAsync(command, model.Table, throwIfEmpty: false, cancellationToken).ConfigureAwait(false);
+                        return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: false, cancellationToken).ConfigureAwait(false);
                     case QueryTerminalKind.Sequence:
                     default:
-                        return await ExecuteSequenceAsync(command, model.Table, resultType, cancellationToken).ConfigureAwait(false);
+                        return await ExecuteSequenceAsync(command, model.Table, model.Projection, resultType, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -113,12 +114,17 @@ namespace Kuery.Linq
             return command;
         }
 
-        private static object ExecuteSequence(IDbCommand command, TableMapping table, Type resultType)
+        private static object ExecuteSequence(IDbCommand command, TableMapping table, LambdaExpression projection, Type resultType)
         {
             var method = typeof(SqlHelper)
                 .GetMethod(nameof(SqlHelper.ExecuteQuery), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
                 .MakeGenericMethod(table.MappedType);
             var result = method.Invoke(null, new object[] { command, table });
+
+            if (projection != null)
+            {
+                return ApplyProjectionToSequence((IEnumerable)result, projection, resultType);
+            }
 
             if (resultType.IsAssignableFrom(result.GetType()))
             {
@@ -133,7 +139,7 @@ namespace Kuery.Linq
             return ((IEnumerable)result).Cast<object>().ToList();
         }
 
-        private static async Task<object> ExecuteSequenceAsync(IDbCommand command, TableMapping table, Type resultType, CancellationToken cancellationToken)
+        private static async Task<object> ExecuteSequenceAsync(IDbCommand command, TableMapping table, LambdaExpression projection, Type resultType, CancellationToken cancellationToken)
         {
             var method = typeof(SqlHelper)
                 .GetMethod("ExecuteQueryAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
@@ -141,6 +147,11 @@ namespace Kuery.Linq
             var task = (Task)method.Invoke(null, new object[] { command, table, cancellationToken });
             await task.ConfigureAwait(false);
             var result = task.GetType().GetProperty("Result").GetValue(task);
+
+            if (projection != null)
+            {
+                return ApplyProjectionToSequence((IEnumerable)result, projection, resultType);
+            }
 
             if (resultType.IsAssignableFrom(result.GetType()))
             {
@@ -177,7 +188,7 @@ namespace Kuery.Linq
             return (int)result;
         }
 
-        private static object ExecuteFirst(IDbCommand command, TableMapping table, bool throwIfEmpty)
+        private static object ExecuteFirst(IDbCommand command, TableMapping table, LambdaExpression projection, bool throwIfEmpty)
         {
             var method = typeof(SqlHelper)
                 .GetMethod(nameof(SqlHelper.ExecuteQuery), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
@@ -189,10 +200,16 @@ namespace Kuery.Linq
                 throw new InvalidOperationException("Sequence contains no elements");
             }
 
+            if (first != null && projection != null)
+            {
+                var compiled = projection.Compile();
+                return compiled.DynamicInvoke(first);
+            }
+
             return first;
         }
 
-        private static async Task<object> ExecuteFirstAsync(IDbCommand command, TableMapping table, bool throwIfEmpty, CancellationToken cancellationToken)
+        private static async Task<object> ExecuteFirstAsync(IDbCommand command, TableMapping table, LambdaExpression projection, bool throwIfEmpty, CancellationToken cancellationToken)
         {
             var method = typeof(SqlHelper)
                 .GetMethod("ExecuteQueryAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
@@ -206,7 +223,42 @@ namespace Kuery.Linq
                 throw new InvalidOperationException("Sequence contains no elements");
             }
 
+            if (first != null && projection != null)
+            {
+                var compiled = projection.Compile();
+                return compiled.DynamicInvoke(first);
+            }
+
             return first;
+        }
+
+        private static object ApplyProjectionToSequence(IEnumerable source, LambdaExpression projection, Type resultType)
+        {
+            var compiled = projection.Compile();
+            var projected = new List<object>();
+            foreach (var item in source)
+            {
+                projected.Add(compiled.DynamicInvoke(item));
+            }
+
+            var elementType = resultType;
+            if (resultType.IsGenericType)
+            {
+                var genDef = resultType.GetGenericTypeDefinition();
+                if (genDef == typeof(IEnumerable<>) || genDef == typeof(List<>))
+                {
+                    elementType = resultType.GetGenericArguments()[0];
+                }
+            }
+
+            var listType = typeof(List<>).MakeGenericType(elementType);
+            var typedList = (IList)Activator.CreateInstance(listType);
+            foreach (var item in projected)
+            {
+                typedList.Add(item);
+            }
+
+            return typedList;
         }
     }
 }

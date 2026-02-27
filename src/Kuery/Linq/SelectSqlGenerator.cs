@@ -35,7 +35,22 @@ namespace Kuery.Linq
                     sql.Append(effectiveTake.Value);
                     sql.Append(") ");
                 }
-                sql.Append("*");
+
+                if (model.ProjectedColumns != null && model.ProjectedColumns.Count > 0)
+                {
+                    for (var i = 0; i < model.ProjectedColumns.Count; i++)
+                    {
+                        if (i > 0)
+                        {
+                            sql.Append(", ");
+                        }
+                        sql.Append(dialect.EscapeIdentifier(model.ProjectedColumns[i].SourceColumn.Name));
+                    }
+                }
+                else
+                {
+                    sql.Append("*");
+                }
             }
 
             sql.Append(" from ");
