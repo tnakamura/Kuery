@@ -34,6 +34,11 @@ namespace Kuery.Tests.Sqlite
                     command.CommandText = "DROP TABLE IF EXISTS NumItem";
                     command.ExecuteNonQuery();
                 }
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = "DROP TABLE IF EXISTS BoolItem";
+                    command.ExecuteNonQuery();
+                }
             }
         }
 
@@ -507,6 +512,157 @@ namespace Kuery.Tests.Sqlite
 
             [Column("Value")]
             public double Value { get; set; }
+        }
+
+        [Table("BoolItem")]
+        public class BoolItem
+        {
+            [PrimaryKey]
+            [Column("Id")]
+            public int Id { get; set; }
+
+            [Column("Name")]
+            public string Name { get; set; }
+
+            [Column("IsActive")]
+            public bool IsActive { get; set; }
+        }
+
+        private void CreateBoolItemTable()
+        {
+            using (var connection = fixture.CreateConnection())
+            {
+                connection.Open();
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS BoolItem (
+                            Id INTEGER PRIMARY KEY NOT NULL,
+                            Name TEXT NOT NULL,
+                            IsActive INTEGER NOT NULL
+                        )";
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+        private void SeedBoolItems()
+        {
+            CreateBoolItemTable();
+            using (var connection = fixture.OpenNewConnection())
+            {
+                connection.Insert(new BoolItem { Id = 1, Name = "Active1", IsActive = true });
+                connection.Insert(new BoolItem { Id = 2, Name = "Inactive", IsActive = false });
+                connection.Insert(new BoolItem { Id = 3, Name = "Active2", IsActive = true });
+            }
+        }
+
+        // --- Any ---
+
+        [Fact]
+        public void AnyReturnsTrueWhenMatchesExist()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>().Any();
+
+                Assert.True(result);
+            }
+        }
+
+        [Fact]
+        public void AnyReturnsFalseWhenEmpty()
+        {
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<Customer>().Any();
+
+                Assert.False(result);
+            }
+        }
+
+        [Fact]
+        public void AnyWithPredicateTest()
+        {
+            SeedThreeCustomers();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                Assert.True(connection.Query<Customer>().Any(x => x.Code == "2"));
+                Assert.False(connection.Query<Customer>().Any(x => x.Code == "999"));
+            }
+        }
+
+        // --- Bool property direct reference ---
+
+        [Fact]
+        public void WhereBoolPropertyDirectTest()
+        {
+            SeedBoolItems();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<BoolItem>()
+                    .Where(x => x.IsActive)
+                    .ToList();
+
+                Assert.Equal(2, result.Count);
+                Assert.All(result, x => Assert.True(x.IsActive));
+            }
+        }
+
+        [Fact]
+        public void WhereNotBoolPropertyTest()
+        {
+            SeedBoolItems();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<BoolItem>()
+                    .Where(x => !x.IsActive)
+                    .ToList();
+
+                Assert.Single(result);
+                Assert.Equal("Inactive", result[0].Name);
+            }
+        }
+
+        // --- string.Replace ---
+
+        [Fact]
+        public void StringReplaceContainsTest()
+        {
+            SeedProducts();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                // "Foobar" → Replace("o","") → "Fbar", contains "Fb"
+                var result = connection.Query<StringProduct>()
+                    .Where(x => x.Name.Replace("o", "").Contains("Fb"))
+                    .ToList();
+
+                Assert.Single(result);
+                Assert.Equal("Foobar", result[0].Name);
+            }
+        }
+
+        [Fact]
+        public void StringReplaceEqualsTest()
+        {
+            SeedProducts();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                // "Bar" → Replace("B","b") → "bar"
+                var result = connection.Query<StringProduct>()
+                    .Where(x => x.Name.Replace("B", "b") == "bar")
+                    .ToList();
+
+                Assert.Single(result);
+                Assert.Equal("Bar", result[0].Name);
+            }
         }
     }
 }

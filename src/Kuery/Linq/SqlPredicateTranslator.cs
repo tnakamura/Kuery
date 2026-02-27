@@ -36,6 +36,12 @@ namespace Kuery.Linq
                     return "not (" + TranslateCore(((UnaryExpression)expression).Operand, table, dialect, parameters) + ")";
                 case ExpressionType.Call:
                     return TranslateMethodCall((MethodCallExpression)expression, table, dialect, parameters);
+                case ExpressionType.MemberAccess:
+                    if (TryGetColumnExpression(expression, table, dialect, out var boolColumnSql))
+                    {
+                        return "(" + boolColumnSql + " = 1)";
+                    }
+                    goto default;
                 default:
                     throw new NotSupportedException(
                         $"Unsupported predicate node: {expression.NodeType}.");
@@ -49,7 +55,7 @@ namespace Kuery.Linq
             // string.Contains(value)
             if (methodName == nameof(string.Contains) && call.Object != null && call.Object.Type == typeof(string) && call.Arguments.Count == 1)
             {
-                var columnSql = TranslateToColumnSql(call.Object, table, dialect);
+                var columnSql = TranslateToColumnSql(call.Object, table, dialect, parameters);
                 if (columnSql != null)
                 {
                     var value = EvaluateExpression(call.Arguments[0]);
@@ -61,7 +67,7 @@ namespace Kuery.Linq
             // string.StartsWith(value) / string.StartsWith(value, StringComparison)
             if (methodName == nameof(string.StartsWith) && call.Object != null && call.Arguments.Count >= 1)
             {
-                var columnSql = TranslateToColumnSql(call.Object, table, dialect);
+                var columnSql = TranslateToColumnSql(call.Object, table, dialect, parameters);
                 if (columnSql != null)
                 {
                     var value = EvaluateExpression(call.Arguments[0]);
@@ -76,7 +82,7 @@ namespace Kuery.Linq
             // string.EndsWith(value) / string.EndsWith(value, StringComparison)
             if (methodName == nameof(string.EndsWith) && call.Object != null && call.Arguments.Count >= 1)
             {
-                var columnSql = TranslateToColumnSql(call.Object, table, dialect);
+                var columnSql = TranslateToColumnSql(call.Object, table, dialect, parameters);
                 if (columnSql != null)
                 {
                     var value = EvaluateExpression(call.Arguments[0]);
@@ -85,6 +91,20 @@ namespace Kuery.Linq
                         ? (StringComparison)EvaluateExpression(call.Arguments[1])
                         : StringComparison.CurrentCulture;
                     return BuildEndsWith(columnSql, paramName, value?.ToString()?.Length ?? 0, comparison, dialect);
+                }
+            }
+
+            // string.Replace(oldValue, newValue)
+            if (methodName == nameof(string.Replace) && call.Object != null && call.Arguments.Count == 2)
+            {
+                var columnSql = TranslateToColumnSql(call.Object, table, dialect, parameters);
+                if (columnSql != null)
+                {
+                    var oldValue = EvaluateExpression(call.Arguments[0]);
+                    var newValue = EvaluateExpression(call.Arguments[1]);
+                    var oldParam = AddParameter(dialect, parameters, oldValue);
+                    var newParam = AddParameter(dialect, parameters, newValue);
+                    return "replace(" + columnSql + ", " + oldParam + ", " + newParam + ")";
                 }
             }
 
@@ -114,18 +134,39 @@ namespace Kuery.Linq
 
         private static string TranslateToColumnSql(Expression expression, TableMapping table, ISqlDialect dialect)
         {
-            // Handle x.Prop.ToLower() / x.Prop.ToUpper() wrapping
+            return TranslateToColumnSql(expression, table, dialect, null);
+        }
+
+        private static string TranslateToColumnSql(Expression expression, TableMapping table, ISqlDialect dialect, List<object> parameters)
+        {
+            // Handle x.Prop.ToLower() / x.Prop.ToUpper() / x.Prop.Replace() wrapping
             if (expression is MethodCallExpression innerCall && innerCall.Object != null)
             {
                 if (innerCall.Method.Name == nameof(string.ToLower) && innerCall.Arguments.Count == 0)
                 {
-                    var inner = TranslateToColumnSql(innerCall.Object, table, dialect);
+                    var inner = TranslateToColumnSql(innerCall.Object, table, dialect, parameters);
                     if (inner != null) return "lower(" + inner + ")";
                 }
                 if (innerCall.Method.Name == nameof(string.ToUpper) && innerCall.Arguments.Count == 0)
                 {
-                    var inner = TranslateToColumnSql(innerCall.Object, table, dialect);
+                    var inner = TranslateToColumnSql(innerCall.Object, table, dialect, parameters);
                     if (inner != null) return "upper(" + inner + ")";
+                }
+                if (innerCall.Method.Name == nameof(string.Replace) && innerCall.Arguments.Count == 2)
+                {
+                    var inner = TranslateToColumnSql(innerCall.Object, table, dialect, parameters);
+                    if (inner != null)
+                    {
+                        var oldVal = EvaluateExpression(innerCall.Arguments[0]);
+                        var newVal = EvaluateExpression(innerCall.Arguments[1]);
+                        if (parameters != null)
+                        {
+                            var oldParam = AddParameter(dialect, parameters, oldVal);
+                            var newParam = AddParameter(dialect, parameters, newVal);
+                            return "replace(" + inner + ", " + oldParam + ", " + newParam + ")";
+                        }
+                        return "replace(" + inner + ", '" + oldVal?.ToString()?.Replace("'", "''") + "', '" + newVal?.ToString()?.Replace("'", "''") + "')";
+                    }
                 }
             }
 
@@ -225,6 +266,26 @@ namespace Kuery.Linq
         {
             var leftIsColumn = TryGetColumnExpression(expression.Left, table, dialect, out var leftColumn);
             var rightIsColumn = TryGetColumnExpression(expression.Right, table, dialect, out var rightColumn);
+
+            // Also try column-transforming expressions (Replace, ToLower, ToUpper)
+            if (!leftIsColumn)
+            {
+                var leftTransformed = TranslateToColumnSql(expression.Left, table, dialect, parameters);
+                if (leftTransformed != null)
+                {
+                    leftColumn = leftTransformed;
+                    leftIsColumn = true;
+                }
+            }
+            if (!rightIsColumn)
+            {
+                var rightTransformed = TranslateToColumnSql(expression.Right, table, dialect, parameters);
+                if (rightTransformed != null)
+                {
+                    rightColumn = rightTransformed;
+                    rightIsColumn = true;
+                }
+            }
 
             if (leftIsColumn && !rightIsColumn)
             {

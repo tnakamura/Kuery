@@ -1717,6 +1717,13 @@ namespace Kuery
                 {
                     sqlCall = "(replace(" + obj.Value.CommandText + "," + args[0].CommandText + "," + args[1].CommandText + "))";
                 }
+                else if (call.Method.IsSpecialName && args.Length == 1
+                    && (call.Method.Name == "op_Implicit" || call.Method.Name == "op_Explicit"))
+                {
+                    // .NET 10+ may insert implicit conversion operators (e.g. array to
+                    // ReadOnlySpan<T>) in expression trees. Pass through the inner argument.
+                    return args[0];
+                }
                 else
                 {
                     sqlCall = call.Method.Name.ToLower() + "(" + string.Join(",", args.Select(a => a.CommandText)) + ")";

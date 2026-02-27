@@ -25,7 +25,7 @@ namespace Kuery.Linq
             }
 
             sql.Append("select ");
-            if (model.Terminal == QueryTerminalKind.Count)
+            if (model.Terminal == QueryTerminalKind.Count || model.Terminal == QueryTerminalKind.Any)
             {
                 sql.Append("count(*)");
             }

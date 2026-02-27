@@ -64,6 +64,8 @@ namespace Kuery.Linq
                 {
                     case QueryTerminalKind.Count:
                         return ExecuteCount(command);
+                    case QueryTerminalKind.Any:
+                        return ExecuteCount(command) > 0;
                     case QueryTerminalKind.Sum:
                     case QueryTerminalKind.Min:
                     case QueryTerminalKind.Max:
@@ -97,6 +99,8 @@ namespace Kuery.Linq
                 {
                     case QueryTerminalKind.Count:
                         return await ExecuteCountAsync(command, cancellationToken).ConfigureAwait(false);
+                    case QueryTerminalKind.Any:
+                        return await ExecuteCountAsync(command, cancellationToken).ConfigureAwait(false) > 0;
                     case QueryTerminalKind.Sum:
                     case QueryTerminalKind.Min:
                     case QueryTerminalKind.Max:

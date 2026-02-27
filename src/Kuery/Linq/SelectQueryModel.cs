@@ -9,6 +9,7 @@ namespace Kuery.Linq
     {
         Sequence,
         Count,
+        Any,
         First,
         FirstOrDefault,
         Single,
