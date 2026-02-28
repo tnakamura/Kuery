@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace Kuery.Linq
 {
@@ -28,12 +29,55 @@ namespace Kuery.Linq
 
             if (expression is MethodCallExpression methodCall && methodCall.Method.DeclaringType == typeof(Queryable))
             {
+                // Special case: SelectMany on GroupJoin → LEFT JOIN pattern
+                if (methodCall.Method.Name == nameof(Queryable.SelectMany)
+                    && methodCall.Arguments.Count == 3
+                    && methodCall.Arguments[0] is MethodCallExpression innerCall
+                    && innerCall.Method.DeclaringType == typeof(Queryable)
+                    && innerCall.Method.Name == nameof(Queryable.GroupJoin))
+                {
+                    return TranslateLeftJoin(innerCall, methodCall);
+                }
+
                 var model = TranslateCore(methodCall.Arguments[0]);
                 ApplyMethod(model, methodCall);
                 return model;
             }
 
             throw new NotSupportedException($"Unsupported query expression: {expression}");
+        }
+
+        private SelectQueryModel TranslateLeftJoin(
+            MethodCallExpression groupJoinCall,
+            MethodCallExpression selectManyCall)
+        {
+            // GroupJoin(outer, inner, outerKey, innerKey, groupResultSelector)
+            var model = TranslateCore(groupJoinCall.Arguments[0]);
+            var innerTable = GetInnerTable(groupJoinCall.Arguments[1]);
+
+            var outerKeyLambda = GetLambda(groupJoinCall.Arguments[2]);
+            var innerKeyLambda = GetLambda(groupJoinCall.Arguments[3]);
+            var groupResultLambda = GetLambda(groupJoinCall.Arguments[4]);
+
+            var keyPairs = BuildKeyPairs(model, outerKeyLambda, innerTable, innerKeyLambda);
+
+            // SelectMany(groupJoinResult, collectionSelector, resultSelector)
+            var resultSelectorLambda = GetLambda(selectManyCall.Arguments[2]);
+
+            // Find outer member name in GroupJoin result selector: (o, ols) => new { o, ols }
+            var outerMemberName = GetOuterEntityMemberName(groupResultLambda, model.Table.MappedType);
+
+            // Rewrite (x, inner) => ... where x.outerMemberName.Prop → outerParam.Prop
+            var rewritten = RewriteLeftJoinSelector(
+                resultSelectorLambda,
+                resultSelectorLambda.Parameters[0],
+                outerMemberName,
+                model.Table.MappedType);
+
+            var joinClause = new JoinClause(innerTable, keyPairs, rewritten, isLeftJoin: true);
+            model.AddJoin(joinClause);
+            model.SetJoinResultSelector(rewritten);
+            return model;
         }
 
         private static void ApplyMethod(SelectQueryModel model, MethodCallExpression methodCall)
@@ -450,46 +494,133 @@ namespace Kuery.Linq
 
         private static void ApplyJoin(SelectQueryModel model, MethodCallExpression methodCall)
         {
-            // Arguments[1] is the inner source
-            var innerExpression = methodCall.Arguments[1];
-            // Unwrap Quote if present
-            while (innerExpression.NodeType == ExpressionType.Quote)
-            {
-                innerExpression = ((UnaryExpression)innerExpression).Operand;
-            }
+            var innerTable = GetInnerTable(methodCall.Arguments[1]);
 
-            TableMapping innerTable;
-            if (innerExpression is ConstantExpression constInner && constInner.Value is IQueryable innerQueryable)
+            var outerKeyLambda = GetLambda(methodCall.Arguments[2]);
+            var innerKeyLambda = GetLambda(methodCall.Arguments[3]);
+            var resultSelector = GetLambda(methodCall.Arguments[4]);
+
+            var keyPairs = BuildKeyPairs(model, outerKeyLambda, innerTable, innerKeyLambda);
+            var joinClause = new JoinClause(innerTable, keyPairs, resultSelector);
+            model.AddJoin(joinClause);
+
+            // For chained joins (JoinShape already exists from a previous join), rewrite the
+            // result selector so the executor can call it with individual entity instances.
+            LambdaExpression finalResultSelector;
+            if (model.JoinShape != null && model.JoinShape.Count > 0)
             {
-                innerTable = SqlMapper.GetMapping(innerQueryable.ElementType);
+                finalResultSelector = RewriteMultiJoinSelector(resultSelector, model.JoinShape);
             }
             else
             {
-                throw new NotSupportedException("Join inner source must be a root query.");
+                finalResultSelector = resultSelector;
             }
+            model.SetJoinResultSelector(finalResultSelector);
 
-            // Arguments[2] is outerKeySelector
-            var outerKeyLambda = GetLambda(methodCall.Arguments[2]);
-            var outerKeyColumn = GetKeyColumn(model.Table, outerKeyLambda);
-
-            // Arguments[3] is innerKeySelector
-            var innerKeyLambda = GetLambda(methodCall.Arguments[3]);
-            var innerKeyColumn = GetKeyColumn(innerTable, innerKeyLambda);
-
-            // Arguments[4] is resultSelector
-            var resultSelector = GetLambda(methodCall.Arguments[4]);
-
-            model.SetJoin(new JoinClause(innerTable, outerKeyColumn, innerKeyColumn, resultSelector));
+            // Update JoinShape AFTER the rewrite, so future chained joins can resolve outer keys.
+            UpdateJoinShape(model, resultSelector, innerTable);
         }
 
-        private static TableMapping.Column GetKeyColumn(TableMapping table, LambdaExpression lambda)
+        private static TableMapping GetInnerTable(Expression expression)
         {
-            var body = lambda.Body;
-            if (body is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+            while (expression.NodeType == ExpressionType.Quote)
             {
-                body = unary.Operand;
+                expression = ((UnaryExpression)expression).Operand;
             }
 
+            if (expression is ConstantExpression constExpr && constExpr.Value is IQueryable innerQueryable)
+            {
+                return SqlMapper.GetMapping(innerQueryable.ElementType);
+            }
+
+            throw new NotSupportedException("Join inner source must be a root query.");
+        }
+
+        /// <summary>
+        /// Builds a list of key pairs from the outer and inner key selectors.
+        /// Handles both single-key (x => x.Id) and composite-key (x => new { x.A, x.B }) selectors.
+        /// </summary>
+        private static IReadOnlyList<JoinKeyPair> BuildKeyPairs(
+            SelectQueryModel model,
+            LambdaExpression outerKeyLambda,
+            TableMapping innerTable,
+            LambdaExpression innerKeyLambda)
+        {
+            var outerBody = UnwrapConvert(outerKeyLambda.Body);
+            var innerBody = UnwrapConvert(innerKeyLambda.Body);
+
+            // Composite key: both sides return anonymous types
+            if (outerBody is NewExpression outerNew && innerBody is NewExpression innerNew)
+            {
+                if (outerNew.Arguments.Count != innerNew.Arguments.Count)
+                {
+                    throw new NotSupportedException(
+                        $"Composite join keys must have the same number of members. " +
+                        $"Outer has {outerNew.Arguments.Count} member(s) but inner has {innerNew.Arguments.Count}.");
+                }
+
+                var pairs = new List<JoinKeyPair>(outerNew.Arguments.Count);
+                for (var i = 0; i < outerNew.Arguments.Count; i++)
+                {
+                    var outerTable = ResolveOuterTable(model, UnwrapConvert(outerNew.Arguments[i]), out var outerCol);
+                    var innerCol = GetColumnFromMember(innerTable, UnwrapConvert(innerNew.Arguments[i]));
+                    pairs.Add(new JoinKeyPair(outerTable, outerCol, innerCol));
+                }
+
+                return pairs;
+            }
+
+            // Single key
+            {
+                var outerTable = ResolveOuterTable(model, outerBody, out var outerCol);
+                var innerCol = GetColumnFromMember(innerTable, innerBody);
+                return new[] { new JoinKeyPair(outerTable, outerCol, innerCol) };
+            }
+        }
+
+        /// <summary>
+        /// Resolves which table an outer key expression belongs to and returns the column.
+        /// Handles both simple (param.Prop) and chained-join (x.member.Prop) forms.
+        /// </summary>
+        private static TableMapping ResolveOuterTable(
+            SelectQueryModel model,
+            Expression body,
+            out TableMapping.Column column)
+        {
+            if (body is MemberExpression member)
+            {
+                // Simple: outerParam.Prop → outer table
+                if (member.Expression?.NodeType == ExpressionType.Parameter)
+                {
+                    var col = model.Table.FindColumnWithPropertyName(member.Member.Name);
+                    if (col != null)
+                    {
+                        column = col;
+                        return model.Table;
+                    }
+                }
+
+                // Chained join: x.joinMember.Prop where joinMember is in JoinShape
+                if (member.Expression is MemberExpression outerAccess
+                    && outerAccess.Expression?.NodeType == ExpressionType.Parameter
+                    && model.JoinShape != null
+                    && model.JoinShape.TryGetValue(outerAccess.Member.Name, out var joinedTable))
+                {
+                    var col = joinedTable.FindColumnWithPropertyName(member.Member.Name);
+                    if (col != null)
+                    {
+                        column = col;
+                        return joinedTable;
+                    }
+                }
+            }
+
+            throw new NotSupportedException(
+                $"Unsupported outer key expression: {body}. Only direct member access or chained join member access is supported.");
+        }
+
+        private static TableMapping.Column GetColumnFromMember(TableMapping table, Expression body)
+        {
             if (body is MemberExpression member && member.Expression?.NodeType == ExpressionType.Parameter)
             {
                 var col = table.FindColumnWithPropertyName(member.Member.Name);
@@ -499,7 +630,224 @@ namespace Kuery.Linq
                 }
             }
 
-            throw new NotSupportedException($"Unsupported key selector: {lambda}. Only direct member access is supported.");
+            throw new NotSupportedException(
+                $"Unsupported key expression: {body}. Only direct member access is supported.");
+        }
+
+        private static Expression UnwrapConvert(Expression expr)
+        {
+            while (expr is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+            {
+                expr = unary.Operand;
+            }
+
+            return expr;
+        }
+
+        /// <summary>
+        /// Updates the JoinShape from a join result selector so subsequent joins can
+        /// resolve outer key expressions like x.member.Prop.
+        /// </summary>
+        private static void UpdateJoinShape(
+            SelectQueryModel model,
+            LambdaExpression resultSelector,
+            TableMapping newInnerTable)
+        {
+            if (!(resultSelector.Body is NewExpression newExpr) || newExpr.Members == null)
+            {
+                return;
+            }
+
+            var firstParam = resultSelector.Parameters[0];
+            var secondParam = resultSelector.Parameters.Count > 1 ? resultSelector.Parameters[1] : null;
+
+            // Build new shape (may replace previous)
+            var newShape = new Dictionary<string, TableMapping>();
+
+            for (var i = 0; i < newExpr.Arguments.Count; i++)
+            {
+                var arg = UnwrapConvert(newExpr.Arguments[i]);
+                var memberName = newExpr.Members[i].Name;
+
+                if (arg is ParameterExpression param)
+                {
+                    if (param == firstParam)
+                    {
+                        // First join: param is the outer entity directly
+                        newShape[memberName] = model.Table;
+                    }
+                    else if (param == secondParam)
+                    {
+                        newShape[memberName] = newInnerTable;
+                    }
+                }
+                else if (arg is MemberExpression memberAccess && memberAccess.Expression == firstParam)
+                {
+                    // Subsequent join: x.prevMember → look up in existing shape
+                    if (model.JoinShape != null
+                        && model.JoinShape.TryGetValue(memberAccess.Member.Name, out var prevTable))
+                    {
+                        newShape[memberName] = prevTable;
+                    }
+                }
+            }
+
+            foreach (var kv in newShape)
+            {
+                model.SetJoinShapeMember(kv.Key, kv.Value);
+            }
+        }
+
+        /// <summary>
+        /// For multiple chained joins, rewrites the final result selector
+        /// from (x, inner) => ... to (t1, t2, ..., inner) => ... where ti are entity params.
+        /// </summary>
+        private static LambdaExpression RewriteMultiJoinSelector(
+            LambdaExpression selector,
+            Dictionary<string, TableMapping> joinShape)
+        {
+            var firstParam = selector.Parameters[0];
+            var innerParam = selector.Parameters[1];
+
+            // Build ordered list of (memberName, table) from shape (preserve insertion order)
+            var tableParams = new Dictionary<string, ParameterExpression>(StringComparer.Ordinal);
+            foreach (var kv in joinShape)
+            {
+                tableParams[kv.Key] = Expression.Parameter(kv.Value.MappedType, kv.Key);
+            }
+
+            var rewriter = new MultiJoinRewriter(firstParam, tableParams);
+            var newBody = rewriter.Visit(selector.Body);
+
+            var newParams = new List<ParameterExpression>(tableParams.Values) { innerParam };
+            return Expression.Lambda(newBody, newParams);
+        }
+
+        /// <summary>
+        /// For LEFT JOIN: rewrites (x, inner) => ... where x.outerMember.Prop
+        /// to (outerParam, inner) => ... where outerParam.Prop.
+        /// </summary>
+        private static LambdaExpression RewriteLeftJoinSelector(
+            LambdaExpression selector,
+            ParameterExpression xParam,
+            string outerMemberName,
+            Type outerEntityType)
+        {
+            var outerParam = Expression.Parameter(outerEntityType, "outer");
+            var innerParam = selector.Parameters[1];
+
+            var rewriter = new LeftJoinRewriter(xParam, outerMemberName, outerParam);
+            var newBody = rewriter.Visit(selector.Body);
+
+            return Expression.Lambda(newBody, outerParam, innerParam);
+        }
+
+        /// <summary>
+        /// Returns the member name in the GroupJoin result selector that holds the outer entity.
+        /// E.g., for (o, ols) => new { o, ols }, returns "o".
+        /// </summary>
+        private static string GetOuterEntityMemberName(LambdaExpression groupResultLambda, Type outerEntityType)
+        {
+            if (groupResultLambda.Body is NewExpression newExpr && newExpr.Members != null)
+            {
+                for (var i = 0; i < newExpr.Arguments.Count; i++)
+                {
+                    var arg = UnwrapConvert(newExpr.Arguments[i]);
+                    if (arg is ParameterExpression param && param.Type == outerEntityType)
+                    {
+                        return newExpr.Members[i].Name;
+                    }
+                }
+            }
+
+            throw new NotSupportedException(
+                "Cannot determine outer entity member from GroupJoin result selector. " +
+                $"Expected pattern: (outer, items) => new {{ outer, items }}. Got: {groupResultLambda}");
+        }
+
+        // ------------------------------------------------------------------
+        // Expression rewriters
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Rewrites x.memberName → corresponding table param (for multi-join selectors).
+        /// Also handles x.memberName.Prop → tableParam.Prop.
+        /// </summary>
+        private sealed class MultiJoinRewriter : ExpressionVisitor
+        {
+            private readonly ParameterExpression _firstParam;
+            private readonly Dictionary<string, ParameterExpression> _memberToParam;
+
+            internal MultiJoinRewriter(
+                ParameterExpression firstParam,
+                Dictionary<string, ParameterExpression> memberToParam)
+            {
+                _firstParam = firstParam;
+                _memberToParam = memberToParam;
+            }
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                var inner = UnwrapConvert(node.Expression);
+
+                // x.memberName.Prop → tableParam.Prop
+                if (inner is MemberExpression innerMember
+                    && innerMember.Expression == _firstParam
+                    && _memberToParam.TryGetValue(innerMember.Member.Name, out var param1))
+                {
+                    var prop = GetMemberInfo(param1.Type, node.Member.Name);
+                    if (prop != null) return Expression.MakeMemberAccess(param1, prop);
+                }
+
+                // x.memberName → tableParam (entire entity)
+                if (node.Expression == _firstParam
+                    && _memberToParam.TryGetValue(node.Member.Name, out var param2))
+                {
+                    return param2;
+                }
+
+                return base.VisitMember(node);
+            }
+        }
+
+        /// <summary>
+        /// Rewrites x.outerMember.Prop → outerParam.Prop (for LEFT JOIN selectors).
+        /// </summary>
+        private sealed class LeftJoinRewriter : ExpressionVisitor
+        {
+            private readonly ParameterExpression _xParam;
+            private readonly string _outerMemberName;
+            private readonly ParameterExpression _outerParam;
+
+            internal LeftJoinRewriter(
+                ParameterExpression xParam,
+                string outerMemberName,
+                ParameterExpression outerParam)
+            {
+                _xParam = xParam;
+                _outerMemberName = outerMemberName;
+                _outerParam = outerParam;
+            }
+
+            protected override Expression VisitMember(MemberExpression node)
+            {
+                var inner = UnwrapConvert(node.Expression);
+                if (inner is MemberExpression outerAccess
+                    && outerAccess.Member.Name == _outerMemberName
+                    && outerAccess.Expression == _xParam)
+                {
+                    var prop = GetMemberInfo(_outerParam.Type, node.Member.Name);
+                    if (prop != null) return Expression.MakeMemberAccess(_outerParam, prop);
+                }
+
+                return base.VisitMember(node);
+            }
+        }
+
+        private static MemberInfo GetMemberInfo(Type type, string name)
+        {
+            return (MemberInfo)type.GetProperty(name)
+                ?? (MemberInfo)type.GetField(name);
         }
 
         private static void AddOrdering(SelectQueryModel model, LambdaExpression lambda, bool ascending)

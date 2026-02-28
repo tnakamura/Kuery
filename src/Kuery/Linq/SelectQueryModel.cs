@@ -65,27 +65,47 @@ namespace Kuery.Linq
         internal bool Ascending { get; }
     }
 
-    internal sealed class JoinClause
+    internal sealed class JoinKeyPair
     {
-        internal JoinClause(
-            TableMapping innerTable,
-            TableMapping.Column outerKeyColumn,
-            TableMapping.Column innerKeyColumn,
-            LambdaExpression resultSelector)
+        internal JoinKeyPair(TableMapping outerKeyTable, TableMapping.Column outerKeyColumn, TableMapping.Column innerKeyColumn)
         {
-            InnerTable = innerTable ?? throw new ArgumentNullException(nameof(innerTable));
+            OuterKeyTable = outerKeyTable ?? throw new ArgumentNullException(nameof(outerKeyTable));
             OuterKeyColumn = outerKeyColumn ?? throw new ArgumentNullException(nameof(outerKeyColumn));
             InnerKeyColumn = innerKeyColumn ?? throw new ArgumentNullException(nameof(innerKeyColumn));
-            ResultSelector = resultSelector ?? throw new ArgumentNullException(nameof(resultSelector));
         }
 
-        internal TableMapping InnerTable { get; }
+        internal TableMapping OuterKeyTable { get; }
 
         internal TableMapping.Column OuterKeyColumn { get; }
 
         internal TableMapping.Column InnerKeyColumn { get; }
+    }
+
+    internal sealed class JoinClause
+    {
+        internal JoinClause(
+            TableMapping innerTable,
+            IReadOnlyList<JoinKeyPair> keyPairs,
+            LambdaExpression resultSelector,
+            bool isLeftJoin = false)
+        {
+            InnerTable = innerTable ?? throw new ArgumentNullException(nameof(innerTable));
+            KeyPairs = keyPairs ?? throw new ArgumentNullException(nameof(keyPairs));
+            ResultSelector = resultSelector ?? throw new ArgumentNullException(nameof(resultSelector));
+            IsLeftJoin = isLeftJoin;
+        }
+
+        internal TableMapping InnerTable { get; }
+
+        internal IReadOnlyList<JoinKeyPair> KeyPairs { get; }
+
+        internal TableMapping.Column OuterKeyColumn => KeyPairs[0].OuterKeyColumn;
+
+        internal TableMapping.Column InnerKeyColumn => KeyPairs[0].InnerKeyColumn;
 
         internal LambdaExpression ResultSelector { get; }
+
+        internal bool IsLeftJoin { get; }
     }
 
     internal sealed class SelectQueryModel
@@ -99,11 +119,29 @@ namespace Kuery.Linq
 
         internal TableMapping Table { get; }
 
-        internal JoinClause Join { get; private set; }
+        internal List<JoinClause> Joins { get; private set; }
 
-        internal void SetJoin(JoinClause join)
+        internal JoinClause Join => Joins?.Count > 0 ? Joins[0] : null;
+
+        internal void AddJoin(JoinClause join)
         {
-            Join = join ?? throw new ArgumentNullException(nameof(join));
+            if (Joins == null) Joins = new List<JoinClause>();
+            Joins.Add(join ?? throw new ArgumentNullException(nameof(join)));
+        }
+
+        internal Dictionary<string, TableMapping> JoinShape { get; private set; }
+
+        internal void SetJoinShapeMember(string memberName, TableMapping table)
+        {
+            if (JoinShape == null) JoinShape = new Dictionary<string, TableMapping>();
+            JoinShape[memberName] = table ?? throw new ArgumentNullException(nameof(table));
+        }
+
+        internal LambdaExpression JoinResultSelector { get; private set; }
+
+        internal void SetJoinResultSelector(LambdaExpression selector)
+        {
+            JoinResultSelector = selector;
         }
 
         internal Expression Predicate { get; private set; }
