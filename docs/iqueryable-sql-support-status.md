@@ -159,14 +159,26 @@
 |----------|-------|------------|--------|
 | 文字列 | `string.Format(...)` | 文字列結合に展開 | 低 |
 | 文字列 | `string.Join(sep, ...)` | N/A（集約コンテキスト依存） | 低 |
+| 文字列 | `string.Concat(a, b, c)` (3 引数以上) | 文字列結合に展開 | 低 |
+| 文字列 | `string.PadLeft(n)` / `string.PadRight(n)` | `LPAD` / `RPAD` | 低 |
+| 数学 | `Math.Truncate(x)` | `TRUNC` / `TRUNCATE` | 低 |
+| 数学 | `Math.Sign(x)` | `SIGN(x)` | 低 |
+| 数学 | `Math.Exp(x)` | `EXP(x)` | 低 |
+| 日時 | `TimeSpan` 演算 | 日時差分（`DATEDIFF` 等） | 低 |
+| 日時 | `DateTimeOffset` 操作 | タイムゾーン付き日時 | 低 |
 
-### SQL 固有機能（LINQ では直接表現が困難）
+### SQL 固有機能
 
 | 機能 | SQL 構文 | 優先度 |
 |------|---------|--------|
 | ウィンドウ関数 | `ROW_NUMBER() OVER(...)`, `RANK()`, etc. | 低 |
 | CTE | `WITH cte AS (...)` | 低 |
-| CASE (複雑) | 複数条件の `CASE WHEN` | 低 |
+| `RIGHT JOIN` | `RIGHT JOIN ... ON ...` | 低 |
+| `FULL OUTER JOIN` | `FULL OUTER JOIN ... ON ...` | 低 |
+| `DISTINCT` + 集計関数 | `COUNT(DISTINCT col)`, `SUM(DISTINCT col)` 等 | 中 |
+| SELECT 内の計算式 | `SELECT col1 + col2`, `SELECT UPPER(col)` 等 | 中 |
+| ORDER BY 内の式 | `ORDER BY length(col)`, `ORDER BY col1 + col2` 等 | 低 |
+| GROUP BY 内の式 | `GROUP BY YEAR(col)` 等 | 低 |
 
 ---
 
@@ -246,9 +258,11 @@ WHERE 述語で使える式を増やし、より複雑な条件を書けるよ�
 ## 制約事項
 
 - `Select` 内では直接のプロパティアクセスのみ対応（計算式やメソッド呼び出しは不可）。
-- `OrderBy` 内では直接のプロパティアクセスのみ対応。
-- `GroupBy` 内では直接のプロパティアクセスのみ対応。
-- `Join` は単一キー / 複合キーの INNER JOIN、および `GroupJoin` + `SelectMany` + `DefaultIfEmpty` による LEFT JOIN に対応。複数テーブルへの JOIN チェインも可能。
+- `OrderBy` 内では直接のプロパティアクセスのみ対応（`OrderBy(x => x.Name.Length)` のような式は不可）。
+- `GroupBy` 内では直接のプロパティアクセスのみ対応（`GroupBy(x => x.Date.Year)` のような式は不可）。
+- `Join` は単一キー / 複合キーの INNER JOIN、および `GroupJoin` + `SelectMany` + `DefaultIfEmpty` による LEFT JOIN に対応。複数テーブルへの JOIN チェインも可能。`RIGHT JOIN` / `FULL OUTER JOIN` は未対応。
 - `SelectMany` はルートクエリ（`connection.Query<T>()`）を返すコレクションセレクタのみ対応（CROSS JOIN を生成）。
 - サブクエリ（`Contains` → `IN (SELECT ...)`、`Any` → `EXISTS (SELECT ...)`）は `IQueryable` をソースとする場合のみ対応。
+- `Distinct()` と集計関数の組み合わせ（`query.Select(x => x.Name).Distinct().Count()` → `COUNT(DISTINCT col)` 等）は未対応。`Distinct()` は通常の `SELECT DISTINCT` としてのみ機能する。
+- `string.Concat()` は 2 引数のみ対応。3 引数以上の `string.Concat(a, b, c)` は未対応（ただし `x.A + x.B + x.C` のような `+` 演算子チェインは対応済み）。
 - 未対応の演算子を使用した場合は `NotSupportedException` がスローされる（クライアント評価へのフォールバックは行わない）。
