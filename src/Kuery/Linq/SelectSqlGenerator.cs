@@ -10,12 +10,61 @@ namespace Kuery.Linq
     {
         readonly SqlPredicateTranslator _predicateTranslator = new SqlPredicateTranslator();
 
-        internal GeneratedSql Generate(SelectQueryModel model, ISqlDialect dialect)
+        internal GeneratedSql GenerateSetOperation(SetOperationQueryModel model, ISqlDialect dialect)
         {
             if (model == null) throw new ArgumentNullException(nameof(model));
             if (dialect == null) throw new ArgumentNullException(nameof(dialect));
 
             var parameters = new List<object>();
+            var sql = new StringBuilder();
+            AppendSetOperand(sql, model.Left, dialect, parameters);
+            sql.Append(GetSetOperator(model.Operation));
+            AppendSetOperand(sql, model.Right, dialect, parameters);
+            return new GeneratedSql(sql.ToString(), parameters);
+        }
+
+        private void AppendSetOperand(StringBuilder sql, object operand, ISqlDialect dialect, List<object> parameters)
+        {
+            if (operand is SelectQueryModel selectModel)
+            {
+                sql.Append(GenerateCore(selectModel, dialect, parameters));
+            }
+            else if (operand is SetOperationQueryModel setModel)
+            {
+                AppendSetOperand(sql, setModel.Left, dialect, parameters);
+                sql.Append(GetSetOperator(setModel.Operation));
+                AppendSetOperand(sql, setModel.Right, dialect, parameters);
+            }
+            else
+            {
+                throw new NotSupportedException($"Unsupported set operation operand type: {operand?.GetType()}");
+            }
+        }
+
+        private static string GetSetOperator(SetOperationKind kind)
+        {
+            switch (kind)
+            {
+                case SetOperationKind.Union: return " union ";
+                case SetOperationKind.UnionAll: return " union all ";
+                case SetOperationKind.Intersect: return " intersect ";
+                case SetOperationKind.Except: return " except ";
+                default: throw new NotSupportedException($"Unsupported set operation: {kind}");
+            }
+        }
+
+        internal GeneratedSql Generate(SelectQueryModel model, ISqlDialect dialect)
+        {
+            var parameters = new List<object>();
+            var sql = GenerateCore(model, dialect, parameters);
+            return new GeneratedSql(sql, parameters);
+        }
+
+        private string GenerateCore(SelectQueryModel model, ISqlDialect dialect, List<object> parameters)
+        {
+            if (model == null) throw new ArgumentNullException(nameof(model));
+            if (dialect == null) throw new ArgumentNullException(nameof(dialect));
+
             var sql = new StringBuilder();
 
             var effectiveTake = model.Take;
@@ -165,7 +214,7 @@ namespace Kuery.Linq
             AppendOrderBy(sql, model, dialect);
             AppendPaging(sql, model, effectiveTake, dialect);
 
-            return new GeneratedSql(sql.ToString(), parameters);
+            return sql.ToString();
         }
 
         private static void AppendOrderBy(StringBuilder sql, SelectQueryModel model, ISqlDialect dialect)
