@@ -209,6 +209,9 @@ namespace Kuery.Linq
                 case nameof(Queryable.GroupBy):
                     ApplyGroupBy(model, methodCall);
                     break;
+                case nameof(Queryable.SelectMany):
+                    ApplySelectMany(model, methodCall);
+                    break;
                 case "ElementAt":
                     model.SetTerminal(QueryTerminalKind.ElementAt);
                     model.Skip = (model.Skip ?? 0) + GetIntValue(methodCall.Arguments[1]);
@@ -542,6 +545,70 @@ namespace Kuery.Linq
 
             // Update JoinShape AFTER the rewrite, so future chained joins can resolve outer keys.
             UpdateJoinShape(model, resultSelector, innerTable);
+        }
+
+        private static void ApplySelectMany(SelectQueryModel model, MethodCallExpression methodCall)
+        {
+            // SelectMany(source, collectionSelector) - 2 args
+            // SelectMany(source, collectionSelector, resultSelector) - 3 args
+            var collectionLambda = GetLambda(methodCall.Arguments[1]);
+            var innerTable = GetInnerTableFromLambdaBody(collectionLambda.Body);
+
+            LambdaExpression resultSelector;
+            if (methodCall.Arguments.Count >= 3)
+            {
+                resultSelector = GetLambda(methodCall.Arguments[2]);
+            }
+            else
+            {
+                // No result selector: return the inner entity
+                // Create a synthetic (outer, inner) => inner
+                var outerParam = Expression.Parameter(model.Table.MappedType, "outer");
+                var innerParam = Expression.Parameter(innerTable.MappedType, "inner");
+                resultSelector = Expression.Lambda(innerParam, outerParam, innerParam);
+            }
+
+            var joinClause = new JoinClause(innerTable, resultSelector);
+            model.AddJoin(joinClause);
+            model.SetJoinResultSelector(resultSelector);
+            UpdateJoinShape(model, resultSelector, innerTable);
+        }
+
+        private static TableMapping GetInnerTableFromLambdaBody(Expression body)
+        {
+            // The collection selector body should evaluate to an IQueryable
+            // Common patterns: c => connection.Query<T>(), c => someQueryable
+            var value = EvaluateLambdaBody(body);
+            if (value is IQueryable queryable)
+            {
+                return SqlMapper.GetMapping(queryable.ElementType);
+            }
+
+            throw new NotSupportedException(
+                "SelectMany collection selector must return a root query. " +
+                $"Got: {body}");
+        }
+
+        private static object EvaluateLambdaBody(Expression expression)
+        {
+            switch (expression)
+            {
+                case ConstantExpression constant:
+                    return constant.Value;
+                case MethodCallExpression methodCall:
+                    // Evaluate the method call by compiling and invoking
+                    break;
+                case MemberExpression member when member.Expression != null:
+                    var obj = EvaluateLambdaBody(member.Expression);
+                    if (member.Member is System.Reflection.FieldInfo field)
+                        return field.GetValue(obj);
+                    if (member.Member is System.Reflection.PropertyInfo prop)
+                        return prop.GetValue(obj);
+                    break;
+            }
+
+            var lambda = Expression.Lambda(expression);
+            return lambda.Compile().DynamicInvoke();
         }
 
         private static TableMapping GetInnerTable(Expression expression)

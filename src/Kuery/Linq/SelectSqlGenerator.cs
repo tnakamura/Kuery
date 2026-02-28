@@ -60,6 +60,11 @@ namespace Kuery.Linq
             return new GeneratedSql(sql, parameters);
         }
 
+        internal string GenerateSubquery(SelectQueryModel model, ISqlDialect dialect, List<object> parameters)
+        {
+            return GenerateCore(model, dialect, parameters);
+        }
+
         private string GenerateCore(SelectQueryModel model, ISqlDialect dialect, List<object> parameters)
         {
             if (model == null) throw new ArgumentNullException(nameof(model));
@@ -156,20 +161,28 @@ namespace Kuery.Linq
             {
                 foreach (var join in model.Joins)
                 {
-                    sql.Append(join.IsLeftJoin ? " left join " : " inner join ");
-                    sql.Append(dialect.EscapeIdentifier(join.InnerTable.TableName));
-                    sql.Append(" on ");
-                    for (var ki = 0; ki < join.KeyPairs.Count; ki++)
+                    if (join.IsCrossJoin)
                     {
-                        if (ki > 0) sql.Append(" and ");
-                        var kp = join.KeyPairs[ki];
-                        sql.Append(dialect.EscapeIdentifier(kp.OuterKeyTable.TableName));
-                        sql.Append(".");
-                        sql.Append(dialect.EscapeIdentifier(kp.OuterKeyColumn.Name));
-                        sql.Append(" = ");
+                        sql.Append(" cross join ");
                         sql.Append(dialect.EscapeIdentifier(join.InnerTable.TableName));
-                        sql.Append(".");
-                        sql.Append(dialect.EscapeIdentifier(kp.InnerKeyColumn.Name));
+                    }
+                    else
+                    {
+                        sql.Append(join.IsLeftJoin ? " left join " : " inner join ");
+                        sql.Append(dialect.EscapeIdentifier(join.InnerTable.TableName));
+                        sql.Append(" on ");
+                        for (var ki = 0; ki < join.KeyPairs.Count; ki++)
+                        {
+                            if (ki > 0) sql.Append(" and ");
+                            var kp = join.KeyPairs[ki];
+                            sql.Append(dialect.EscapeIdentifier(kp.OuterKeyTable.TableName));
+                            sql.Append(".");
+                            sql.Append(dialect.EscapeIdentifier(kp.OuterKeyColumn.Name));
+                            sql.Append(" = ");
+                            sql.Append(dialect.EscapeIdentifier(join.InnerTable.TableName));
+                            sql.Append(".");
+                            sql.Append(dialect.EscapeIdentifier(kp.InnerKeyColumn.Name));
+                        }
                     }
                 }
             }
