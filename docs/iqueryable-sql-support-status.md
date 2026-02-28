@@ -99,6 +99,14 @@
 | 日時演算 | `x.Date.AddHours(n)` | `DATEADD(hour, n, col)` | PostgreSQL: `col + make_interval(...)`, SQLite: `datetime(col, 'n hours')` |
 | 日時演算 | `x.Date.AddMinutes(n)` | `DATEADD(minute, n, col)` | PostgreSQL: `col + make_interval(...)`, SQLite: `datetime(col, 'n minutes')` |
 | 日時演算 | `x.Date.AddSeconds(n)` | `DATEADD(second, n, col)` | PostgreSQL: `col + make_interval(...)`, SQLite: `datetime(col, 'n seconds')` |
+| 型変換 | `Convert.ToInt32(x.Prop)` | `CAST(col AS int)` | SQLite/PostgreSQL: `integer` |
+| 型変換 | `Convert.ToInt64(x.Prop)` | `CAST(col AS bigint)` | SQLite/PostgreSQL: `integer` |
+| 型変換 | `Convert.ToDouble(x.Prop)` | `CAST(col AS float)` | SQLite/PostgreSQL: `real` |
+| 型変換 | `Convert.ToSingle(x.Prop)` | `CAST(col AS real)` | |
+| 型変換 | `Convert.ToBoolean(x.Prop)` | `CAST(col AS bit)` | SQLite/PostgreSQL: `integer` |
+| 型変換 | `Convert.ToString(x.Prop)` | `CAST(col AS nvarchar(max))` | SQLite/PostgreSQL: `text` |
+| 型変換 | `x.Prop.ToString()` | `CAST(col AS nvarchar(max))` | SQLite/PostgreSQL: `text` |
+| LIKE | `KueryFunctions.Like(x.Name, "%pattern%")` | `col LIKE @p` | SQL LIKE ワイルドカード (`%`, `_`) を使用 |
 
 ### 対応 SQL 方言
 
@@ -135,11 +143,8 @@
 
 | カテゴリ | C# 式 | 対応する SQL | 優先度 |
 |----------|-------|------------|--------|
-| 型変換 | `Convert.ToInt32(x.Prop)` 等 | `CAST(col AS int)` | 中 |
-| 型変換 | `x.Prop.ToString()` | `CAST(col AS text)` | 中 |
 | 文字列 | `string.Format(...)` | 文字列結合に展開 | 低 |
 | 文字列 | `string.Join(sep, ...)` | N/A（集約コンテキスト依存） | 低 |
-| 文字列 | カスタム LIKE パターン | `LIKE @pattern` | 中 |
 | 数学 | `Math.Pow(x, y)` | `POWER(x, y)` | 低 |
 | 数学 | `Math.Sqrt(x)` | `SQRT(x)` | 低 |
 | 数学 | `Math.Log(x)` / `Math.Log10(x)` | `LOG(x)` / `LOG10(x)` | 低 |
@@ -184,13 +189,13 @@ WHERE 述語で使える式を増やし、より複雑な条件を書けるよ�
 | 2-3 | ✅ `DateTime.Now` / `DateTime.UtcNow` | 各方言の現在時刻関数への変換 |
 | 2-4 | ✅ `DateTime.AddDays()` 等の日時演算 | `DATEADD` / SQLite の `datetime()` への変換 |
 
-### Phase 3: 型変換（優先度: 中）
+### Phase 3: 型変換（✅ 実装済み）
 
 | # | 機能 | 概要 |
 |---|------|------|
-| 3-1 | `Convert.ToInt32()` 等 | `CAST(col AS int)` への変換 |
-| 3-2 | `ToString()` | `CAST(col AS text)` への変換 |
-| 3-3 | カスタム LIKE パターン | `EF.Functions.Like()` 相当のヘルパーメソッド提供を検討 |
+| 3-1 | ✅ `Convert.ToInt32()` 等 | `CAST(col AS int)` への変換 |
+| 3-2 | ✅ `ToString()` | `CAST(col AS text)` への変換 |
+| 3-3 | ✅ カスタム LIKE パターン | `KueryFunctions.Like()` ヘルパーメソッドによる `LIKE` パターン検索 |
 
 ### Phase 4: 集合演算（優先度: 中）
 
