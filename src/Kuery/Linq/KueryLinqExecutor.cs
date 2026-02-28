@@ -58,6 +58,11 @@ namespace Kuery.Linq
 
         private static object ExecuteCore(IDbConnection connection, SelectQueryModel model, GeneratedSql generated, Type resultType)
         {
+            if (model.Join != null)
+            {
+                return ExecuteJoinCore(connection, model, generated, resultType);
+            }
+
             using (var command = CreateCommand(connection, generated))
             {
                 switch (model.Terminal)
@@ -105,6 +110,11 @@ namespace Kuery.Linq
             Type resultType,
             CancellationToken cancellationToken)
         {
+            if (model.Join != null)
+            {
+                return await ExecuteJoinCoreAsync(connection, model, generated, resultType, cancellationToken).ConfigureAwait(false);
+            }
+
             using (var command = CreateCommand(connection, generated))
             {
                 switch (model.Terminal)
@@ -158,6 +168,181 @@ namespace Kuery.Linq
             }
 
             return command;
+        }
+
+        private static object ExecuteJoinCore(IDbConnection connection, SelectQueryModel model, GeneratedSql generated, Type resultType)
+        {
+            using (var command = CreateCommand(connection, generated))
+            {
+                switch (model.Terminal)
+                {
+                    case QueryTerminalKind.Count:
+                    case QueryTerminalKind.LongCount:
+                    case QueryTerminalKind.Any:
+                    case QueryTerminalKind.All:
+                        var countResult = model.Terminal == QueryTerminalKind.LongCount
+                            ? (object)ExecuteLongCount(command)
+                            : ExecuteCount(command);
+                        if (model.Terminal == QueryTerminalKind.Any)
+                            return (int)countResult > 0;
+                        if (model.Terminal == QueryTerminalKind.All)
+                            return (int)countResult == 0;
+                        return countResult;
+                    default:
+                        return ExecuteJoinSequence(command, model, resultType);
+                }
+            }
+        }
+
+        private static async Task<object> ExecuteJoinCoreAsync(
+            IDbConnection connection,
+            SelectQueryModel model,
+            GeneratedSql generated,
+            Type resultType,
+            CancellationToken cancellationToken)
+        {
+            using (var command = CreateCommand(connection, generated))
+            {
+                switch (model.Terminal)
+                {
+                    case QueryTerminalKind.Count:
+                    case QueryTerminalKind.LongCount:
+                    case QueryTerminalKind.Any:
+                    case QueryTerminalKind.All:
+                        var countResult = model.Terminal == QueryTerminalKind.LongCount
+                            ? (object)await ExecuteLongCountAsync(command, cancellationToken).ConfigureAwait(false)
+                            : await ExecuteCountAsync(command, cancellationToken).ConfigureAwait(false);
+                        if (model.Terminal == QueryTerminalKind.Any)
+                            return (int)countResult > 0;
+                        if (model.Terminal == QueryTerminalKind.All)
+                            return (int)countResult == 0;
+                        return countResult;
+                    default:
+                        return await ExecuteJoinSequenceAsync(command, model, resultType, cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+
+        private static object ExecuteJoinSequence(IDbCommand command, SelectQueryModel model, Type resultType)
+        {
+            var outerTable = model.Table;
+            var innerTable = model.Join.InnerTable;
+            var resultSelector = model.Join.ResultSelector.Compile();
+            var outerColCount = outerTable.Columns.Count;
+
+            var results = new List<object>();
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    var outer = ReadObject(reader, outerTable, 0);
+                    var inner = ReadObject(reader, innerTable, outerColCount);
+                    var result = resultSelector.DynamicInvoke(outer, inner);
+                    results.Add(result);
+                }
+            }
+
+            return HandleJoinTerminal(results, model.Terminal, resultType);
+        }
+
+        private static async Task<object> ExecuteJoinSequenceAsync(IDbCommand command, SelectQueryModel model, Type resultType, CancellationToken cancellationToken)
+        {
+            var outerTable = model.Table;
+            var innerTable = model.Join.InnerTable;
+            var resultSelector = model.Join.ResultSelector.Compile();
+            var outerColCount = outerTable.Columns.Count;
+
+            var results = new List<object>();
+            if (command is System.Data.Common.DbCommand dbCommand)
+            {
+                using (var reader = await dbCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        var outer = ReadObject(reader, outerTable, 0);
+                        var inner = ReadObject(reader, innerTable, outerColCount);
+                        var result = resultSelector.DynamicInvoke(outer, inner);
+                        results.Add(result);
+                    }
+                }
+            }
+            else
+            {
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        var outer = ReadObject(reader, outerTable, 0);
+                        var inner = ReadObject(reader, innerTable, outerColCount);
+                        var result = resultSelector.DynamicInvoke(outer, inner);
+                        results.Add(result);
+                    }
+                }
+            }
+
+            return HandleJoinTerminal(results, model.Terminal, resultType);
+        }
+
+        private static object ReadObject(IDataReader reader, TableMapping table, int startOrdinal)
+        {
+            var obj = Activator.CreateInstance(table.MappedType);
+            for (var i = 0; i < table.Columns.Count; i++)
+            {
+                var col = table.Columns[i];
+                var val = reader.GetValue(startOrdinal + i);
+                if (val is DBNull)
+                {
+                    val = null;
+                }
+                if (val != null)
+                {
+                    col.SetValue(obj, val);
+                }
+            }
+            return obj;
+        }
+
+        private static object HandleJoinTerminal(List<object> results, QueryTerminalKind terminal, Type resultType)
+        {
+            switch (terminal)
+            {
+                case QueryTerminalKind.First:
+                    if (results.Count == 0)
+                        throw new InvalidOperationException("Sequence contains no elements");
+                    return results[0];
+                case QueryTerminalKind.FirstOrDefault:
+                    return results.Count > 0 ? results[0] : null;
+                case QueryTerminalKind.Last:
+                    if (results.Count == 0)
+                        throw new InvalidOperationException("Sequence contains no elements");
+                    return results[results.Count - 1];
+                case QueryTerminalKind.LastOrDefault:
+                    return results.Count > 0 ? results[results.Count - 1] : null;
+                case QueryTerminalKind.Single:
+                    if (results.Count == 0)
+                        throw new InvalidOperationException("Sequence contains no elements");
+                    if (results.Count > 1)
+                        throw new InvalidOperationException("Sequence contains more than one element");
+                    return results[0];
+                case QueryTerminalKind.SingleOrDefault:
+                    if (results.Count > 1)
+                        throw new InvalidOperationException("Sequence contains more than one element");
+                    return results.Count > 0 ? results[0] : null;
+                case QueryTerminalKind.Sequence:
+                default:
+                    if (resultType.IsGenericType)
+                    {
+                        var elementType = resultType.GetGenericArguments()[0];
+                        var listType = typeof(List<>).MakeGenericType(elementType);
+                        var typedList = (IList)Activator.CreateInstance(listType);
+                        foreach (var item in results)
+                        {
+                            typedList.Add(item);
+                        }
+                        return typedList;
+                    }
+                    return results;
+            }
         }
 
         private static object ExecuteSequence(IDbCommand command, TableMapping table, LambdaExpression projection, Type resultType)

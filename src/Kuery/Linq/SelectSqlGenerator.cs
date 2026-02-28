@@ -67,6 +67,10 @@ namespace Kuery.Linq
                         sql.Append(dialect.EscapeIdentifier(model.ProjectedColumns[i].SourceColumn.Name));
                     }
                 }
+                else if (model.Join != null)
+                {
+                    AppendJoinColumns(sql, model.Table, model.Join.InnerTable, dialect);
+                }
                 else
                 {
                     sql.Append("*");
@@ -76,6 +80,20 @@ namespace Kuery.Linq
             sql.Append(" from ");
             sql.Append(dialect.EscapeIdentifier(model.Table.TableName));
 
+            if (model.Join != null)
+            {
+                sql.Append(" inner join ");
+                sql.Append(dialect.EscapeIdentifier(model.Join.InnerTable.TableName));
+                sql.Append(" on ");
+                sql.Append(dialect.EscapeIdentifier(model.Table.TableName));
+                sql.Append(".");
+                sql.Append(dialect.EscapeIdentifier(model.Join.OuterKeyColumn.Name));
+                sql.Append(" = ");
+                sql.Append(dialect.EscapeIdentifier(model.Join.InnerTable.TableName));
+                sql.Append(".");
+                sql.Append(dialect.EscapeIdentifier(model.Join.InnerKeyColumn.Name));
+            }
+
             if (model.Terminal == QueryTerminalKind.All && model.AllPredicate != null)
             {
                 var negated = Expression.Not(model.AllPredicate);
@@ -83,12 +101,14 @@ namespace Kuery.Linq
                     ? Expression.AndAlso(model.Predicate, negated)
                     : (Expression)negated;
                 sql.Append(" where ");
-                sql.Append(_predicateTranslator.Translate(allWhere, model.Table, dialect, parameters));
+                var predicateSql = _predicateTranslator.Translate(allWhere, model.Table, dialect, parameters);
+                sql.Append(model.Join != null ? QualifyColumns(predicateSql, model.Table, dialect) : predicateSql);
             }
             else if (model.Predicate != null)
             {
                 sql.Append(" where ");
-                sql.Append(_predicateTranslator.Translate(model.Predicate, model.Table, dialect, parameters));
+                var predicateSql = _predicateTranslator.Translate(model.Predicate, model.Table, dialect, parameters);
+                sql.Append(model.Join != null ? QualifyColumns(predicateSql, model.Table, dialect) : predicateSql);
             }
 
             AppendOrderBy(sql, model, dialect);
@@ -207,6 +227,37 @@ namespace Kuery.Linq
             }
 
             return "*";
+        }
+
+        private static void AppendJoinColumns(StringBuilder sql, TableMapping outerTable, TableMapping innerTable, ISqlDialect dialect)
+        {
+            var first = true;
+            foreach (var col in outerTable.Columns)
+            {
+                if (!first) sql.Append(", ");
+                sql.Append(dialect.EscapeIdentifier(outerTable.TableName));
+                sql.Append(".");
+                sql.Append(dialect.EscapeIdentifier(col.Name));
+                first = false;
+            }
+            foreach (var col in innerTable.Columns)
+            {
+                sql.Append(", ");
+                sql.Append(dialect.EscapeIdentifier(innerTable.TableName));
+                sql.Append(".");
+                sql.Append(dialect.EscapeIdentifier(col.Name));
+            }
+        }
+
+        private static string QualifyColumns(string predicateSql, TableMapping table, ISqlDialect dialect)
+        {
+            var tablePrefix = dialect.EscapeIdentifier(table.TableName) + ".";
+            foreach (var col in table.Columns)
+            {
+                var escaped = dialect.EscapeIdentifier(col.Name);
+                predicateSql = predicateSql.Replace(escaped, tablePrefix + escaped);
+            }
+            return predicateSql;
         }
     }
 }
