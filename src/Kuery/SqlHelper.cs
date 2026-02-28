@@ -1017,9 +1017,13 @@ namespace Kuery
 
         private BaseTableQuery _joinInner;
 
+        private TableMapping _joinInnerTable;
+
         private Expression _joinInnerKeySelector;
 
         private BaseTableQuery _joinOuter;
+
+        private TableMapping _joinOuterTable;
 
         private Expression _joinOuterKeySelector;
 
@@ -1053,8 +1057,10 @@ namespace Kuery
             q._limit = _limit;
             q._offset = _offset;
             q._joinInner = _joinInner;
+            q._joinInnerTable = _joinInnerTable;
             q._joinInnerKeySelector = _joinInnerKeySelector;
             q._joinOuter = _joinOuter;
+            q._joinOuterTable = _joinOuterTable;
             q._joinOuterKeySelector = _joinOuterKeySelector;
             q._joinSelector = _joinSelector;
             q._selector = _selector;
@@ -1210,6 +1216,72 @@ namespace Kuery
             }
         }
 
+        public TableQuery<T> Join<TInner, TKey>(
+            TableQuery<TInner> inner,
+            Expression<Func<T, TKey>> outerKeySelector,
+            Expression<Func<TInner, TKey>> innerKeySelector)
+        {
+            var q = Clone<T>();
+            q._joinInner = inner;
+            q._joinInnerTable = inner.Table;
+            q._joinOuterKeySelector = outerKeySelector;
+            q._joinInnerKeySelector = innerKeySelector;
+            return q;
+        }
+
+        public TableQuery<TResult> Join<TInner, TKey, TResult>(
+            TableQuery<TInner> inner,
+            Expression<Func<T, TKey>> outerKeySelector,
+            Expression<Func<TInner, TKey>> innerKeySelector,
+            Expression<Func<T, TInner, TResult>> resultSelector)
+        {
+            var q = Clone<T>();
+            q._joinInner = inner;
+            q._joinInnerTable = inner.Table;
+            q._joinOuterKeySelector = outerKeySelector;
+            q._joinInnerKeySelector = innerKeySelector;
+            q._joinSelector = resultSelector;
+            var rq = new TableQuery<TResult>(Connection, SqlMapper.GetMapping(typeof(TResult)));
+            rq._where = q._where;
+            rq._deferred = q._deferred;
+            if (q._orderBys != null)
+            {
+                rq._orderBys = new List<Ordering>(q._orderBys);
+            }
+            rq._limit = q._limit;
+            rq._offset = q._offset;
+            rq._joinInner = q._joinInner;
+            rq._joinInnerTable = q._joinInnerTable;
+            rq._joinInnerKeySelector = q._joinInnerKeySelector;
+            rq._joinOuter = q._joinOuter;
+            rq._joinOuterTable = Table;
+            rq._joinOuterKeySelector = q._joinOuterKeySelector;
+            rq._joinSelector = q._joinSelector;
+            rq._selector = q._selector;
+            return rq;
+        }
+
+        private static string GetJoinKeyColumnName(Expression keySelector, TableMapping table)
+        {
+            if (keySelector.NodeType == ExpressionType.Lambda)
+            {
+                var lambda = (LambdaExpression)keySelector;
+                var body = lambda.Body;
+
+                if (body is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+                {
+                    body = unary.Operand;
+                }
+
+                if (body is MemberExpression mem && mem.Expression.NodeType == ExpressionType.Parameter)
+                {
+                    return table.FindColumnWithPropertyName(mem.Member.Name).Name;
+                }
+            }
+            throw new NotSupportedException(
+                "Join key selector must be a simple member access expression.");
+        }
+
         public List<T> ToList()
         {
             return GenerateCommand("*").ExecuteQuery<T>(Table);
@@ -1254,17 +1326,47 @@ namespace Kuery
 
         private IDbCommand GenerateCommandForPostgreSql(string selectionList)
         {
-            if (_joinInner != null && _joinOuter != null)
-            {
-                throw new NotSupportedException("Joins are not supported.");
-            }
+            var outerTable = _joinOuterTable ?? Table;
 
             var commandText = new StringBuilder();
             commandText.Append("select ");
-            commandText.Append(selectionList);
+            if (_joinInner != null && _joinInnerTable != null)
+            {
+                if (selectionList == "*")
+                {
+                    commandText.Append(EscapeLiteral(Table.TableName));
+                    commandText.Append(".*");
+                }
+                else
+                {
+                    commandText.Append(selectionList);
+                }
+            }
+            else
+            {
+                commandText.Append(selectionList);
+            }
             commandText.Append(" from ");
-            commandText.Append(EscapeLiteral(Table.TableName));
+            commandText.Append(EscapeLiteral(outerTable.TableName));
             commandText.Append(" ");
+
+            if (_joinInner != null && _joinInnerTable != null)
+            {
+                var outerKeyColumn = GetJoinKeyColumnName(_joinOuterKeySelector, outerTable);
+                var innerKeyColumn = GetJoinKeyColumnName(_joinInnerKeySelector, _joinInnerTable);
+
+                commandText.Append("inner join ");
+                commandText.Append(EscapeLiteral(_joinInnerTable.TableName));
+                commandText.Append(" on ");
+                commandText.Append(EscapeLiteral(outerTable.TableName));
+                commandText.Append(".");
+                commandText.Append(EscapeLiteral(outerKeyColumn));
+                commandText.Append(" = ");
+                commandText.Append(EscapeLiteral(_joinInnerTable.TableName));
+                commandText.Append(".");
+                commandText.Append(EscapeLiteral(innerKeyColumn));
+                commandText.Append(" ");
+            }
 
             List<object> args = null;
             if (_where != null)
@@ -1328,17 +1430,48 @@ namespace Kuery
 
         private IDbCommand GenerateCommandForSqlite(string selectionList)
         {
-            if (_joinInner != null && _joinOuter != null)
-            {
-                throw new NotSupportedException("Joins are not supported.");
-            }
+            var outerTable = _joinOuterTable ?? Table;
 
             var commandText = new StringBuilder();
             commandText.Append("select ");
-            commandText.Append(selectionList);
+            if (_joinInner != null && _joinInnerTable != null)
+            {
+                if (selectionList == "*")
+                {
+                    commandText.Append("[");
+                    commandText.Append(Table.TableName);
+                    commandText.Append("].*");
+                }
+                else
+                {
+                    commandText.Append(selectionList);
+                }
+            }
+            else
+            {
+                commandText.Append(selectionList);
+            }
             commandText.Append(" from [");
-            commandText.Append(Table.TableName);
+            commandText.Append(outerTable.TableName);
             commandText.Append("] ");
+
+            if (_joinInner != null && _joinInnerTable != null)
+            {
+                var outerKeyColumn = GetJoinKeyColumnName(_joinOuterKeySelector, outerTable);
+                var innerKeyColumn = GetJoinKeyColumnName(_joinInnerKeySelector, _joinInnerTable);
+
+                commandText.Append("inner join [");
+                commandText.Append(_joinInnerTable.TableName);
+                commandText.Append("] on [");
+                commandText.Append(outerTable.TableName);
+                commandText.Append("].[");
+                commandText.Append(outerKeyColumn);
+                commandText.Append("] = [");
+                commandText.Append(_joinInnerTable.TableName);
+                commandText.Append("].[");
+                commandText.Append(innerKeyColumn);
+                commandText.Append("] ");
+            }
 
             List<object> args = null;
             if (_where != null)
@@ -1409,10 +1542,7 @@ namespace Kuery
 
         private IDbCommand GenerateCommandForSqlServer(string selectionList)
         {
-            if (_joinInner != null && _joinOuter != null)
-            {
-                throw new NotSupportedException("Joins are not supported.");
-            }
+            var outerTable = _joinOuterTable ?? Table;
 
             var commandText = new StringBuilder();
             commandText.Append("select ");
@@ -1422,10 +1552,44 @@ namespace Kuery
                 commandText.Append(_limit.Value);
                 commandText.Append(" ) ");
             }
-            commandText.Append(selectionList);
+            if (_joinInner != null && _joinInnerTable != null)
+            {
+                if (selectionList == "*")
+                {
+                    commandText.Append("[");
+                    commandText.Append(Table.TableName);
+                    commandText.Append("].*");
+                }
+                else
+                {
+                    commandText.Append(selectionList);
+                }
+            }
+            else
+            {
+                commandText.Append(selectionList);
+            }
             commandText.Append(" from [");
-            commandText.Append(Table.TableName);
+            commandText.Append(outerTable.TableName);
             commandText.Append("] ");
+
+            if (_joinInner != null && _joinInnerTable != null)
+            {
+                var outerKeyColumn = GetJoinKeyColumnName(_joinOuterKeySelector, outerTable);
+                var innerKeyColumn = GetJoinKeyColumnName(_joinInnerKeySelector, _joinInnerTable);
+
+                commandText.Append("inner join [");
+                commandText.Append(_joinInnerTable.TableName);
+                commandText.Append("] on [");
+                commandText.Append(outerTable.TableName);
+                commandText.Append("].[");
+                commandText.Append(outerKeyColumn);
+                commandText.Append("] = [");
+                commandText.Append(_joinInnerTable.TableName);
+                commandText.Append("].[");
+                commandText.Append(innerKeyColumn);
+                commandText.Append("] ");
+            }
 
             List<object> args = null;
             if (_where != null)
