@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 
@@ -144,6 +145,13 @@ namespace Kuery.Linq
                     }
                     sql.Append(dialect.EscapeIdentifier(model.GroupByColumns[i].Name));
                 }
+            }
+
+            if (model.HavingPredicate != null)
+            {
+                sql.Append(" having ");
+                var havingSql = TranslateHavingExpression(model.HavingPredicate, model.HavingGroupParameter, model, dialect, parameters);
+                sql.Append(havingSql);
             }
 
             AppendOrderBy(sql, model, dialect);
@@ -293,6 +301,188 @@ namespace Kuery.Linq
                 predicateSql = predicateSql.Replace(escaped, tablePrefix + escaped);
             }
             return predicateSql;
+        }
+
+        private static string TranslateHavingExpression(
+            Expression expression,
+            ParameterExpression groupParam,
+            SelectQueryModel model,
+            ISqlDialect dialect,
+            List<object> parameters)
+        {
+            if (expression is BinaryExpression binary)
+            {
+                if (binary.NodeType == ExpressionType.AndAlso || binary.NodeType == ExpressionType.OrElse)
+                {
+                    var left = TranslateHavingExpression(binary.Left, groupParam, model, dialect, parameters);
+                    var right = TranslateHavingExpression(binary.Right, groupParam, model, dialect, parameters);
+                    var op = binary.NodeType == ExpressionType.AndAlso ? " and " : " or ";
+                    return "(" + left + op + right + ")";
+                }
+
+                var leftSql = TranslateHavingOperand(binary.Left, groupParam, model, dialect, parameters);
+                var rightSql = TranslateHavingOperand(binary.Right, groupParam, model, dialect, parameters);
+                var sqlOp = ToSqlOperator(binary.NodeType);
+                return "(" + leftSql + " " + sqlOp + " " + rightSql + ")";
+            }
+
+            if (expression is UnaryExpression unary && unary.NodeType == ExpressionType.Not)
+            {
+                return "not (" + TranslateHavingExpression(unary.Operand, groupParam, model, dialect, parameters) + ")";
+            }
+
+            throw new NotSupportedException($"Unsupported HAVING expression: {expression.NodeType}.");
+        }
+
+        private static string TranslateHavingOperand(
+            Expression expression,
+            ParameterExpression groupParam,
+            SelectQueryModel model,
+            ISqlDialect dialect,
+            List<object> parameters)
+        {
+            if (expression is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+            {
+                return TranslateHavingOperand(unary.Operand, groupParam, model, dialect, parameters);
+            }
+
+            // Aggregate method calls: g.Count(), g.Sum(x => x.Prop), etc.
+            if (expression is MethodCallExpression methodCall
+                && methodCall.Method.DeclaringType == typeof(Enumerable))
+            {
+                return TranslateHavingAggregate(methodCall, groupParam, model, dialect);
+            }
+
+            // g.Key → group by column(s)
+            if (expression is MemberExpression member
+                && member.Member.Name == "Key"
+                && member.Expression == groupParam)
+            {
+                if (model.GroupByColumns.Count == 1)
+                {
+                    return dialect.EscapeIdentifier(model.GroupByColumns[0].Name);
+                }
+                throw new NotSupportedException("Composite key reference in HAVING is not supported without a specific property.");
+            }
+
+            // g.Key.Prop → specific group by column for composite keys
+            if (expression is MemberExpression outerMember
+                && outerMember.Expression is MemberExpression innerMember
+                && innerMember.Member.Name == "Key"
+                && innerMember.Expression == groupParam)
+            {
+                var propName = outerMember.Member.Name;
+                var col = model.Table.FindColumnWithPropertyName(propName);
+                if (col != null)
+                {
+                    return dialect.EscapeIdentifier(col.Name);
+                }
+                throw new NotSupportedException($"Unknown property '{propName}' in HAVING clause.");
+            }
+
+            // Constant or captured value
+            var value = EvaluateHavingValue(expression);
+            return AddHavingParameter(dialect, parameters, value);
+        }
+
+        private static string TranslateHavingAggregate(
+            MethodCallExpression methodCall,
+            ParameterExpression groupParam,
+            SelectQueryModel model,
+            ISqlDialect dialect)
+        {
+            var methodName = methodCall.Method.Name;
+            switch (methodName)
+            {
+                case nameof(Enumerable.Count):
+                case nameof(Enumerable.LongCount):
+                    return "count(*)";
+                case "Sum":
+                case "Min":
+                case "Max":
+                case "Average":
+                {
+                    var funcName = methodName == "Average" ? "avg" : methodName.ToLower();
+                    if (methodCall.Arguments.Count < 2)
+                    {
+                        throw new NotSupportedException($"Aggregate {methodName} requires a selector in HAVING context.");
+                    }
+
+                    var selectorExpr = methodCall.Arguments[1];
+                    while (selectorExpr.NodeType == ExpressionType.Quote)
+                    {
+                        selectorExpr = ((UnaryExpression)selectorExpr).Operand;
+                    }
+
+                    if (!(selectorExpr is LambdaExpression selectorLambda))
+                    {
+                        throw new NotSupportedException($"Expected lambda for aggregate {methodName}.");
+                    }
+
+                    var selectorBody = selectorLambda.Body;
+                    if (selectorBody is UnaryExpression selectorUnary && selectorUnary.NodeType == ExpressionType.Convert)
+                    {
+                        selectorBody = selectorUnary.Operand;
+                    }
+
+                    if (selectorBody is MemberExpression selectorMember && selectorMember.Expression?.NodeType == ExpressionType.Parameter)
+                    {
+                        var col = model.Table.FindColumnWithPropertyName(selectorMember.Member.Name);
+                        if (col != null)
+                        {
+                            return funcName + "(" + dialect.EscapeIdentifier(col.Name) + ")";
+                        }
+                    }
+
+                    throw new NotSupportedException($"Unsupported aggregate selector in HAVING: {selectorExpr}.");
+                }
+                default:
+                    throw new NotSupportedException($"Unsupported aggregate method in HAVING: {methodName}.");
+            }
+        }
+
+        private static string AddHavingParameter(ISqlDialect dialect, List<object> parameters, object value)
+        {
+            var paramBaseName = "p" + (parameters.Count + 1).ToString();
+            var parameterName = dialect.FormatParameterName(paramBaseName);
+            parameters.Add(value);
+            return parameterName;
+        }
+
+        private static object EvaluateHavingValue(Expression expression)
+        {
+            switch (expression)
+            {
+                case ConstantExpression constant:
+                    return constant.Value;
+                case MemberExpression member when member.Expression != null:
+                    var obj = EvaluateHavingValue(member.Expression);
+                    if (member.Member is System.Reflection.FieldInfo field)
+                        return field.GetValue(obj);
+                    if (member.Member is System.Reflection.PropertyInfo prop)
+                        return prop.GetValue(obj);
+                    break;
+                case UnaryExpression unary when unary.NodeType == ExpressionType.Convert:
+                    return EvaluateHavingValue(unary.Operand);
+            }
+
+            var lambda = Expression.Lambda(expression);
+            return lambda.Compile().DynamicInvoke();
+        }
+
+        private static string ToSqlOperator(ExpressionType expressionType)
+        {
+            switch (expressionType)
+            {
+                case ExpressionType.Equal: return "=";
+                case ExpressionType.NotEqual: return "!=";
+                case ExpressionType.GreaterThan: return ">";
+                case ExpressionType.GreaterThanOrEqual: return ">=";
+                case ExpressionType.LessThan: return "<";
+                case ExpressionType.LessThanOrEqual: return "<=";
+                default:
+                    throw new NotSupportedException($"Unsupported operator: {expressionType}.");
+            }
         }
     }
 }
