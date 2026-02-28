@@ -37,10 +37,23 @@ namespace Kuery.Linq
                 case ExpressionType.Divide:
                 case ExpressionType.Modulo:
                 case ExpressionType.Coalesce:
+                case ExpressionType.And:
+                case ExpressionType.Or:
+                case ExpressionType.ExclusiveOr:
                     return TranslateBinary((BinaryExpression)expression, table, dialect, parameters);
                 case ExpressionType.Not:
                     {
                         var operand = ((UnaryExpression)expression).Operand;
+                        // ~int (bitwise NOT) – C# compiles ~int as ExpressionType.Not
+                        if (operand.Type != typeof(bool) && operand.Type != typeof(bool?))
+                        {
+                            var bitwiseNotSql = TranslateToColumnSql(operand, table, dialect, parameters)
+                                ?? TryTranslateArithmeticSql(operand, table, dialect, parameters);
+                            if (bitwiseNotSql != null)
+                            {
+                                return "(~" + bitwiseNotSql + ")";
+                            }
+                        }
                         // !Nullable<T>.HasValue → IS NULL
                         if (operand is MemberExpression notHasValue
                             && notHasValue.Member.Name == "HasValue"
@@ -56,6 +69,17 @@ namespace Kuery.Linq
                     }
                 case ExpressionType.Call:
                     return TranslateMethodCall((MethodCallExpression)expression, table, dialect, parameters);
+                case ExpressionType.OnesComplement:
+                    {
+                        var bitwiseNotOperand = ((UnaryExpression)expression).Operand;
+                        var bitwiseNotSql = TranslateToColumnSql(bitwiseNotOperand, table, dialect, parameters)
+                            ?? TryTranslateArithmeticSql(bitwiseNotOperand, table, dialect, parameters);
+                        if (bitwiseNotSql != null)
+                        {
+                            return "(~" + bitwiseNotSql + ")";
+                        }
+                        throw new NotSupportedException("Unsupported bitwise NOT operand.");
+                    }
                 case ExpressionType.Conditional:
                     return TranslateConditional((ConditionalExpression)expression, table, dialect, parameters);
                 case ExpressionType.MemberAccess:
@@ -288,6 +312,56 @@ namespace Kuery.Linq
             {
                 var result = TryBuildMathMaxMin(methodName, call.Arguments[0], call.Arguments[1], table, dialect, parameters);
                 if (result != null) return result;
+            }
+
+            // Math.Pow(x, y)
+            if (methodName == nameof(Math.Pow) && call.Object == null && call.Arguments.Count == 2
+                && call.Method.DeclaringType == typeof(Math))
+            {
+                var baseResult = TryBuildMathPow(call.Arguments[0], call.Arguments[1], table, dialect, parameters);
+                if (baseResult != null) return baseResult;
+            }
+
+            // Math.Sqrt(value)
+            if (methodName == nameof(Math.Sqrt) && call.Object == null && call.Arguments.Count == 1
+                && call.Method.DeclaringType == typeof(Math))
+            {
+                var inner = ResolveInnerSql(call.Arguments[0], table, dialect, parameters);
+                if (inner != null)
+                {
+                    return BuildSqrt(inner, dialect);
+                }
+            }
+
+            // Math.Log(value) / Math.Log(value, newBase)
+            if (methodName == nameof(Math.Log) && call.Object == null
+                && call.Method.DeclaringType == typeof(Math)
+                && (call.Arguments.Count == 1 || call.Arguments.Count == 2))
+            {
+                var inner = ResolveInnerSql(call.Arguments[0], table, dialect, parameters);
+                if (inner != null)
+                {
+                    if (call.Arguments.Count == 1)
+                    {
+                        return BuildLog(inner, dialect);
+                    }
+                    else
+                    {
+                        var newBase = EvaluateExpression(call.Arguments[1]);
+                        return BuildLogWithBase(inner, Convert.ToDouble(newBase), dialect, parameters);
+                    }
+                }
+            }
+
+            // Math.Log10(value)
+            if (methodName == nameof(Math.Log10) && call.Object == null && call.Arguments.Count == 1
+                && call.Method.DeclaringType == typeof(Math))
+            {
+                var inner = ResolveInnerSql(call.Arguments[0], table, dialect, parameters);
+                if (inner != null)
+                {
+                    return BuildLog10(inner, dialect);
+                }
             }
 
             // Convert.ToXxx(value) → CAST(col AS type)
@@ -743,6 +817,44 @@ namespace Kuery.Linq
                     var result = TryBuildMathMaxMin(staticCall.Method.Name, staticCall.Arguments[0], staticCall.Arguments[1], table, dialect, parameters);
                     if (result != null) return result;
                 }
+                if (staticCall.Method.Name == nameof(Math.Pow) && staticCall.Arguments.Count == 2)
+                {
+                    var result = TryBuildMathPow(staticCall.Arguments[0], staticCall.Arguments[1], table, dialect, parameters);
+                    if (result != null) return result;
+                }
+                if (staticCall.Method.Name == nameof(Math.Sqrt) && staticCall.Arguments.Count == 1)
+                {
+                    var inner = ResolveInnerSql(staticCall.Arguments[0], table, dialect, parameters);
+                    if (inner != null)
+                    {
+                        return BuildSqrt(inner, dialect);
+                    }
+                }
+                if (staticCall.Method.Name == nameof(Math.Log)
+                    && (staticCall.Arguments.Count == 1 || staticCall.Arguments.Count == 2))
+                {
+                    var inner = ResolveInnerSql(staticCall.Arguments[0], table, dialect, parameters);
+                    if (inner != null)
+                    {
+                        if (staticCall.Arguments.Count == 1)
+                        {
+                            return BuildLog(inner, dialect);
+                        }
+                        else
+                        {
+                            var newBase = EvaluateExpression(staticCall.Arguments[1]);
+                            return BuildLogWithBase(inner, Convert.ToDouble(newBase), dialect, parameters);
+                        }
+                    }
+                }
+                if (staticCall.Method.Name == nameof(Math.Log10) && staticCall.Arguments.Count == 1)
+                {
+                    var inner = ResolveInnerSql(staticCall.Arguments[0], table, dialect, parameters);
+                    if (inner != null)
+                    {
+                        return BuildLog10(inner, dialect);
+                    }
+                }
             }
 
             // Handle Convert.ToXxx(value) → CAST(col AS type)
@@ -773,7 +885,7 @@ namespace Kuery.Linq
                 }
             }
 
-            // Handle DateTime properties (Year, Month, Day, Hour, Minute, Second)
+            // Handle DateTime properties (Year, Month, Day, Hour, Minute, Second, Date, DayOfWeek)
             if (expression is MemberExpression dtMember
                 && dtMember.Expression != null
                 && (dtMember.Expression.Type == typeof(DateTime) || dtMember.Expression.Type == typeof(DateTime?)))
@@ -795,6 +907,10 @@ namespace Kuery.Linq
                         case nameof(DateTime.Minute):
                         case nameof(DateTime.Second):
                             return BuildDatePart(partName, inner, dialect);
+                        case nameof(DateTime.Date):
+                            return BuildDateTrunc(inner, dialect);
+                        case nameof(DateTime.DayOfWeek):
+                            return BuildDayOfWeek(inner, dialect);
                     }
                 }
             }
@@ -1096,6 +1212,93 @@ namespace Kuery.Linq
             return "(case when " + inner + " = cast(" + inner + " as integer) then cast(" + inner + " as integer) when " + inner + " > 0 then cast(" + inner + " as integer) + 1 else cast(" + inner + " as integer) end)";
         }
 
+        private static string TryBuildMathPow(Expression baseArg, Expression expArg, TableMapping table, ISqlDialect dialect, List<object> parameters)
+        {
+            var baseSql = ResolveInnerSql(baseArg, table, dialect, parameters);
+            var expSql = ResolveInnerSql(expArg, table, dialect, parameters);
+            if (baseSql == null && (baseArg is ConstantExpression || baseArg is MemberExpression))
+            {
+                baseSql = AddParameter(dialect, parameters, EvaluateExpression(baseArg));
+            }
+            if (expSql == null && (expArg is ConstantExpression || expArg is MemberExpression))
+            {
+                expSql = AddParameter(dialect, parameters, EvaluateExpression(expArg));
+            }
+            if (baseSql != null && expSql != null)
+            {
+                if (dialect.Kind == SqlDialectKind.SqlServer)
+                {
+                    return "POWER(" + baseSql + ", " + expSql + ")";
+                }
+                return "power(" + baseSql + ", " + expSql + ")";
+            }
+            return null;
+        }
+
+        private static string BuildSqrt(string inner, ISqlDialect dialect)
+        {
+            if (dialect.Kind == SqlDialectKind.SqlServer) return "SQRT(" + inner + ")";
+            return "sqrt(" + inner + ")";
+        }
+
+        private static string BuildLog(string inner, ISqlDialect dialect)
+        {
+            if (dialect.Kind == SqlDialectKind.SqlServer) return "LOG(" + inner + ")";
+            if (dialect.Kind == SqlDialectKind.PostgreSql) return "ln(" + inner + ")";
+            return "ln(" + inner + ")";
+        }
+
+        private static string BuildLogWithBase(string inner, double newBase, ISqlDialect dialect, List<object> parameters)
+        {
+            var baseParam = AddParameter(dialect, parameters, newBase);
+            if (dialect.Kind == SqlDialectKind.SqlServer)
+            {
+                return "LOG(" + inner + ", " + baseParam + ")";
+            }
+            if (dialect.Kind == SqlDialectKind.PostgreSql)
+            {
+                return "(ln(" + inner + ") / ln(" + baseParam + "))";
+            }
+            return "(ln(" + inner + ") / ln(" + baseParam + "))";
+        }
+
+        private static string BuildLog10(string inner, ISqlDialect dialect)
+        {
+            if (dialect.Kind == SqlDialectKind.SqlServer) return "LOG10(" + inner + ")";
+            return "log10(" + inner + ")";
+        }
+
+        private static string BuildDateTrunc(string columnSql, ISqlDialect dialect)
+        {
+            if (dialect.Kind == SqlDialectKind.SqlServer)
+            {
+                return "CAST(CAST(" + columnSql + " AS date) AS datetime)";
+            }
+            if (dialect.Kind == SqlDialectKind.PostgreSql)
+            {
+                return "date_trunc('day', " + columnSql + ")";
+            }
+            // SQLite: use strftime to produce datetime format consistent with parameter format
+            return "strftime('%Y-%m-%d 00:00:00', " + columnSql + ")";
+        }
+
+        private static string BuildDayOfWeek(string columnSql, ISqlDialect dialect)
+        {
+            if (dialect.Kind == SqlDialectKind.SqlServer)
+            {
+                // SQL Server DATEPART(weekday, ...) returns 1=Sunday..7=Saturday
+                // .NET DayOfWeek: 0=Sunday..6=Saturday → subtract 1
+                return "(DATEPART(weekday, " + columnSql + ") - 1)";
+            }
+            if (dialect.Kind == SqlDialectKind.PostgreSql)
+            {
+                // PostgreSQL EXTRACT(dow FROM ...) returns 0=Sunday..6=Saturday (same as .NET)
+                return "cast(EXTRACT(dow from " + columnSql + ") as integer)";
+            }
+            // SQLite: strftime('%w', ...) returns 0=Sunday..6=Saturday (same as .NET)
+            return "cast(strftime('%w', " + columnSql + ") as integer)";
+        }
+
         private static string BuildCoalesce(Expression left, Expression right, TableMapping table, ISqlDialect dialect, List<object> parameters)
         {
             var leftSql = TranslateToColumnSql(left, table, dialect, parameters)
@@ -1219,6 +1422,9 @@ namespace Kuery.Linq
                 case ExpressionType.Multiply:
                 case ExpressionType.Divide:
                 case ExpressionType.Modulo:
+                case ExpressionType.And:
+                case ExpressionType.Or:
+                case ExpressionType.ExclusiveOr:
                     return true;
                 default:
                     return false;
@@ -1238,6 +1444,20 @@ namespace Kuery.Linq
                 if (operand != null) return "(-" + operand + ")";
             }
 
+            if (expression is UnaryExpression onesComplement && onesComplement.NodeType == ExpressionType.OnesComplement)
+            {
+                var operand = TryTranslateArithmeticSql(onesComplement.Operand, table, dialect, parameters);
+                if (operand != null) return "(~" + operand + ")";
+            }
+
+            // C# compiles ~int as ExpressionType.Not (not OnesComplement)
+            if (expression is UnaryExpression notExpr && notExpr.NodeType == ExpressionType.Not
+                && notExpr.Type != typeof(bool) && notExpr.Type != typeof(bool?))
+            {
+                var operand = TryTranslateArithmeticSql(notExpr.Operand, table, dialect, parameters);
+                if (operand != null) return "(~" + operand + ")";
+            }
+
             if (TryGetColumnExpression(expression, table, dialect, out var columnSql))
             {
                 return columnSql;
@@ -1255,7 +1475,7 @@ namespace Kuery.Linq
                 var right = TryTranslateArithmeticSql(binary.Right, table, dialect, parameters);
                 if (left != null && right != null)
                 {
-                    return "(" + left + " " + ToSqlOperator(binary.NodeType) + " " + right + ")";
+                    return BuildBinaryArithmeticSql(left, binary.NodeType, right, dialect);
                 }
             }
 
@@ -1283,7 +1503,7 @@ namespace Kuery.Linq
                 var arithRight = TryTranslateArithmeticSql(expression.Right, table, dialect, parameters);
                 if (arithLeft != null && arithRight != null)
                 {
-                    return "(" + arithLeft + " " + ToSqlOperator(expression.NodeType) + " " + arithRight + ")";
+                    return BuildBinaryArithmeticSql(arithLeft, expression.NodeType, arithRight, dialect);
                 }
             }
 
@@ -1301,7 +1521,9 @@ namespace Kuery.Linq
                     leftIsColumn = true;
                 }
                 else if (expression.Left is BinaryExpression leftBin && IsArithmeticOperator(leftBin.NodeType)
-                    || expression.Left is UnaryExpression leftUn && leftUn.NodeType == ExpressionType.Negate)
+                    || expression.Left is UnaryExpression leftUn && (leftUn.NodeType == ExpressionType.Negate
+                        || leftUn.NodeType == ExpressionType.OnesComplement
+                        || (leftUn.NodeType == ExpressionType.Not && leftUn.Type != typeof(bool) && leftUn.Type != typeof(bool?))))
                 {
                     var arith = TryTranslateArithmeticSql(expression.Left, table, dialect, parameters);
                     if (arith != null)
@@ -1320,7 +1542,9 @@ namespace Kuery.Linq
                     rightIsColumn = true;
                 }
                 else if (expression.Right is BinaryExpression rightBin && IsArithmeticOperator(rightBin.NodeType)
-                    || expression.Right is UnaryExpression rightUn && rightUn.NodeType == ExpressionType.Negate)
+                    || expression.Right is UnaryExpression rightUn && (rightUn.NodeType == ExpressionType.Negate
+                        || rightUn.NodeType == ExpressionType.OnesComplement
+                        || (rightUn.NodeType == ExpressionType.Not && rightUn.Type != typeof(bool) && rightUn.Type != typeof(bool?))))
                 {
                     var arith = TryTranslateArithmeticSql(expression.Right, table, dialect, parameters);
                     if (arith != null)
@@ -1465,6 +1689,16 @@ namespace Kuery.Linq
             return invokeMethod.Invoke(compiled, null);
         }
 
+        private static string BuildBinaryArithmeticSql(string left, ExpressionType nodeType, string right, ISqlDialect dialect)
+        {
+            // SQLite does not support ^ for XOR; emulate as (a | b) - (a & b)
+            if (nodeType == ExpressionType.ExclusiveOr && dialect.Kind == SqlDialectKind.Sqlite)
+            {
+                return "((" + left + " | " + right + ") - (" + left + " & " + right + "))";
+            }
+            return "(" + left + " " + ToSqlOperator(nodeType) + " " + right + ")";
+        }
+
         private static string ToSqlOperator(ExpressionType expressionType)
         {
             switch (expressionType)
@@ -1495,6 +1729,12 @@ namespace Kuery.Linq
                     return "/";
                 case ExpressionType.Modulo:
                     return "%";
+                case ExpressionType.And:
+                    return "&";
+                case ExpressionType.Or:
+                    return "|";
+                case ExpressionType.ExclusiveOr:
+                    return "^";
                 default:
                     throw new NotSupportedException($"Unsupported expression type: {expressionType}");
             }
