@@ -118,6 +118,9 @@ namespace Kuery.Linq
                 case nameof(Queryable.Select):
                     ApplySelect(model, GetLambda(methodCall.Arguments[1]));
                     break;
+                case nameof(Queryable.Join):
+                    ApplyJoin(model, methodCall);
+                    break;
                 case nameof(Queryable.Distinct):
                     model.IsDistinct = true;
                     break;
@@ -251,6 +254,60 @@ namespace Kuery.Linq
             }
 
             model.SetProjection(lambda, columns);
+        }
+
+        private static void ApplyJoin(SelectQueryModel model, MethodCallExpression methodCall)
+        {
+            // Arguments[1] is the inner source
+            var innerExpression = methodCall.Arguments[1];
+            // Unwrap Quote if present
+            while (innerExpression.NodeType == ExpressionType.Quote)
+            {
+                innerExpression = ((UnaryExpression)innerExpression).Operand;
+            }
+
+            TableMapping innerTable;
+            if (innerExpression is ConstantExpression constInner && constInner.Value is IQueryable innerQueryable)
+            {
+                innerTable = SqlMapper.GetMapping(innerQueryable.ElementType);
+            }
+            else
+            {
+                throw new NotSupportedException("Join inner source must be a root query.");
+            }
+
+            // Arguments[2] is outerKeySelector
+            var outerKeyLambda = GetLambda(methodCall.Arguments[2]);
+            var outerKeyColumn = GetKeyColumn(model.Table, outerKeyLambda);
+
+            // Arguments[3] is innerKeySelector
+            var innerKeyLambda = GetLambda(methodCall.Arguments[3]);
+            var innerKeyColumn = GetKeyColumn(innerTable, innerKeyLambda);
+
+            // Arguments[4] is resultSelector
+            var resultSelector = GetLambda(methodCall.Arguments[4]);
+
+            model.SetJoin(new JoinClause(innerTable, outerKeyColumn, innerKeyColumn, resultSelector));
+        }
+
+        private static TableMapping.Column GetKeyColumn(TableMapping table, LambdaExpression lambda)
+        {
+            var body = lambda.Body;
+            if (body is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+            {
+                body = unary.Operand;
+            }
+
+            if (body is MemberExpression member && member.Expression?.NodeType == ExpressionType.Parameter)
+            {
+                var col = table.FindColumnWithPropertyName(member.Member.Name);
+                if (col != null)
+                {
+                    return col;
+                }
+            }
+
+            throw new NotSupportedException($"Unsupported key selector: {lambda}. Only direct member access is supported.");
         }
 
         private static void AddOrdering(SelectQueryModel model, LambdaExpression lambda, bool ascending)

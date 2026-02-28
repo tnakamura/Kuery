@@ -39,6 +39,29 @@ namespace Kuery.Linq
         internal bool Ascending { get; }
     }
 
+    internal sealed class JoinClause
+    {
+        internal JoinClause(
+            TableMapping innerTable,
+            TableMapping.Column outerKeyColumn,
+            TableMapping.Column innerKeyColumn,
+            LambdaExpression resultSelector)
+        {
+            InnerTable = innerTable ?? throw new ArgumentNullException(nameof(innerTable));
+            OuterKeyColumn = outerKeyColumn ?? throw new ArgumentNullException(nameof(outerKeyColumn));
+            InnerKeyColumn = innerKeyColumn ?? throw new ArgumentNullException(nameof(innerKeyColumn));
+            ResultSelector = resultSelector ?? throw new ArgumentNullException(nameof(resultSelector));
+        }
+
+        internal TableMapping InnerTable { get; }
+
+        internal TableMapping.Column OuterKeyColumn { get; }
+
+        internal TableMapping.Column InnerKeyColumn { get; }
+
+        internal LambdaExpression ResultSelector { get; }
+    }
+
     internal sealed class SelectQueryModel
     {
         internal SelectQueryModel(TableMapping table)
@@ -49,6 +72,13 @@ namespace Kuery.Linq
         }
 
         internal TableMapping Table { get; }
+
+        internal JoinClause Join { get; private set; }
+
+        internal void SetJoin(JoinClause join)
+        {
+            Join = join ?? throw new ArgumentNullException(nameof(join));
+        }
 
         internal Expression Predicate { get; private set; }
 
