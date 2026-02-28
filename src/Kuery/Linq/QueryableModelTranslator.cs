@@ -116,13 +116,23 @@ namespace Kuery.Linq
                     }
                     break;
                 case nameof(Queryable.Select):
-                    ApplySelect(model, GetLambda(methodCall.Arguments[1]));
+                    if (model.GroupByColumns != null && model.GroupByColumns.Count > 0)
+                    {
+                        ApplyGroupBySelect(model, GetLambda(methodCall.Arguments[1]));
+                    }
+                    else
+                    {
+                        ApplySelect(model, GetLambda(methodCall.Arguments[1]));
+                    }
                     break;
                 case nameof(Queryable.Join):
                     ApplyJoin(model, methodCall);
                     break;
                 case nameof(Queryable.Distinct):
                     model.IsDistinct = true;
+                    break;
+                case nameof(Queryable.GroupBy):
+                    ApplyGroupBy(model, methodCall);
                     break;
                 case "ElementAt":
                     model.SetTerminal(QueryTerminalKind.ElementAt);
@@ -254,6 +264,127 @@ namespace Kuery.Linq
             }
 
             model.SetProjection(lambda, columns);
+        }
+
+        private static void ApplyGroupBy(SelectQueryModel model, MethodCallExpression methodCall)
+        {
+            var lambda = GetLambda(methodCall.Arguments[1]);
+            var body = lambda.Body;
+            if (body is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+            {
+                body = unary.Operand;
+            }
+
+            if (body is MemberExpression member && member.Expression?.NodeType == ExpressionType.Parameter)
+            {
+                var col = model.Table.FindColumnWithPropertyName(member.Member.Name);
+                if (col == null)
+                {
+                    throw new NotSupportedException($"Unknown property '{member.Member.Name}' in GroupBy.");
+                }
+                model.AddGroupByColumn(col);
+            }
+            else
+            {
+                throw new NotSupportedException($"Unsupported GroupBy expression: {lambda}. Only direct member access is supported.");
+            }
+        }
+
+        private static void ApplyGroupBySelect(SelectQueryModel model, LambdaExpression lambda)
+        {
+            var body = lambda.Body;
+            if (body is NewExpression newExpr)
+            {
+                var items = new List<GroupBySelectItem>();
+                for (var i = 0; i < newExpr.Arguments.Count; i++)
+                {
+                    var arg = newExpr.Arguments[i];
+                    if (arg is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+                    {
+                        arg = unary.Operand;
+                    }
+
+                    var targetName = newExpr.Members != null ? newExpr.Members[i].Name : "Item" + i;
+
+                    if (arg is MemberExpression memberExpr
+                        && memberExpr.Member.Name == "Key"
+                        && memberExpr.Expression?.NodeType == ExpressionType.Parameter)
+                    {
+                        items.Add(new GroupBySelectItem(model.GroupByColumns[0], targetName));
+                    }
+                    else if (arg is MethodCallExpression methodCall)
+                    {
+                        items.Add(TranslateGroupByAggregate(model, methodCall, targetName));
+                    }
+                    else
+                    {
+                        throw new NotSupportedException($"Unsupported expression in GroupBy Select: {arg}");
+                    }
+                }
+                model.SetGroupBySelect(items, newExpr.Constructor);
+            }
+            else
+            {
+                throw new NotSupportedException($"Unsupported GroupBy Select body: {body.NodeType}. Only new {{ }} is supported.");
+            }
+        }
+
+        private static GroupBySelectItem TranslateGroupByAggregate(SelectQueryModel model, MethodCallExpression methodCall, string targetName)
+        {
+            var method = methodCall.Method;
+            if (method.DeclaringType != typeof(Enumerable))
+            {
+                throw new NotSupportedException($"Unsupported method in GroupBy Select: {method.DeclaringType?.Name}.{method.Name}");
+            }
+
+            switch (method.Name)
+            {
+                case nameof(Enumerable.Count):
+                case nameof(Enumerable.LongCount):
+                    return new GroupBySelectItem("count", null, targetName);
+                case "Sum":
+                case "Min":
+                case "Max":
+                case "Average":
+                {
+                    var funcName = method.Name == "Average" ? "avg" : method.Name.ToLower();
+                    if (methodCall.Arguments.Count < 2)
+                    {
+                        throw new NotSupportedException($"Aggregate {method.Name} requires a selector in GroupBy context.");
+                    }
+
+                    var selectorExpr = methodCall.Arguments[1];
+                    while (selectorExpr.NodeType == ExpressionType.Quote)
+                    {
+                        selectorExpr = ((UnaryExpression)selectorExpr).Operand;
+                    }
+
+                    if (!(selectorExpr is LambdaExpression selectorLambda))
+                    {
+                        throw new NotSupportedException($"Expected lambda for aggregate {method.Name}.");
+                    }
+
+                    var selectorBody = selectorLambda.Body;
+                    if (selectorBody is UnaryExpression selectorUnary && selectorUnary.NodeType == ExpressionType.Convert)
+                    {
+                        selectorBody = selectorUnary.Operand;
+                    }
+
+                    if (selectorBody is MemberExpression member && member.Expression?.NodeType == ExpressionType.Parameter)
+                    {
+                        var col = model.Table.FindColumnWithPropertyName(member.Member.Name);
+                        if (col == null)
+                        {
+                            throw new NotSupportedException($"Unknown property '{member.Member.Name}' in aggregate.");
+                        }
+                        return new GroupBySelectItem(funcName, col, targetName);
+                    }
+
+                    throw new NotSupportedException($"Unsupported aggregate selector: {selectorExpr}. Only direct member access is supported.");
+                }
+                default:
+                    throw new NotSupportedException($"Unsupported aggregate method in GroupBy: {method.Name}");
+            }
         }
 
         private static void ApplyJoin(SelectQueryModel model, MethodCallExpression methodCall)
