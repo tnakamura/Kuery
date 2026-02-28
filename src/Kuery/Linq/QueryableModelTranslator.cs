@@ -42,7 +42,15 @@ namespace Kuery.Linq
             switch (name)
             {
                 case nameof(Queryable.Where):
-                    model.AddPredicate(GetLambda(methodCall.Arguments[1]).Body);
+                    if (model.GroupByColumns != null && model.GroupByColumns.Count > 0)
+                    {
+                        var havingLambda = GetLambda(methodCall.Arguments[1]);
+                        model.AddHavingPredicate(havingLambda.Body, havingLambda.Parameters[0]);
+                    }
+                    else
+                    {
+                        model.AddPredicate(GetLambda(methodCall.Arguments[1]).Body);
+                    }
                     break;
                 case nameof(Queryable.OrderBy):
                     AddOrdering(model, GetLambda(methodCall.Arguments[1]), true);
@@ -284,6 +292,30 @@ namespace Kuery.Linq
                 }
                 model.AddGroupByColumn(col);
             }
+            else if (body is NewExpression newExpr)
+            {
+                for (var i = 0; i < newExpr.Arguments.Count; i++)
+                {
+                    var arg = newExpr.Arguments[i];
+                    if (arg is UnaryExpression argUnary && argUnary.NodeType == ExpressionType.Convert)
+                    {
+                        arg = argUnary.Operand;
+                    }
+
+                    if (!(arg is MemberExpression argMember) || argMember.Expression?.NodeType != ExpressionType.Parameter)
+                    {
+                        throw new NotSupportedException($"Unsupported GroupBy expression: {arg}. Only direct member access is supported.");
+                    }
+
+                    var col = model.Table.FindColumnWithPropertyName(argMember.Member.Name);
+                    if (col == null)
+                    {
+                        throw new NotSupportedException($"Unknown property '{argMember.Member.Name}' in GroupBy.");
+                    }
+                    model.AddGroupByColumn(col);
+                }
+                model.GroupByKeyMembers = newExpr.Members;
+            }
             else
             {
                 throw new NotSupportedException($"Unsupported GroupBy expression: {lambda}. Only direct member access is supported.");
@@ -312,6 +344,20 @@ namespace Kuery.Linq
                     {
                         items.Add(new GroupBySelectItem(model.GroupByColumns[0], targetName));
                     }
+                    else if (arg is MemberExpression outerMember
+                        && outerMember.Expression is MemberExpression innerMember
+                        && innerMember.Member.Name == "Key"
+                        && innerMember.Expression?.NodeType == ExpressionType.Parameter)
+                    {
+                        // Composite key: g.Key.Prop
+                        var propName = outerMember.Member.Name;
+                        var col = FindGroupByColumn(model, propName);
+                        if (col == null)
+                        {
+                            throw new NotSupportedException($"Unknown property '{propName}' in GroupBy composite key.");
+                        }
+                        items.Add(new GroupBySelectItem(col, targetName));
+                    }
                     else if (arg is MethodCallExpression methodCall)
                     {
                         items.Add(TranslateGroupByAggregate(model, methodCall, targetName));
@@ -327,6 +373,21 @@ namespace Kuery.Linq
             {
                 throw new NotSupportedException($"Unsupported GroupBy Select body: {body.NodeType}. Only new {{ }} is supported.");
             }
+        }
+
+        private static TableMapping.Column FindGroupByColumn(SelectQueryModel model, string propertyName)
+        {
+            if (model.GroupByKeyMembers != null)
+            {
+                for (var i = 0; i < model.GroupByKeyMembers.Count; i++)
+                {
+                    if (model.GroupByKeyMembers[i].Name == propertyName && i < model.GroupByColumns.Count)
+                    {
+                        return model.GroupByColumns[i];
+                    }
+                }
+            }
+            return model.Table.FindColumnWithPropertyName(propertyName);
         }
 
         private static GroupBySelectItem TranslateGroupByAggregate(SelectQueryModel model, MethodCallExpression methodCall, string targetName)

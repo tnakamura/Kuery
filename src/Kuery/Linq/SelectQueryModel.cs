@@ -148,6 +148,18 @@ namespace Kuery.Linq
 
         internal ConstructorInfo GroupByResultConstructor { get; private set; }
 
+        internal System.Collections.ObjectModel.ReadOnlyCollection<System.Reflection.MemberInfo> GroupByKeyMembers { get; set; }
+
+        internal Expression HavingPredicate { get; private set; }
+
+        internal ParameterExpression HavingGroupParameter { get; private set; }
+
+        internal void AddHavingPredicate(Expression predicate, ParameterExpression groupParameter)
+        {
+            HavingGroupParameter = groupParameter;
+            HavingPredicate = HavingPredicate == null ? predicate : Expression.AndAlso(HavingPredicate, predicate);
+        }
+
         internal void AddGroupByColumn(TableMapping.Column column)
         {
             if (GroupByColumns == null)
