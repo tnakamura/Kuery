@@ -1224,6 +1224,8 @@ namespace Kuery
             var q = Clone<T>();
             q._joinInner = inner;
             q._joinInnerTable = inner.Table;
+            q._joinOuter = this;
+            q._joinOuterTable = Table;
             q._joinOuterKeySelector = outerKeySelector;
             q._joinInnerKeySelector = innerKeySelector;
             return q;
@@ -1235,29 +1237,23 @@ namespace Kuery
             Expression<Func<TInner, TKey>> innerKeySelector,
             Expression<Func<T, TInner, TResult>> resultSelector)
         {
-            var q = Clone<T>();
-            q._joinInner = inner;
-            q._joinInnerTable = inner.Table;
-            q._joinOuterKeySelector = outerKeySelector;
-            q._joinInnerKeySelector = innerKeySelector;
-            q._joinSelector = resultSelector;
             var rq = new TableQuery<TResult>(Connection, SqlMapper.GetMapping(typeof(TResult)));
-            rq._where = q._where;
-            rq._deferred = q._deferred;
-            if (q._orderBys != null)
+            rq._where = _where;
+            rq._deferred = _deferred;
+            if (_orderBys != null)
             {
-                rq._orderBys = new List<Ordering>(q._orderBys);
+                rq._orderBys = new List<Ordering>(_orderBys);
             }
-            rq._limit = q._limit;
-            rq._offset = q._offset;
-            rq._joinInner = q._joinInner;
-            rq._joinInnerTable = q._joinInnerTable;
-            rq._joinInnerKeySelector = q._joinInnerKeySelector;
-            rq._joinOuter = q._joinOuter;
+            rq._limit = _limit;
+            rq._offset = _offset;
+            rq._joinInner = inner;
+            rq._joinInnerTable = inner.Table;
+            rq._joinInnerKeySelector = innerKeySelector;
+            rq._joinOuter = this;
             rq._joinOuterTable = Table;
-            rq._joinOuterKeySelector = q._joinOuterKeySelector;
-            rq._joinSelector = q._joinSelector;
-            rq._selector = q._selector;
+            rq._joinOuterKeySelector = outerKeySelector;
+            rq._joinSelector = resultSelector;
+            rq._selector = _selector;
             return rq;
         }
 
@@ -1275,7 +1271,13 @@ namespace Kuery
 
                 if (body is MemberExpression mem && mem.Expression.NodeType == ExpressionType.Parameter)
                 {
-                    return table.FindColumnWithPropertyName(mem.Member.Name).Name;
+                    var column = table.FindColumnWithPropertyName(mem.Member.Name);
+                    if (column == null)
+                    {
+                        throw new NotSupportedException(
+                            $"Column not found for property '{mem.Member.Name}' in table '{table.TableName}'.");
+                    }
+                    return column.Name;
                 }
             }
             throw new NotSupportedException(
