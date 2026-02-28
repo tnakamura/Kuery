@@ -91,6 +91,11 @@
 | 数学 | `Math.Ceiling(x.Value)` | `CEILING(col)` / `ceil(col)` | SQLite: CASE 式で代替 |
 | 数学 | `Math.Max(x.A, x.B)` | `max(a, b)` | |
 | 数学 | `Math.Min(x.A, x.B)` | `min(a, b)` | |
+| 数学 | `Math.Pow(x, y)` | `POWER(x, y)` / `power(x, y)` | |
+| 数学 | `Math.Sqrt(x)` | `SQRT(x)` / `sqrt(x)` | |
+| 数学 | `Math.Log(x)` | `LOG(x)` | PostgreSQL/SQLite: `ln(x)` |
+| 数学 | `Math.Log(x, newBase)` | `LOG(x, newBase)` | PostgreSQL/SQLite: `ln(x) / ln(newBase)` |
+| 数学 | `Math.Log10(x)` | `LOG10(x)` / `log10(x)` | |
 | null 合体 | `x.Prop ?? defaultValue` | `COALESCE(col, default)` | |
 | 日時 | `x.Date.Year` | `DATEPART(year, col)` | PostgreSQL: `EXTRACT`, SQLite: `strftime('%Y')` |
 | 日時 | `x.Date.Month` | `DATEPART(month, col)` | PostgreSQL: `EXTRACT`, SQLite: `strftime('%m')` |
@@ -98,6 +103,8 @@
 | 日時 | `x.Date.Hour` | `DATEPART(hour, col)` | PostgreSQL: `EXTRACT`, SQLite: `strftime('%H')` |
 | 日時 | `x.Date.Minute` | `DATEPART(minute, col)` | PostgreSQL: `EXTRACT`, SQLite: `strftime('%M')` |
 | 日時 | `x.Date.Second` | `DATEPART(second, col)` | PostgreSQL: `EXTRACT`, SQLite: `strftime('%S')` |
+| 日時 | `x.Date.Date` | `CAST(CAST(col AS date) AS datetime)` | PostgreSQL: `date_trunc('day', col)`, SQLite: `strftime('%Y-%m-%d 00:00:00', col)` |
+| 日時 | `x.Date.DayOfWeek` | `DATEPART(weekday, col) - 1` | PostgreSQL: `EXTRACT(dow)`, SQLite: `strftime('%w', col)` |
 | 日時 | `DateTime.Now` | `GETDATE()` | PostgreSQL: `LOCALTIMESTAMP`, SQLite: `datetime('now', 'localtime')` |
 | 日時 | `DateTime.UtcNow` | `GETUTCDATE()` | PostgreSQL: `NOW() AT TIME ZONE 'UTC'`, SQLite: `datetime('now')` |
 | 日時演算 | `x.Date.AddDays(n)` | `DATEADD(day, n, col)` | PostgreSQL: `col + make_interval(...)`, SQLite: `datetime(col, 'n days')` |
@@ -115,6 +122,10 @@
 | 型変換 | `Convert.ToString(x.Prop)` | `CAST(col AS nvarchar(max))` | SQLite/PostgreSQL: `text` |
 | 型変換 | `x.Prop.ToString()` | `CAST(col AS nvarchar(max))` | SQLite/PostgreSQL: `text` |
 | LIKE | `KueryFunctions.Like(x.Name, "%pattern%")` | `col LIKE @p` | SQL LIKE ワイルドカード (`%`, `_`) を使用 |
+| ビット演算 | `x.Flags & mask` | `col & mask` | |
+| ビット演算 | `x.Flags \| mask` | `col \| mask` | |
+| ビット演算 | `x.Flags ^ mask` | `col ^ mask` | SQLite: `(col \| mask) - (col & mask)` で代替 |
+| ビット演算 | `~x.Flags` | `~col` | |
 
 ### 対応 SQL 方言
 
@@ -148,12 +159,6 @@
 |----------|-------|------------|--------|
 | 文字列 | `string.Format(...)` | 文字列結合に展開 | 低 |
 | 文字列 | `string.Join(sep, ...)` | N/A（集約コンテキスト依存） | 低 |
-| 数学 | `Math.Pow(x, y)` | `POWER(x, y)` | 低 |
-| 数学 | `Math.Sqrt(x)` | `SQRT(x)` | 低 |
-| 数学 | `Math.Log(x)` / `Math.Log10(x)` | `LOG(x)` / `LOG10(x)` | 低 |
-| 日時 | `x.Date.Date` | 日付部分の切り出し | 低 |
-| 日時 | `x.Date.DayOfWeek` | `DATEPART(weekday, col)` 等 | 低 |
-| ビット演算 | `&`, `\|`, `^`, `~` | `&`, `\|`, `^`, `~` | 低 |
 
 ### SQL 固有機能（LINQ では直接表現が困難）
 
@@ -215,14 +220,14 @@ WHERE 述語で使える式を増やし、より複雑な条件を書けるよ�
 | 5-2 | ✅ EXISTS サブクエリ | `WHERE EXISTS (SELECT ...)` パターン |
 | 5-3 | ✅ `SelectMany()` | CROSS JOIN パターン |
 
-### Phase 6: 追加の数学・日時関数（優先度: 低）
+### Phase 6: 追加の数学・日時関数（✅ 実装済み）
 
 | # | 機能 | 概要 |
 |---|------|------|
-| 6-1 | `Math.Pow()` / `Math.Sqrt()` | `POWER` / `SQRT` 関数 |
-| 6-2 | `Math.Log()` / `Math.Log10()` | `LOG` / `LOG10` 関数 |
-| 6-3 | `DateTime.Date` / `DateTime.DayOfWeek` | 日付部分の取得 |
-| 6-4 | ビット演算 | `&`, `\|`, `^`, `~` の SQL 変換 |
+| 6-1 | ✅ `Math.Pow()` / `Math.Sqrt()` | `POWER` / `SQRT` 関数 |
+| 6-2 | ✅ `Math.Log()` / `Math.Log10()` | `LOG` / `LOG10` 関数 |
+| 6-3 | ✅ `DateTime.Date` / `DateTime.DayOfWeek` | 日付部分の取得 |
+| 6-4 | ✅ ビット演算 | `&`, `\|`, `^`, `~` の SQL 変換 |
 
 ### 対応予定なし
 
