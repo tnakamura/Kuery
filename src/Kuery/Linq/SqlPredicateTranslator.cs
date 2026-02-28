@@ -36,6 +36,7 @@ namespace Kuery.Linq
                 case ExpressionType.Multiply:
                 case ExpressionType.Divide:
                 case ExpressionType.Modulo:
+                case ExpressionType.Coalesce:
                     return TranslateBinary((BinaryExpression)expression, table, dialect, parameters);
                 case ExpressionType.Not:
                     {
@@ -189,6 +190,21 @@ namespace Kuery.Linq
                 if (transformed2 != null)
                 {
                     return "(" + transformed2 + " is null or " + transformed2 + " = '')";
+                }
+            }
+
+            // string.IsNullOrWhiteSpace(value) - static 1-arg form
+            if (methodName == nameof(string.IsNullOrWhiteSpace) && call.Object == null && call.Arguments.Count == 1
+                && call.Method.DeclaringType == typeof(string))
+            {
+                if (TryGetColumnExpression(call.Arguments[0], table, dialect, out var columnSql))
+                {
+                    return "(" + columnSql + " is null or trim(" + columnSql + ") = '')";
+                }
+                var transformed3 = TranslateToColumnSql(call.Arguments[0], table, dialect, parameters);
+                if (transformed3 != null)
+                {
+                    return "(" + transformed3 + " is null or trim(" + transformed3 + ") = '')";
                 }
             }
 
@@ -502,6 +518,58 @@ namespace Kuery.Linq
                 return TranslateConditional(conditional, table, dialect, parameters);
             }
 
+            // Handle DateTime.Now / DateTime.UtcNow as static member access
+            if (expression is MemberExpression staticDtMember
+                && staticDtMember.Expression == null
+                && staticDtMember.Member.DeclaringType == typeof(DateTime))
+            {
+                if (staticDtMember.Member.Name == nameof(DateTime.Now))
+                {
+                    return BuildDateTimeNow(dialect);
+                }
+                if (staticDtMember.Member.Name == nameof(DateTime.UtcNow))
+                {
+                    return BuildDateTimeUtcNow(dialect);
+                }
+            }
+
+            // Handle DateTime.AddXxx() instance methods
+            if (expression is MethodCallExpression dtAddCall
+                && dtAddCall.Object != null
+                && (dtAddCall.Object.Type == typeof(DateTime) || dtAddCall.Object.Type == typeof(DateTime?))
+                && dtAddCall.Arguments.Count == 1)
+            {
+                string datePart = null;
+                switch (dtAddCall.Method.Name)
+                {
+                    case nameof(DateTime.AddDays): datePart = "day"; break;
+                    case nameof(DateTime.AddMonths): datePart = "month"; break;
+                    case nameof(DateTime.AddYears): datePart = "year"; break;
+                    case nameof(DateTime.AddHours): datePart = "hour"; break;
+                    case nameof(DateTime.AddMinutes): datePart = "minute"; break;
+                    case nameof(DateTime.AddSeconds): datePart = "second"; break;
+                }
+                if (datePart != null)
+                {
+                    var inner = TranslateToColumnSql(dtAddCall.Object, table, dialect, parameters);
+                    if (inner == null && TryGetColumnExpression(dtAddCall.Object, table, dialect, out var dtAddColSql))
+                    {
+                        inner = dtAddColSql;
+                    }
+                    if (inner != null)
+                    {
+                        return BuildDateAdd(datePart, inner, dtAddCall.Arguments[0], dialect, parameters);
+                    }
+                }
+            }
+
+            // Handle null coalescing (??) as a column-like expression
+            if (expression is BinaryExpression coalesceBinary
+                && coalesceBinary.NodeType == ExpressionType.Coalesce)
+            {
+                return BuildCoalesce(coalesceBinary.Left, coalesceBinary.Right, table, dialect, parameters);
+            }
+
             if (TryGetColumnExpression(expression, table, dialect, out var columnSql))
             {
                 return columnSql;
@@ -701,6 +769,78 @@ namespace Kuery.Linq
             return "(case when " + inner + " = cast(" + inner + " as integer) then cast(" + inner + " as integer) when " + inner + " > 0 then cast(" + inner + " as integer) + 1 else cast(" + inner + " as integer) end)";
         }
 
+        private static string BuildCoalesce(Expression left, Expression right, TableMapping table, ISqlDialect dialect, List<object> parameters)
+        {
+            var leftSql = TranslateToColumnSql(left, table, dialect, parameters)
+                ?? TryTranslateArithmeticSql(left, table, dialect, parameters);
+            var rightSql = TranslateToColumnSql(right, table, dialect, parameters)
+                ?? TryTranslateArithmeticSql(right, table, dialect, parameters);
+            if (rightSql == null)
+            {
+                var value = EvaluateExpression(right);
+                rightSql = AddParameter(dialect, parameters, value);
+            }
+            if (leftSql != null && rightSql != null)
+            {
+                return "coalesce(" + leftSql + ", " + rightSql + ")";
+            }
+            throw new NotSupportedException("Unsupported coalesce expression.");
+        }
+
+        private static string BuildDateTimeNow(ISqlDialect dialect)
+        {
+            if (dialect.Kind == SqlDialectKind.SqlServer) return "GETDATE()";
+            if (dialect.Kind == SqlDialectKind.PostgreSql) return "LOCALTIMESTAMP";
+            return "datetime('now', 'localtime')";
+        }
+
+        private static string BuildDateTimeUtcNow(ISqlDialect dialect)
+        {
+            if (dialect.Kind == SqlDialectKind.SqlServer) return "GETUTCDATE()";
+            if (dialect.Kind == SqlDialectKind.PostgreSql) return "(NOW() AT TIME ZONE 'UTC')";
+            return "datetime('now')";
+        }
+
+        private static string BuildDateAdd(string partName, string columnSql, Expression amountArg, ISqlDialect dialect, List<object> parameters)
+        {
+            var amount = EvaluateExpression(amountArg);
+            if (dialect.Kind == SqlDialectKind.SqlServer)
+            {
+                var paramName = AddParameter(dialect, parameters, amount);
+                return "DATEADD(" + partName + ", " + paramName + ", " + columnSql + ")";
+            }
+            if (dialect.Kind == SqlDialectKind.PostgreSql)
+            {
+                var paramName = AddParameter(dialect, parameters, amount);
+                string unit;
+                switch (partName)
+                {
+                    case "day": unit = "days"; break;
+                    case "month": unit = "months"; break;
+                    case "year": unit = "years"; break;
+                    case "hour": unit = "hours"; break;
+                    case "minute": unit = "minutes"; break;
+                    case "second": unit = "seconds"; break;
+                    default: throw new NotSupportedException($"Unsupported date part: {partName}");
+                }
+                return "(" + columnSql + " + make_interval(" + unit + " => " + paramName + "))";
+            }
+            // SQLite
+            var n = Convert.ToDouble(amount);
+            string modifier;
+            switch (partName)
+            {
+                case "day": modifier = n.ToString(System.Globalization.CultureInfo.InvariantCulture) + " days"; break;
+                case "month": modifier = n.ToString(System.Globalization.CultureInfo.InvariantCulture) + " months"; break;
+                case "year": modifier = n.ToString(System.Globalization.CultureInfo.InvariantCulture) + " years"; break;
+                case "hour": modifier = n.ToString(System.Globalization.CultureInfo.InvariantCulture) + " hours"; break;
+                case "minute": modifier = n.ToString(System.Globalization.CultureInfo.InvariantCulture) + " minutes"; break;
+                case "second": modifier = n.ToString(System.Globalization.CultureInfo.InvariantCulture) + " seconds"; break;
+                default: throw new NotSupportedException($"Unsupported date part: {partName}");
+            }
+            return "datetime(" + columnSql + ", '" + modifier + "')";
+        }
+
         private static string TryBuildMathMaxMin(string methodName, Expression leftArg, Expression rightArg, TableMapping table, ISqlDialect dialect, List<object> parameters)
         {
             var left = ResolveInnerSql(leftArg, table, dialect, parameters);
@@ -781,6 +921,12 @@ namespace Kuery.Linq
 
         private static string TranslateBinary(BinaryExpression expression, TableMapping table, ISqlDialect dialect, List<object> parameters)
         {
+            // Handle null coalescing (??) → COALESCE
+            if (expression.NodeType == ExpressionType.Coalesce)
+            {
+                return BuildCoalesce(expression.Left, expression.Right, table, dialect, parameters);
+            }
+
             // Handle arithmetic sub-expressions (e.g. x.Price * x.Qty > 100)
             if (IsArithmeticOperator(expression.NodeType))
             {

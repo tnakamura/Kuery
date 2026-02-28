@@ -74,6 +74,7 @@
 | 文字列 | `x.Name.IndexOf("a")` | `instr(col, @p) - 1` | SqlServer: `CHARINDEX`, PostgreSQL: `strpos` |
 | 文字列 | `x.Name.Length` | `length(col)` | SqlServer: `LEN` |
 | 文字列 | `string.IsNullOrEmpty(x.Name)` | `col IS NULL OR col = ''` | |
+| 文字列 | `string.IsNullOrWhiteSpace(x.Name)` | `col IS NULL OR TRIM(col) = ''` | |
 | 文字列結合 | `x.A + x.B` (string 型) | `col1 \|\| col2` | SqlServer: `col1 + col2` |
 | 文字列結合 | `string.Concat(x.A, x.B)` | `col1 \|\| col2` | SqlServer: `col1 + col2` |
 | 数学 | `Math.Abs(x.Value)` | `abs(col)` | |
@@ -83,12 +84,21 @@
 | 数学 | `Math.Ceiling(x.Value)` | `CEILING(col)` / `ceil(col)` | SQLite: CASE 式で代替 |
 | 数学 | `Math.Max(x.A, x.B)` | `max(a, b)` | |
 | 数学 | `Math.Min(x.A, x.B)` | `min(a, b)` | |
+| null 合体 | `x.Prop ?? defaultValue` | `COALESCE(col, default)` | |
 | 日時 | `x.Date.Year` | `DATEPART(year, col)` | PostgreSQL: `EXTRACT`, SQLite: `strftime('%Y')` |
 | 日時 | `x.Date.Month` | `DATEPART(month, col)` | PostgreSQL: `EXTRACT`, SQLite: `strftime('%m')` |
 | 日時 | `x.Date.Day` | `DATEPART(day, col)` | PostgreSQL: `EXTRACT`, SQLite: `strftime('%d')` |
 | 日時 | `x.Date.Hour` | `DATEPART(hour, col)` | PostgreSQL: `EXTRACT`, SQLite: `strftime('%H')` |
 | 日時 | `x.Date.Minute` | `DATEPART(minute, col)` | PostgreSQL: `EXTRACT`, SQLite: `strftime('%M')` |
 | 日時 | `x.Date.Second` | `DATEPART(second, col)` | PostgreSQL: `EXTRACT`, SQLite: `strftime('%S')` |
+| 日時 | `DateTime.Now` | `GETDATE()` | PostgreSQL: `LOCALTIMESTAMP`, SQLite: `datetime('now', 'localtime')` |
+| 日時 | `DateTime.UtcNow` | `GETUTCDATE()` | PostgreSQL: `NOW() AT TIME ZONE 'UTC'`, SQLite: `datetime('now')` |
+| 日時演算 | `x.Date.AddDays(n)` | `DATEADD(day, n, col)` | PostgreSQL: `col + make_interval(...)`, SQLite: `datetime(col, 'n days')` |
+| 日時演算 | `x.Date.AddMonths(n)` | `DATEADD(month, n, col)` | PostgreSQL: `col + make_interval(...)`, SQLite: `datetime(col, 'n months')` |
+| 日時演算 | `x.Date.AddYears(n)` | `DATEADD(year, n, col)` | PostgreSQL: `col + make_interval(...)`, SQLite: `datetime(col, 'n years')` |
+| 日時演算 | `x.Date.AddHours(n)` | `DATEADD(hour, n, col)` | PostgreSQL: `col + make_interval(...)`, SQLite: `datetime(col, 'n hours')` |
+| 日時演算 | `x.Date.AddMinutes(n)` | `DATEADD(minute, n, col)` | PostgreSQL: `col + make_interval(...)`, SQLite: `datetime(col, 'n minutes')` |
+| 日時演算 | `x.Date.AddSeconds(n)` | `DATEADD(second, n, col)` | PostgreSQL: `col + make_interval(...)`, SQLite: `datetime(col, 'n seconds')` |
 
 ### 対応 SQL 方言
 
@@ -125,18 +135,14 @@
 
 | カテゴリ | C# 式 | 対応する SQL | 優先度 |
 |----------|-------|------------|--------|
-| null 合体 | `x.Prop ?? defaultValue` | `COALESCE(col, default)` | 高 |
 | 型変換 | `Convert.ToInt32(x.Prop)` 等 | `CAST(col AS int)` | 中 |
 | 型変換 | `x.Prop.ToString()` | `CAST(col AS text)` | 中 |
 | 文字列 | `string.Format(...)` | 文字列結合に展開 | 低 |
 | 文字列 | `string.Join(sep, ...)` | N/A（集約コンテキスト依存） | 低 |
-| 文字列 | `string.IsNullOrWhiteSpace()` | `IS NULL OR TRIM(col) = ''` | 中 |
 | 文字列 | カスタム LIKE パターン | `LIKE @pattern` | 中 |
 | 数学 | `Math.Pow(x, y)` | `POWER(x, y)` | 低 |
 | 数学 | `Math.Sqrt(x)` | `SQRT(x)` | 低 |
 | 数学 | `Math.Log(x)` / `Math.Log10(x)` | `LOG(x)` / `LOG10(x)` | 低 |
-| 日時 | `DateTime.Now` / `DateTime.UtcNow` | `GETDATE()` / `datetime('now')` 等 | 中 |
-| 日時 | `x.Date.AddDays(n)` 等 | `DATEADD` / `datetime(col, '+n days')` 等 | 中 |
 | 日時 | `x.Date.Date` | 日付部分の切り出し | 低 |
 | 日時 | `x.Date.DayOfWeek` | `DATEPART(weekday, col)` 等 | 低 |
 | ビット演算 | `&`, `\|`, `^`, `~` | `&`, `\|`, `^`, `~` | 低 |
@@ -167,16 +173,16 @@ JOIN は実用上の利用頻度が非常に高い。現状 INNER JOIN の単一
 | 1-2 | ✅ 複合キー JOIN | `Join(inner, x => new { x.A, x.B }, y => new { y.A, y.B }, ...)` で複数 ON 条件を生成 |
 | 1-3 | ✅ 複数テーブル JOIN | `Join` を複数回チェインした場合に 3 テーブル以上の結合を可能にする |
 
-### Phase 2: 式の拡張（優先度: 高〜中）
+### Phase 2: 式の拡張（✅ 実装済み）
 
 WHERE 述語で使える式を増やし、より複雑な条件を書けるようにする。
 
 | # | 機能 | 概要 |
 |---|------|------|
-| 2-1 | null 合体演算子 (`??`) | `COALESCE` への変換 |
-| 2-2 | `string.IsNullOrWhiteSpace()` | `IS NULL OR TRIM(col) = ''` への変換 |
-| 2-3 | `DateTime.Now` / `DateTime.UtcNow` | 各方言の現在時刻関数への変換 |
-| 2-4 | `DateTime.AddDays()` 等の日時演算 | `DATEADD` / SQLite の `datetime()` への変換 |
+| 2-1 | ✅ null 合体演算子 (`??`) | `COALESCE` への変換 |
+| 2-2 | ✅ `string.IsNullOrWhiteSpace()` | `IS NULL OR TRIM(col) = ''` への変換 |
+| 2-3 | ✅ `DateTime.Now` / `DateTime.UtcNow` | 各方言の現在時刻関数への変換 |
+| 2-4 | ✅ `DateTime.AddDays()` 等の日時演算 | `DATEADD` / SQLite の `datetime()` への変換 |
 
 ### Phase 3: 型変換（優先度: 中）
 
