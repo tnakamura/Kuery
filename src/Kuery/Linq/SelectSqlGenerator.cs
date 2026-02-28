@@ -56,7 +56,29 @@ namespace Kuery.Linq
                     sql.Append("distinct ");
                 }
 
-                if (model.ProjectedColumns != null && model.ProjectedColumns.Count > 0)
+                if (model.GroupBySelectItems != null && model.GroupBySelectItems.Count > 0)
+                {
+                    for (var i = 0; i < model.GroupBySelectItems.Count; i++)
+                    {
+                        if (i > 0)
+                        {
+                            sql.Append(", ");
+                        }
+                        var item = model.GroupBySelectItems[i];
+                        if (item.IsKey)
+                        {
+                            sql.Append(dialect.EscapeIdentifier(item.SourceColumn.Name));
+                        }
+                        else
+                        {
+                            sql.Append(item.AggregateFunction);
+                            sql.Append("(");
+                            sql.Append(item.SourceColumn != null ? dialect.EscapeIdentifier(item.SourceColumn.Name) : "*");
+                            sql.Append(")");
+                        }
+                    }
+                }
+                else if (model.ProjectedColumns != null && model.ProjectedColumns.Count > 0)
                 {
                     for (var i = 0; i < model.ProjectedColumns.Count; i++)
                     {
@@ -109,6 +131,19 @@ namespace Kuery.Linq
                 sql.Append(" where ");
                 var predicateSql = _predicateTranslator.Translate(model.Predicate, model.Table, dialect, parameters);
                 sql.Append(model.Join != null ? QualifyColumns(predicateSql, model.Table, dialect) : predicateSql);
+            }
+
+            if (model.GroupByColumns != null && model.GroupByColumns.Count > 0)
+            {
+                sql.Append(" group by ");
+                for (var i = 0; i < model.GroupByColumns.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        sql.Append(", ");
+                    }
+                    sql.Append(dialect.EscapeIdentifier(model.GroupByColumns[i].Name));
+                }
             }
 
             AppendOrderBy(sql, model, dialect);

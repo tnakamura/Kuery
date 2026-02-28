@@ -63,6 +63,11 @@ namespace Kuery.Linq
                 return ExecuteJoinCore(connection, model, generated, resultType);
             }
 
+            if (model.GroupBySelectItems != null && model.GroupBySelectItems.Count > 0)
+            {
+                return ExecuteGroupByCore(connection, model, generated, resultType);
+            }
+
             using (var command = CreateCommand(connection, generated))
             {
                 switch (model.Terminal)
@@ -113,6 +118,11 @@ namespace Kuery.Linq
             if (model.Join != null)
             {
                 return await ExecuteJoinCoreAsync(connection, model, generated, resultType, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (model.GroupBySelectItems != null && model.GroupBySelectItems.Count > 0)
+            {
+                return await ExecuteGroupByCoreAsync(connection, model, generated, resultType, cancellationToken).ConfigureAwait(false);
             }
 
             using (var command = CreateCommand(connection, generated))
@@ -281,6 +291,126 @@ namespace Kuery.Linq
             }
 
             return HandleJoinTerminal(results, model.Terminal, resultType);
+        }
+
+        private static object ExecuteGroupByCore(IDbConnection connection, SelectQueryModel model, GeneratedSql generated, Type resultType)
+        {
+            using (var command = CreateCommand(connection, generated))
+            {
+                var results = ReadGroupByResults(command, model);
+                return HandleGroupByTerminal(results, model.Terminal, resultType);
+            }
+        }
+
+        private static async Task<object> ExecuteGroupByCoreAsync(
+            IDbConnection connection,
+            SelectQueryModel model,
+            GeneratedSql generated,
+            Type resultType,
+            CancellationToken cancellationToken)
+        {
+            using (var command = CreateCommand(connection, generated))
+            {
+                List<object> results;
+                if (command is System.Data.Common.DbCommand dbCommand)
+                {
+                    results = new List<object>();
+                    using (var reader = await dbCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                    {
+                        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        {
+                            results.Add(ReadGroupByRow(reader, model));
+                        }
+                    }
+                }
+                else
+                {
+                    results = ReadGroupByResults(command, model);
+                }
+
+                return HandleGroupByTerminal(results, model.Terminal, resultType);
+            }
+        }
+
+        private static List<object> ReadGroupByResults(IDbCommand command, SelectQueryModel model)
+        {
+            var results = new List<object>();
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    results.Add(ReadGroupByRow(reader, model));
+                }
+            }
+            return results;
+        }
+
+        private static object ReadGroupByRow(IDataReader reader, SelectQueryModel model)
+        {
+            var constructor = model.GroupByResultConstructor;
+            var selectItems = model.GroupBySelectItems;
+            var parameters = constructor.GetParameters();
+            var args = new object[selectItems.Count];
+
+            for (var i = 0; i < selectItems.Count; i++)
+            {
+                var val = reader.GetValue(i);
+                if (val is DBNull)
+                {
+                    val = null;
+                }
+
+                var targetType = parameters[i].ParameterType;
+                var underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
+
+                if (val != null)
+                {
+                    args[i] = Convert.ChangeType(val, underlying);
+                }
+                else if (targetType.IsValueType && Nullable.GetUnderlyingType(targetType) == null)
+                {
+                    args[i] = Activator.CreateInstance(targetType);
+                }
+            }
+
+            return constructor.Invoke(args);
+        }
+
+        private static object HandleGroupByTerminal(List<object> results, QueryTerminalKind terminal, Type resultType)
+        {
+            switch (terminal)
+            {
+                case QueryTerminalKind.First:
+                    if (results.Count == 0)
+                        throw new InvalidOperationException("Sequence contains no elements");
+                    return results[0];
+                case QueryTerminalKind.FirstOrDefault:
+                    return results.Count > 0 ? results[0] : null;
+                case QueryTerminalKind.Single:
+                    if (results.Count == 0)
+                        throw new InvalidOperationException("Sequence contains no elements");
+                    if (results.Count > 1)
+                        throw new InvalidOperationException("Sequence contains more than one element");
+                    return results[0];
+                case QueryTerminalKind.SingleOrDefault:
+                    if (results.Count > 1)
+                        throw new InvalidOperationException("Sequence contains more than one element");
+                    return results.Count > 0 ? results[0] : null;
+                case QueryTerminalKind.Sequence:
+                default:
+                    if (resultType.IsGenericType)
+                    {
+                        var elementType = resultType.GetGenericArguments()[0];
+                        var listType = typeof(List<>).MakeGenericType(elementType);
+                        var typedList = (IList)Activator.CreateInstance(listType);
+                        foreach (var item in results)
+                        {
+                            typedList.Add(item);
+                        }
+                        return typedList;
+                    }
+                    return results;
+            }
         }
 
         private static object ReadObject(IDataReader reader, TableMapping table, int startOrdinal)

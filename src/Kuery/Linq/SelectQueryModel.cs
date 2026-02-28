@@ -5,6 +5,32 @@ using System.Reflection;
 
 namespace Kuery.Linq
 {
+    internal sealed class GroupBySelectItem
+    {
+        internal GroupBySelectItem(TableMapping.Column keyColumn, string targetMemberName)
+        {
+            IsKey = true;
+            SourceColumn = keyColumn ?? throw new ArgumentNullException(nameof(keyColumn));
+            TargetMemberName = targetMemberName ?? throw new ArgumentNullException(nameof(targetMemberName));
+        }
+
+        internal GroupBySelectItem(string aggregateFunction, TableMapping.Column sourceColumn, string targetMemberName)
+        {
+            IsKey = false;
+            AggregateFunction = aggregateFunction ?? throw new ArgumentNullException(nameof(aggregateFunction));
+            SourceColumn = sourceColumn;
+            TargetMemberName = targetMemberName ?? throw new ArgumentNullException(nameof(targetMemberName));
+        }
+
+        internal bool IsKey { get; }
+
+        internal string AggregateFunction { get; }
+
+        internal TableMapping.Column SourceColumn { get; }
+
+        internal string TargetMemberName { get; }
+    }
+
     internal enum QueryTerminalKind
     {
         Sequence,
@@ -114,6 +140,27 @@ namespace Kuery.Linq
         {
             Projection = projection ?? throw new ArgumentNullException(nameof(projection));
             ProjectedColumns = columns ?? throw new ArgumentNullException(nameof(columns));
+        }
+
+        internal List<TableMapping.Column> GroupByColumns { get; private set; }
+
+        internal IReadOnlyList<GroupBySelectItem> GroupBySelectItems { get; private set; }
+
+        internal ConstructorInfo GroupByResultConstructor { get; private set; }
+
+        internal void AddGroupByColumn(TableMapping.Column column)
+        {
+            if (GroupByColumns == null)
+            {
+                GroupByColumns = new List<TableMapping.Column>();
+            }
+            GroupByColumns.Add(column ?? throw new ArgumentNullException(nameof(column)));
+        }
+
+        internal void SetGroupBySelect(IReadOnlyList<GroupBySelectItem> items, ConstructorInfo constructor)
+        {
+            GroupBySelectItems = items ?? throw new ArgumentNullException(nameof(items));
+            GroupByResultConstructor = constructor ?? throw new ArgumentNullException(nameof(constructor));
         }
 
         internal void AddPredicate(Expression predicate)
