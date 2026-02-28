@@ -85,6 +85,21 @@ namespace Kuery.Linq
         {
             var methodName = call.Method.Name;
 
+            // Queryable.Contains(source, value) → col IN (SELECT ...)
+            if (methodName == nameof(Queryable.Contains)
+                && call.Method.DeclaringType == typeof(Queryable)
+                && call.Arguments.Count == 2)
+            {
+                return TranslateSubqueryContains(call, table, dialect, parameters);
+            }
+
+            // Queryable.Any(source) or Queryable.Any(source, predicate) → EXISTS (SELECT ...)
+            if (methodName == nameof(Queryable.Any)
+                && call.Method.DeclaringType == typeof(Queryable))
+            {
+                return TranslateSubqueryExists(call, table, dialect, parameters);
+            }
+
             // string.Contains(value)
             if (methodName == nameof(string.Contains) && call.Object != null && call.Object.Type == typeof(string) && call.Arguments.Count == 1)
             {
@@ -320,6 +335,239 @@ namespace Kuery.Linq
             }
 
             throw new NotSupportedException($"Unsupported method call: {call.Method.DeclaringType?.Name}.{methodName}.");
+        }
+
+        private static string TranslateSubqueryContains(MethodCallExpression call, TableMapping outerTable, ISqlDialect dialect, List<object> parameters)
+        {
+            // Queryable.Contains<T>(source, value) → value IN (SELECT ...)
+            var sourceExpr = call.Arguments[0];
+            var valueExpr = call.Arguments[1];
+
+            // Resolve the column for the value (e.g., c.Id → `id`)
+            string columnSql;
+            if (!TryGetColumnExpression(valueExpr, outerTable, dialect, out columnSql))
+            {
+                columnSql = TranslateToColumnSql(valueExpr, outerTable, dialect, parameters);
+                if (columnSql == null)
+                {
+                    throw new NotSupportedException(
+                        $"Unsupported expression in subquery Contains: {valueExpr}. Only direct column access is supported.");
+                }
+            }
+
+            // Build subquery SQL
+            var subquerySql = BuildSubquerySql(sourceExpr, dialect, parameters);
+            return "(" + columnSql + " in (" + subquerySql + "))";
+        }
+
+        private static string TranslateSubqueryExists(MethodCallExpression call, TableMapping outerTable, ISqlDialect dialect, List<object> parameters)
+        {
+            // Queryable.Any(source) → EXISTS (SELECT 1 FROM ...)
+            // Queryable.Any(source, predicate) → EXISTS (SELECT 1 FROM ... WHERE ...)
+            var sourceExpr = call.Arguments[0];
+
+            // Evaluate source to get IQueryable
+            var queryable = EvaluateExpression(sourceExpr) as IQueryable;
+            if (queryable == null)
+            {
+                throw new NotSupportedException("EXISTS source must be an IQueryable.");
+            }
+
+            var translator = new QueryableModelTranslator();
+            var model = translator.Translate(queryable.Expression);
+            if (!(model is SelectQueryModel innerModel))
+            {
+                throw new NotSupportedException("EXISTS source must be a simple query (set operations are not supported).");
+            }
+
+            var sb = new StringBuilder();
+            sb.Append("exists (select 1 from ");
+            sb.Append(dialect.EscapeIdentifier(innerModel.Table.TableName));
+
+            var whereParts = new List<string>();
+
+            // If the inner model has a predicate (from Where clauses on the subquery source)
+            if (innerModel.Predicate != null)
+            {
+                var predicateTranslator = new SqlPredicateTranslator();
+                var innerWhere = predicateTranslator.Translate(innerModel.Predicate, innerModel.Table, dialect, parameters);
+                // Table-qualify the inner table columns
+                innerWhere = QualifyColumnsForTable(innerWhere, innerModel.Table, dialect);
+                whereParts.Add(innerWhere);
+            }
+
+            // If there's a correlated predicate (second argument to Any)
+            if (call.Arguments.Count > 1)
+            {
+                var predicateLambda = GetLambdaFromExpression(call.Arguments[1]);
+                var correlatedWhere = TranslateCorrelatedPredicate(
+                    predicateLambda.Body,
+                    predicateLambda.Parameters[0],
+                    innerModel.Table,
+                    outerTable,
+                    dialect,
+                    parameters);
+                whereParts.Add(correlatedWhere);
+            }
+
+            if (whereParts.Count > 0)
+            {
+                sb.Append(" where ");
+                sb.Append(string.Join(" and ", whereParts));
+            }
+
+            sb.Append(")");
+            return sb.ToString();
+        }
+
+        private static string BuildSubquerySql(Expression sourceExpr, ISqlDialect dialect, List<object> parameters)
+        {
+            // Evaluate to get IQueryable
+            var queryable = EvaluateExpression(sourceExpr) as IQueryable;
+            if (queryable == null)
+            {
+                throw new NotSupportedException("Subquery source must be an IQueryable.");
+            }
+
+            var translator = new QueryableModelTranslator();
+            var model = translator.Translate(queryable.Expression);
+
+            var sqlGen = new SelectSqlGenerator();
+            if (model is SelectQueryModel selectModel)
+            {
+                return sqlGen.GenerateSubquery(selectModel, dialect, parameters);
+            }
+
+            throw new NotSupportedException("Subquery must be a simple query (set operations are not supported in subqueries).");
+        }
+
+        private static string TranslateCorrelatedPredicate(
+            Expression expression,
+            ParameterExpression innerParam,
+            TableMapping innerTable,
+            TableMapping outerTable,
+            ISqlDialect dialect,
+            List<object> parameters)
+        {
+            if (expression is BinaryExpression binary)
+            {
+                if (binary.NodeType == ExpressionType.AndAlso || binary.NodeType == ExpressionType.OrElse)
+                {
+                    var left = TranslateCorrelatedPredicate(binary.Left, innerParam, innerTable, outerTable, dialect, parameters);
+                    var right = TranslateCorrelatedPredicate(binary.Right, innerParam, innerTable, outerTable, dialect, parameters);
+                    var op = binary.NodeType == ExpressionType.AndAlso ? " and " : " or ";
+                    return "(" + left + op + right + ")";
+                }
+
+                var leftSql = TranslateCorrelatedOperand(binary.Left, innerParam, innerTable, outerTable, dialect, parameters);
+                var rightSql = TranslateCorrelatedOperand(binary.Right, innerParam, innerTable, outerTable, dialect, parameters);
+                var sqlOp = ToSqlOperator(binary.NodeType);
+
+                // Handle null comparison
+                if (binary.NodeType == ExpressionType.Equal || binary.NodeType == ExpressionType.NotEqual)
+                {
+                    if (leftSql == null || rightSql == null)
+                    {
+                        var colSide = leftSql ?? rightSql;
+                        if (colSide != null)
+                        {
+                            return binary.NodeType == ExpressionType.Equal
+                                ? "(" + colSide + " is null)"
+                                : "(" + colSide + " is not null)";
+                        }
+                    }
+                }
+
+                return "(" + leftSql + " " + sqlOp + " " + rightSql + ")";
+            }
+
+            if (expression is UnaryExpression unary && unary.NodeType == ExpressionType.Not)
+            {
+                return "not (" + TranslateCorrelatedPredicate(unary.Operand, innerParam, innerTable, outerTable, dialect, parameters) + ")";
+            }
+
+            // Boolean column reference
+            var boolSql = TranslateCorrelatedOperand(expression, innerParam, innerTable, outerTable, dialect, parameters);
+            return "(" + boolSql + " = 1)";
+        }
+
+        private static string TranslateCorrelatedOperand(
+            Expression expression,
+            ParameterExpression innerParam,
+            TableMapping innerTable,
+            TableMapping outerTable,
+            ISqlDialect dialect,
+            List<object> parameters)
+        {
+            // Unwrap converts
+            if (expression is UnaryExpression convert && convert.NodeType == ExpressionType.Convert)
+            {
+                return TranslateCorrelatedOperand(convert.Operand, innerParam, innerTable, outerTable, dialect, parameters);
+            }
+
+            // Member access on parameter
+            if (expression is MemberExpression member && member.Expression is ParameterExpression param)
+            {
+                if (param == innerParam)
+                {
+                    var col = innerTable.FindColumnWithPropertyName(member.Member.Name);
+                    if (col != null)
+                    {
+                        return dialect.EscapeIdentifier(innerTable.TableName) + "." + dialect.EscapeIdentifier(col.Name);
+                    }
+                }
+
+                // Outer parameter reference
+                var outerCol = outerTable.FindColumnWithPropertyName(member.Member.Name);
+                if (outerCol != null)
+                {
+                    return dialect.EscapeIdentifier(outerTable.TableName) + "." + dialect.EscapeIdentifier(outerCol.Name);
+                }
+
+                throw new NotSupportedException(
+                    $"Cannot resolve property '{member.Member.Name}' in correlated subquery.");
+            }
+
+            // Constant
+            if (expression is ConstantExpression constant)
+            {
+                return AddParameter(dialect, parameters, constant.Value);
+            }
+
+            // Captured variable or other evaluable expression
+            var value = EvaluateExpression(expression);
+            return AddParameter(dialect, parameters, value);
+        }
+
+        private static LambdaExpression GetLambdaFromExpression(Expression expression)
+        {
+            while (expression.NodeType == ExpressionType.Quote)
+            {
+                expression = ((UnaryExpression)expression).Operand;
+            }
+
+            if (expression is LambdaExpression lambda)
+            {
+                return lambda;
+            }
+
+            throw new NotSupportedException($"Expected lambda expression, got: {expression.NodeType}");
+        }
+
+        /// <summary>
+        /// Qualifies column names with table prefix. Safe because escaped identifiers
+        /// (e.g. `col`) are unique tokens that won't match as substrings of other
+        /// escaped identifiers (e.g. `other_col`). Same approach as SelectSqlGenerator.QualifyColumns.
+        /// </summary>
+        private static string QualifyColumnsForTable(string sql, TableMapping table, ISqlDialect dialect)
+        {
+            var tablePrefix = dialect.EscapeIdentifier(table.TableName) + ".";
+            foreach (var col in table.Columns)
+            {
+                var escaped = dialect.EscapeIdentifier(col.Name);
+                sql = sql.Replace(escaped, tablePrefix + escaped);
+            }
+            return sql;
         }
 
         private static string TranslateConditional(ConditionalExpression expression, TableMapping table, ISqlDialect dialect, List<object> parameters)

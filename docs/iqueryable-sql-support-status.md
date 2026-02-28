@@ -45,6 +45,9 @@
 | グループ化 | `GroupBy(x => new { x.A, x.B })` | `GROUP BY colA, colB` | 複合キー |
 | グループ化 | `.GroupBy(...).Select(g => new { g.Key, Count = g.Count() })` | `SELECT col, count(*)` | 集計関数と組合せ |
 | HAVING | `.GroupBy(...).Where(g => g.Count() > n).Select(...)` | `HAVING count(*) > n` | GroupBy の後の Where が HAVING に変換される |
+| サブクエリ | `subQuery.Contains(x.Prop)` | `col IN (SELECT ...)` | IQueryable を使ったサブクエリ |
+| サブクエリ | `query.Any(predicate)` in Where | `EXISTS (SELECT ...)` | 相関サブクエリ対応 |
+| クロス結合 | `SelectMany(x => query)` | `CROSS JOIN` | 結果セレクタ有無両対応 |
 | 集合演算 | `Union()` | `UNION` | 重複を除いた和集合 |
 | 集合演算 | `Concat()` | `UNION ALL` | 重複を含む和集合 |
 | 集合演算 | `Intersect()` | `INTERSECT` | 積集合 |
@@ -129,7 +132,6 @@
 
 | カテゴリ | LINQ メソッド / パターン | 対応する SQL | 優先度 |
 |----------|----------------------|------------|--------|
-| サブクエリ | `SelectMany(x => x.Children)` | サブクエリ / `CROSS JOIN` | 中 |
 | その他 | `Reverse()` | ソート反転 | 低 |
 | その他 | `SkipWhile(predicate)` | N/A（SQL で直接表現不可） | 対応予定なし |
 | その他 | `TakeWhile(predicate)` | N/A（SQL で直接表現不可） | 対応予定なし |
@@ -157,8 +159,6 @@
 
 | 機能 | SQL 構文 | 優先度 |
 |------|---------|--------|
-| サブクエリ (WHERE 内) | `WHERE col IN (SELECT ...)` | 中 |
-| EXISTS サブクエリ | `WHERE EXISTS (SELECT ...)` | 中 |
 | ウィンドウ関数 | `ROW_NUMBER() OVER(...)`, `RANK()`, etc. | 低 |
 | CTE | `WITH cte AS (...)` | 低 |
 | CASE (複雑) | 複数条件の `CASE WHEN` | 低 |
@@ -207,13 +207,13 @@ WHERE 述語で使える式を増やし、より複雑な条件を書けるよ�
 | 4-3 | ✅ `Intersect()` | `INTERSECT` への変換 |
 | 4-4 | ✅ `Except()` | `EXCEPT` への変換 |
 
-### Phase 5: サブクエリ（優先度: 中）
+### Phase 5: サブクエリ（✅ 実装済み）
 
 | # | 機能 | 概要 |
 |---|------|------|
-| 5-1 | WHERE 内サブクエリ | `col IN (SELECT ...)` パターン |
-| 5-2 | EXISTS サブクエリ | `WHERE EXISTS (SELECT ...)` パターン |
-| 5-3 | `SelectMany()` | サブクエリ / CROSS JOIN パターン |
+| 5-1 | ✅ WHERE 内サブクエリ | `col IN (SELECT ...)` パターン |
+| 5-2 | ✅ EXISTS サブクエリ | `WHERE EXISTS (SELECT ...)` パターン |
+| 5-3 | ✅ `SelectMany()` | CROSS JOIN パターン |
 
 ### Phase 6: 追加の数学・日時関数（優先度: 低）
 
@@ -244,4 +244,6 @@ WHERE 述語で使える式を増やし、より複雑な条件を書けるよ�
 - `OrderBy` 内では直接のプロパティアクセスのみ対応。
 - `GroupBy` 内では直接のプロパティアクセスのみ対応。
 - `Join` は単一キー / 複合キーの INNER JOIN、および `GroupJoin` + `SelectMany` + `DefaultIfEmpty` による LEFT JOIN に対応。複数テーブルへの JOIN チェインも可能。
+- `SelectMany` はルートクエリ（`connection.Query<T>()`）を返すコレクションセレクタのみ対応（CROSS JOIN を生成）。
+- サブクエリ（`Contains` → `IN (SELECT ...)`、`Any` → `EXISTS (SELECT ...)`）は `IQueryable` をソースとする場合のみ対応。
 - 未対応の演算子を使用した場合は `NotSupportedException` がスローされる（クライアント評価へのフォールバックは行わない）。

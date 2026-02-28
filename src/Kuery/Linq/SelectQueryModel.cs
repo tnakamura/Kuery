@@ -95,6 +95,16 @@ namespace Kuery.Linq
             IsLeftJoin = isLeftJoin;
         }
 
+        internal JoinClause(
+            TableMapping innerTable,
+            LambdaExpression resultSelector)
+        {
+            InnerTable = innerTable ?? throw new ArgumentNullException(nameof(innerTable));
+            KeyPairs = Array.Empty<JoinKeyPair>();
+            ResultSelector = resultSelector ?? throw new ArgumentNullException(nameof(resultSelector));
+            IsCrossJoin = true;
+        }
+
         internal TableMapping InnerTable { get; }
 
         internal IReadOnlyList<JoinKeyPair> KeyPairs { get; }
@@ -106,6 +116,8 @@ namespace Kuery.Linq
         internal LambdaExpression ResultSelector { get; }
 
         internal bool IsLeftJoin { get; }
+
+        internal bool IsCrossJoin { get; }
     }
 
     internal sealed class SelectQueryModel
