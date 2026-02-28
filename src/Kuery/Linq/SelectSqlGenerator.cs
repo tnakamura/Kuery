@@ -90,9 +90,9 @@ namespace Kuery.Linq
                         sql.Append(dialect.EscapeIdentifier(model.ProjectedColumns[i].SourceColumn.Name));
                     }
                 }
-                else if (model.Join != null)
+                else if (model.Joins != null && model.Joins.Count > 0)
                 {
-                    AppendJoinColumns(sql, model.Table, model.Join.InnerTable, dialect);
+                    AppendJoinColumns(sql, model.Table, model.Joins, dialect);
                 }
                 else
                 {
@@ -103,18 +103,26 @@ namespace Kuery.Linq
             sql.Append(" from ");
             sql.Append(dialect.EscapeIdentifier(model.Table.TableName));
 
-            if (model.Join != null)
+            if (model.Joins != null && model.Joins.Count > 0)
             {
-                sql.Append(" inner join ");
-                sql.Append(dialect.EscapeIdentifier(model.Join.InnerTable.TableName));
-                sql.Append(" on ");
-                sql.Append(dialect.EscapeIdentifier(model.Table.TableName));
-                sql.Append(".");
-                sql.Append(dialect.EscapeIdentifier(model.Join.OuterKeyColumn.Name));
-                sql.Append(" = ");
-                sql.Append(dialect.EscapeIdentifier(model.Join.InnerTable.TableName));
-                sql.Append(".");
-                sql.Append(dialect.EscapeIdentifier(model.Join.InnerKeyColumn.Name));
+                foreach (var join in model.Joins)
+                {
+                    sql.Append(join.IsLeftJoin ? " left join " : " inner join ");
+                    sql.Append(dialect.EscapeIdentifier(join.InnerTable.TableName));
+                    sql.Append(" on ");
+                    for (var ki = 0; ki < join.KeyPairs.Count; ki++)
+                    {
+                        if (ki > 0) sql.Append(" and ");
+                        var kp = join.KeyPairs[ki];
+                        sql.Append(dialect.EscapeIdentifier(kp.OuterKeyTable.TableName));
+                        sql.Append(".");
+                        sql.Append(dialect.EscapeIdentifier(kp.OuterKeyColumn.Name));
+                        sql.Append(" = ");
+                        sql.Append(dialect.EscapeIdentifier(join.InnerTable.TableName));
+                        sql.Append(".");
+                        sql.Append(dialect.EscapeIdentifier(kp.InnerKeyColumn.Name));
+                    }
+                }
             }
 
             if (model.Terminal == QueryTerminalKind.All && model.AllPredicate != null)
@@ -125,13 +133,13 @@ namespace Kuery.Linq
                     : (Expression)negated;
                 sql.Append(" where ");
                 var predicateSql = _predicateTranslator.Translate(allWhere, model.Table, dialect, parameters);
-                sql.Append(model.Join != null ? QualifyColumns(predicateSql, model.Table, dialect) : predicateSql);
+                sql.Append(model.Joins != null && model.Joins.Count > 0 ? QualifyColumns(predicateSql, model.Table, dialect) : predicateSql);
             }
             else if (model.Predicate != null)
             {
                 sql.Append(" where ");
                 var predicateSql = _predicateTranslator.Translate(model.Predicate, model.Table, dialect, parameters);
-                sql.Append(model.Join != null ? QualifyColumns(predicateSql, model.Table, dialect) : predicateSql);
+                sql.Append(model.Joins != null && model.Joins.Count > 0 ? QualifyColumns(predicateSql, model.Table, dialect) : predicateSql);
             }
 
             if (model.GroupByColumns != null && model.GroupByColumns.Count > 0)
@@ -272,7 +280,7 @@ namespace Kuery.Linq
             return "*";
         }
 
-        private static void AppendJoinColumns(StringBuilder sql, TableMapping outerTable, TableMapping innerTable, ISqlDialect dialect)
+        private static void AppendJoinColumns(StringBuilder sql, TableMapping outerTable, IReadOnlyList<JoinClause> joins, ISqlDialect dialect)
         {
             var first = true;
             foreach (var col in outerTable.Columns)
@@ -283,12 +291,15 @@ namespace Kuery.Linq
                 sql.Append(dialect.EscapeIdentifier(col.Name));
                 first = false;
             }
-            foreach (var col in innerTable.Columns)
+            foreach (var join in joins)
             {
-                sql.Append(", ");
-                sql.Append(dialect.EscapeIdentifier(innerTable.TableName));
-                sql.Append(".");
-                sql.Append(dialect.EscapeIdentifier(col.Name));
+                foreach (var col in join.InnerTable.Columns)
+                {
+                    sql.Append(", ");
+                    sql.Append(dialect.EscapeIdentifier(join.InnerTable.TableName));
+                    sql.Append(".");
+                    sql.Append(dialect.EscapeIdentifier(col.Name));
+                }
             }
         }
 

@@ -38,6 +38,9 @@
 | 全件チェック | `All(predicate)` | `SELECT count(*) WHERE NOT(predicate)` → `== 0` 判定 | |
 | 重複排除 | `Distinct()` | `SELECT DISTINCT ...` | |
 | 結合 | `Join(inner, outerKey, innerKey, resultSelector)` | `INNER JOIN ... ON ...` | 単一キーのみ |
+| 結合 | `Join(inner, x => new { x.A, x.B }, y => new { y.A, y.B }, ...)` | `INNER JOIN ... ON t1.A = t2.A AND t1.B = t2.B` | 複合キー |
+| 結合 | 複数 `Join` チェイン | `INNER JOIN t2 ... INNER JOIN t3 ...` | 3 テーブル以上 |
+| 結合 | `GroupJoin` + `SelectMany` + `DefaultIfEmpty` | `LEFT JOIN ... ON ...` | |
 | グループ化 | `GroupBy(x => x.Prop)` | `GROUP BY col` | 単一キー |
 | グループ化 | `GroupBy(x => new { x.A, x.B })` | `GROUP BY colA, colB` | 複合キー |
 | グループ化 | `.GroupBy(...).Select(g => new { g.Key, Count = g.Count() })` | `SELECT col, count(*)` | 集計関数と組合せ |
@@ -103,9 +106,6 @@
 
 | カテゴリ | LINQ メソッド / パターン | 対応する SQL | 優先度 |
 |----------|----------------------|------------|--------|
-| 結合 | `GroupJoin` + `SelectMany` + `DefaultIfEmpty` | `LEFT JOIN` | 高 |
-| 結合 | `Join` で複合キー (`new { x.A, x.B }`) | `ON t1.a = t2.a AND t1.b = t2.b` | 高 |
-| 結合 | 複数 `Join` チェイン | 複数テーブル `INNER JOIN` | 高 |
 | サブクエリ | `SelectMany(x => x.Children)` | サブクエリ / `CROSS JOIN` | 中 |
 | 集合演算 | `Union()` | `UNION` | 中 |
 | 集合演算 | `Concat()` | `UNION ALL` | 中 |
@@ -157,15 +157,15 @@
 
 優先度が高い順に実装する。各フェーズは独立してリリース可能。
 
-### Phase 1: 結合の強化（優先度: 高）
+### Phase 1: 結合の強化（✅ 実装済み）
 
 JOIN は実用上の利用頻度が非常に高い。現状 INNER JOIN の単一キーのみ対応しているため、まず結合機能を拡充する。
 
 | # | 機能 | 概要 |
 |---|------|------|
-| 1-1 | LEFT JOIN | `GroupJoin` + `SelectMany` + `DefaultIfEmpty` パターンを認識して `LEFT JOIN` を生成 |
-| 1-2 | 複合キー JOIN | `Join(inner, x => new { x.A, x.B }, y => new { y.A, y.B }, ...)` で複数 ON 条件を生成 |
-| 1-3 | 複数テーブル JOIN | `Join` を複数回チェインした場合に 3 テーブル以上の結合を可能にする |
+| 1-1 | ✅ LEFT JOIN | `GroupJoin` + `SelectMany` + `DefaultIfEmpty` パターンを認識して `LEFT JOIN` を生成 |
+| 1-2 | ✅ 複合キー JOIN | `Join(inner, x => new { x.A, x.B }, y => new { y.A, y.B }, ...)` で複数 ON 条件を生成 |
+| 1-3 | ✅ 複数テーブル JOIN | `Join` を複数回チェインした場合に 3 テーブル以上の結合を可能にする |
 
 ### Phase 2: 式の拡張（優先度: 高〜中）
 
@@ -231,5 +231,5 @@ WHERE 述語で使える式を増やし、より複雑な条件を書けるよ�
 - `Select` 内では直接のプロパティアクセスのみ対応（計算式やメソッド呼び出しは不可）。
 - `OrderBy` 内では直接のプロパティアクセスのみ対応。
 - `GroupBy` 内では直接のプロパティアクセスのみ対応。
-- `Join` は単一キーの INNER JOIN のみ対応。
+- `Join` は単一キー / 複合キーの INNER JOIN、および `GroupJoin` + `SelectMany` + `DefaultIfEmpty` による LEFT JOIN に対応。複数テーブルへの JOIN チェインも可能。
 - 未対応の演算子を使用した場合は `NotSupportedException` がスローされる（クライアント評価へのフォールバックは行わない）。

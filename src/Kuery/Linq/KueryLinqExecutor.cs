@@ -58,7 +58,7 @@ namespace Kuery.Linq
 
         private static object ExecuteCore(IDbConnection connection, SelectQueryModel model, GeneratedSql generated, Type resultType)
         {
-            if (model.Join != null)
+            if (model.Joins != null && model.Joins.Count > 0)
             {
                 return ExecuteJoinCore(connection, model, generated, resultType);
             }
@@ -115,7 +115,7 @@ namespace Kuery.Linq
             Type resultType,
             CancellationToken cancellationToken)
         {
-            if (model.Join != null)
+            if (model.Joins != null && model.Joins.Count > 0)
             {
                 return await ExecuteJoinCoreAsync(connection, model, generated, resultType, cancellationToken).ConfigureAwait(false);
             }
@@ -236,19 +236,16 @@ namespace Kuery.Linq
         private static object ExecuteJoinSequence(IDbCommand command, SelectQueryModel model, Type resultType)
         {
             var outerTable = model.Table;
-            var innerTable = model.Join.InnerTable;
-            var resultSelector = model.Join.ResultSelector.Compile();
-            var outerColCount = outerTable.Columns.Count;
+            var joins = model.Joins;
+            var resultSelector = model.JoinResultSelector.Compile();
 
             var results = new List<object>();
             using (var reader = command.ExecuteReader())
             {
                 while (reader.Read())
                 {
-                    var outer = ReadObject(reader, outerTable, 0);
-                    var inner = ReadObject(reader, innerTable, outerColCount);
-                    var result = resultSelector.DynamicInvoke(outer, inner);
-                    results.Add(result);
+                    var args = ReadJoinRow(reader, outerTable, joins);
+                    results.Add(resultSelector.DynamicInvoke(args));
                 }
             }
 
@@ -258,9 +255,8 @@ namespace Kuery.Linq
         private static async Task<object> ExecuteJoinSequenceAsync(IDbCommand command, SelectQueryModel model, Type resultType, CancellationToken cancellationToken)
         {
             var outerTable = model.Table;
-            var innerTable = model.Join.InnerTable;
-            var resultSelector = model.Join.ResultSelector.Compile();
-            var outerColCount = outerTable.Columns.Count;
+            var joins = model.Joins;
+            var resultSelector = model.JoinResultSelector.Compile();
 
             var results = new List<object>();
             if (command is System.Data.Common.DbCommand dbCommand)
@@ -269,10 +265,8 @@ namespace Kuery.Linq
                 {
                     while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                     {
-                        var outer = ReadObject(reader, outerTable, 0);
-                        var inner = ReadObject(reader, innerTable, outerColCount);
-                        var result = resultSelector.DynamicInvoke(outer, inner);
-                        results.Add(result);
+                        var args = ReadJoinRow(reader, outerTable, joins);
+                        results.Add(resultSelector.DynamicInvoke(args));
                     }
                 }
             }
@@ -282,15 +276,53 @@ namespace Kuery.Linq
                 {
                     while (reader.Read())
                     {
-                        var outer = ReadObject(reader, outerTable, 0);
-                        var inner = ReadObject(reader, innerTable, outerColCount);
-                        var result = resultSelector.DynamicInvoke(outer, inner);
-                        results.Add(result);
+                        var args = ReadJoinRow(reader, outerTable, joins);
+                        results.Add(resultSelector.DynamicInvoke(args));
                     }
                 }
             }
 
             return HandleJoinTerminal(results, model.Terminal, resultType);
+        }
+
+        /// <summary>
+        /// Reads a row from the result set and returns an object array: [outerEntity, inner1, inner2, ...].
+        /// For LEFT JOIN, inner entities are null when all their columns are NULL.
+        /// </summary>
+        private static object[] ReadJoinRow(IDataReader reader, TableMapping outerTable, IReadOnlyList<JoinClause> joins)
+        {
+            var args = new object[joins.Count + 1];
+            args[0] = ReadObject(reader, outerTable, 0);
+            var offset = outerTable.Columns.Count;
+            for (var i = 0; i < joins.Count; i++)
+            {
+                var join = joins[i];
+                args[i + 1] = join.IsLeftJoin
+                    ? ReadNullableObject(reader, join.InnerTable, offset)
+                    : ReadObject(reader, join.InnerTable, offset);
+                offset += join.InnerTable.Columns.Count;
+            }
+            return args;
+        }
+
+        /// <summary>
+        /// Reads an entity from the reader at the given column offset.
+        /// Returns null if all columns in the range are NULL (for LEFT JOIN support).
+        /// </summary>
+        private static object ReadNullableObject(IDataReader reader, TableMapping table, int startOrdinal)
+        {
+            var allNull = true;
+            for (var i = 0; i < table.Columns.Count; i++)
+            {
+                if (!reader.IsDBNull(startOrdinal + i))
+                {
+                    allNull = false;
+                    break;
+                }
+            }
+
+            if (allNull) return null;
+            return ReadObject(reader, table, startOrdinal);
         }
 
         private static object ExecuteGroupByCore(IDbConnection connection, SelectQueryModel model, GeneratedSql generated, Type resultType)
