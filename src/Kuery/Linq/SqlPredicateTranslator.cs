@@ -554,6 +554,11 @@ namespace Kuery.Linq
             throw new NotSupportedException($"Expected lambda expression, got: {expression.NodeType}");
         }
 
+        /// <summary>
+        /// Qualifies column names with table prefix. Safe because escaped identifiers
+        /// (e.g. `col`) are unique tokens that won't match as substrings of other
+        /// escaped identifiers (e.g. `other_col`). Same approach as SelectSqlGenerator.QualifyColumns.
+        /// </summary>
         private static string QualifyColumnsForTable(string sql, TableMapping table, ISqlDialect dialect)
         {
             var tablePrefix = dialect.EscapeIdentifier(table.TableName) + ".";

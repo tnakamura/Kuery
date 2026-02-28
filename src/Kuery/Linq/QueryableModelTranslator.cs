@@ -578,7 +578,7 @@ namespace Kuery.Linq
         {
             // The collection selector body should evaluate to an IQueryable
             // Common patterns: c => connection.Query<T>(), c => someQueryable
-            var value = EvaluateLambdaBody(body);
+            var value = EvaluateExpressionValue(body);
             if (value is IQueryable queryable)
             {
                 return SqlMapper.GetMapping(queryable.ElementType);
@@ -589,7 +589,7 @@ namespace Kuery.Linq
                 $"Got: {body}");
         }
 
-        private static object EvaluateLambdaBody(Expression expression)
+        private static object EvaluateExpressionValue(Expression expression)
         {
             switch (expression)
             {
@@ -599,7 +599,7 @@ namespace Kuery.Linq
                     // Evaluate the method call by compiling and invoking
                     break;
                 case MemberExpression member when member.Expression != null:
-                    var obj = EvaluateLambdaBody(member.Expression);
+                    var obj = EvaluateExpressionValue(member.Expression);
                     if (member.Member is System.Reflection.FieldInfo field)
                         return field.GetValue(obj);
                     if (member.Member is System.Reflection.PropertyInfo prop)
