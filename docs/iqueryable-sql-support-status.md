@@ -45,6 +45,10 @@
 | グループ化 | `GroupBy(x => new { x.A, x.B })` | `GROUP BY colA, colB` | 複合キー |
 | グループ化 | `.GroupBy(...).Select(g => new { g.Key, Count = g.Count() })` | `SELECT col, count(*)` | 集計関数と組合せ |
 | HAVING | `.GroupBy(...).Where(g => g.Count() > n).Select(...)` | `HAVING count(*) > n` | GroupBy の後の Where が HAVING に変換される |
+| 集合演算 | `Union()` | `UNION` | 重複を除いた和集合 |
+| 集合演算 | `Concat()` | `UNION ALL` | 重複を含む和集合 |
+| 集合演算 | `Intersect()` | `INTERSECT` | 積集合 |
+| 集合演算 | `Except()` | `EXCEPT` | 差集合 |
 
 ### WHERE 述語で使える式
 
@@ -126,10 +130,6 @@
 | カテゴリ | LINQ メソッド / パターン | 対応する SQL | 優先度 |
 |----------|----------------------|------------|--------|
 | サブクエリ | `SelectMany(x => x.Children)` | サブクエリ / `CROSS JOIN` | 中 |
-| 集合演算 | `Union()` | `UNION` | 中 |
-| 集合演算 | `Concat()` | `UNION ALL` | 中 |
-| 集合演算 | `Intersect()` | `INTERSECT` | 低 |
-| 集合演算 | `Except()` | `EXCEPT` | 低 |
 | その他 | `Reverse()` | ソート反転 | 低 |
 | その他 | `SkipWhile(predicate)` | N/A（SQL で直接表現不可） | 対応予定なし |
 | その他 | `TakeWhile(predicate)` | N/A（SQL で直接表現不可） | 対応予定なし |
@@ -198,14 +198,14 @@ WHERE 述語で使える式を増やし、より複雑な条件を書けるよ�
 | 3-2 | ✅ `ToString()` | `CAST(col AS text)` への変換 |
 | 3-3 | ✅ カスタム LIKE パターン | `KueryFunctions.Like()` ヘルパーメソッドによる `LIKE` パターン検索 |
 
-### Phase 4: 集合演算（優先度: 中）
+### Phase 4: 集合演算（✅ 実装済み）
 
 | # | 機能 | 概要 |
 |---|------|------|
-| 4-1 | `Union()` | `UNION` への変換 |
-| 4-2 | `Concat()` | `UNION ALL` への変換 |
-| 4-3 | `Intersect()` | `INTERSECT` への変換 |
-| 4-4 | `Except()` | `EXCEPT` への変換 |
+| 4-1 | ✅ `Union()` | `UNION` への変換 |
+| 4-2 | ✅ `Concat()` | `UNION ALL` への変換 |
+| 4-3 | ✅ `Intersect()` | `INTERSECT` への変換 |
+| 4-4 | ✅ `Except()` | `EXCEPT` への変換 |
 
 ### Phase 5: サブクエリ（優先度: 中）
 

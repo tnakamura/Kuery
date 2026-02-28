@@ -28,10 +28,18 @@ namespace Kuery.Linq
             Requires.NotNull(expression, nameof(expression));
             Requires.NotNull(resultType, nameof(resultType));
 
-            var model = (SelectQueryModel)BuildQueryModel(context, expression);
+            var model = BuildQueryModel(context, expression);
             var dialect = SqlDialectFactory.Create(context.Connection);
-            var generated = _sqlGenerator.Generate(model, dialect);
-            return ExecuteCore(context.Connection, model, generated, resultType);
+
+            if (model is SetOperationQueryModel setModel)
+            {
+                var generated = _sqlGenerator.GenerateSetOperation(setModel, dialect);
+                return ExecuteSetOperationCore(context.Connection, setModel, generated, resultType);
+            }
+
+            var selectModel = (SelectQueryModel)model;
+            var selectGenerated = _sqlGenerator.Generate(selectModel, dialect);
+            return ExecuteCore(context.Connection, selectModel, selectGenerated, resultType);
         }
 
         public async Task<object> ExecuteAsync(KueryQueryContext context, Expression expression, Type resultType, CancellationToken cancellationToken)
@@ -40,10 +48,18 @@ namespace Kuery.Linq
             Requires.NotNull(expression, nameof(expression));
             Requires.NotNull(resultType, nameof(resultType));
 
-            var model = (SelectQueryModel)BuildQueryModel(context, expression);
+            var model = BuildQueryModel(context, expression);
             var dialect = SqlDialectFactory.Create(context.Connection);
-            var generated = _sqlGenerator.Generate(model, dialect);
-            return await ExecuteCoreAsync(context.Connection, model, generated, resultType, cancellationToken).ConfigureAwait(false);
+
+            if (model is SetOperationQueryModel setModel)
+            {
+                var generated = _sqlGenerator.GenerateSetOperation(setModel, dialect);
+                return await ExecuteSetOperationCoreAsync(context.Connection, setModel, generated, resultType, cancellationToken).ConfigureAwait(false);
+            }
+
+            var selectModel = (SelectQueryModel)model;
+            var selectGenerated = _sqlGenerator.Generate(selectModel, dialect);
+            return await ExecuteCoreAsync(context.Connection, selectModel, selectGenerated, resultType, cancellationToken).ConfigureAwait(false);
         }
 
         public object ExecuteTerminal(KueryQueryContext context, Expression expression)
@@ -162,6 +178,27 @@ namespace Kuery.Linq
                     default:
                         return await ExecuteSequenceAsync(command, model.Table, model.Projection, resultType, cancellationToken).ConfigureAwait(false);
                 }
+            }
+        }
+
+        private static object ExecuteSetOperationCore(IDbConnection connection, SetOperationQueryModel model, GeneratedSql generated, Type resultType)
+        {
+            using (var command = CreateCommand(connection, generated))
+            {
+                return ExecuteSequence(command, model.Table, null, resultType);
+            }
+        }
+
+        private static async Task<object> ExecuteSetOperationCoreAsync(
+            IDbConnection connection,
+            SetOperationQueryModel model,
+            GeneratedSql generated,
+            Type resultType,
+            CancellationToken cancellationToken)
+        {
+            using (var command = CreateCommand(connection, generated))
+            {
+                return await ExecuteSequenceAsync(command, model.Table, null, resultType, cancellationToken).ConfigureAwait(false);
             }
         }
 

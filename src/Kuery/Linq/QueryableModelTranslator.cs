@@ -8,9 +8,32 @@ namespace Kuery.Linq
 {
     internal sealed class QueryableModelTranslator
     {
-        internal SelectQueryModel Translate(Expression expression)
+        internal object Translate(Expression expression)
         {
             Requires.NotNull(expression, nameof(expression));
+            return TranslateAny(expression);
+        }
+
+        private object TranslateAny(Expression expression)
+        {
+            if (expression is MethodCallExpression methodCall && methodCall.Method.DeclaringType == typeof(Queryable))
+            {
+                var name = methodCall.Method.Name;
+                if (name == nameof(Queryable.Union)
+                    || name == nameof(Queryable.Concat)
+                    || name == nameof(Queryable.Intersect)
+                    || name == nameof(Queryable.Except))
+                {
+                    var left = TranslateAny(methodCall.Arguments[0]);
+                    var right = TranslateAny(methodCall.Arguments[1]);
+                    var kind = name == nameof(Queryable.Union) ? SetOperationKind.Union
+                        : name == nameof(Queryable.Concat) ? SetOperationKind.UnionAll
+                        : name == nameof(Queryable.Intersect) ? SetOperationKind.Intersect
+                        : SetOperationKind.Except;
+                    return new SetOperationQueryModel(left, right, kind);
+                }
+            }
+
             return TranslateCore(expression);
         }
 
