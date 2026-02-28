@@ -99,6 +99,7 @@
 | 日時演算 | `x.Date.AddHours(n)` | `DATEADD(hour, n, col)` | PostgreSQL: `col + make_interval(...)`, SQLite: `datetime(col, 'n hours')` |
 | 日時演算 | `x.Date.AddMinutes(n)` | `DATEADD(minute, n, col)` | PostgreSQL: `col + make_interval(...)`, SQLite: `datetime(col, 'n minutes')` |
 | 日時演算 | `x.Date.AddSeconds(n)` | `DATEADD(second, n, col)` | PostgreSQL: `col + make_interval(...)`, SQLite: `datetime(col, 'n seconds')` |
+| 型変換 | `Convert.ToInt16(x.Prop)` | `CAST(col AS int)` | SQLite/PostgreSQL: `integer` |
 | 型変換 | `Convert.ToInt32(x.Prop)` | `CAST(col AS int)` | SQLite/PostgreSQL: `integer` |
 | 型変換 | `Convert.ToInt64(x.Prop)` | `CAST(col AS bigint)` | SQLite/PostgreSQL: `integer` |
 | 型変換 | `Convert.ToDouble(x.Prop)` | `CAST(col AS float)` | SQLite/PostgreSQL: `real` |

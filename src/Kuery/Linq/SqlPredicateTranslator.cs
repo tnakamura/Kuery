@@ -357,6 +357,13 @@ namespace Kuery.Linq
 
         private static string TranslateToColumnSql(Expression expression, TableMapping table, ISqlDialect dialect, List<object> parameters)
         {
+            // Unwrap implicit Convert nodes (e.g. short→int promotion)
+            if (expression is UnaryExpression convertUnary && convertUnary.NodeType == ExpressionType.Convert)
+            {
+                var innerResult = TranslateToColumnSql(convertUnary.Operand, table, dialect, parameters);
+                if (innerResult != null) return innerResult;
+            }
+
             // Handle x.Prop.ToLower() / x.Prop.ToUpper() / x.Prop.Replace() wrapping
             if (expression is MethodCallExpression innerCall && innerCall.Object != null)
             {

@@ -202,6 +202,28 @@ namespace Kuery.Tests.Sqlite
         }
 
         // =====================================================
+        // 3-1: Convert.ToInt16() → CAST(col AS integer)
+        // =====================================================
+
+        [Fact]
+        public void ConvertToInt16Test()
+        {
+            SeedConvertItems();
+
+            using (var connection = fixture.OpenNewConnection())
+            {
+                var result = connection.Query<ConvertItem>()
+                    .Where(x => Convert.ToInt16(x.RealValue) > 2)
+                    .OrderBy(x => x.Id)
+                    .ToList();
+
+                Assert.Equal(2, result.Count);
+                Assert.Equal(3, result[0].Id);
+                Assert.Equal(4, result[1].Id);
+            }
+        }
+
+        // =====================================================
         // 3-1: Convert.ToDouble() → CAST(col AS real)
         // =====================================================
 
