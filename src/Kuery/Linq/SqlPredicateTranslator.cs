@@ -275,6 +275,50 @@ namespace Kuery.Linq
                 if (result != null) return result;
             }
 
+            // Convert.ToXxx(value) → CAST(col AS type)
+            if (call.Object == null && call.Arguments.Count == 1
+                && call.Method.DeclaringType == typeof(Convert))
+            {
+                var castType = GetCastTypeName(methodName, dialect);
+                if (castType != null)
+                {
+                    var inner = ResolveInnerSql(call.Arguments[0], table, dialect, parameters);
+                    if (inner != null)
+                    {
+                        return "cast(" + inner + " as " + castType + ")";
+                    }
+                }
+            }
+
+            // x.Prop.ToString() → CAST(col AS text)
+            if (methodName == nameof(object.ToString) && call.Object != null && call.Arguments.Count == 0)
+            {
+                var inner = ResolveInnerSql(call.Object, table, dialect, parameters);
+                if (inner != null)
+                {
+                    var textType = dialect.Kind == SqlDialectKind.SqlServer ? "nvarchar(max)" : "text";
+                    return "cast(" + inner + " as " + textType + ")";
+                }
+            }
+
+            // KueryFunctions.Like(column, pattern) → col LIKE @pattern
+            if (methodName == nameof(KueryFunctions.Like)
+                && call.Object == null && call.Arguments.Count == 2
+                && call.Method.DeclaringType == typeof(KueryFunctions))
+            {
+                var columnSql = TranslateToColumnSql(call.Arguments[0], table, dialect, parameters);
+                if (columnSql == null && TryGetColumnExpression(call.Arguments[0], table, dialect, out var likeColSql))
+                {
+                    columnSql = likeColSql;
+                }
+                if (columnSql != null)
+                {
+                    var pattern = EvaluateExpression(call.Arguments[1]);
+                    var paramName = AddParameter(dialect, parameters, pattern);
+                    return "(" + columnSql + " like " + paramName + ")";
+                }
+            }
+
             throw new NotSupportedException($"Unsupported method call: {call.Method.DeclaringType?.Name}.{methodName}.");
         }
 
@@ -313,6 +357,13 @@ namespace Kuery.Linq
 
         private static string TranslateToColumnSql(Expression expression, TableMapping table, ISqlDialect dialect, List<object> parameters)
         {
+            // Unwrap implicit Convert nodes (e.g. short→int promotion)
+            if (expression is UnaryExpression convertUnary && convertUnary.NodeType == ExpressionType.Convert)
+            {
+                var innerResult = TranslateToColumnSql(convertUnary.Operand, table, dialect, parameters);
+                if (innerResult != null) return innerResult;
+            }
+
             // Handle x.Prop.ToLower() / x.Prop.ToUpper() / x.Prop.Replace() wrapping
             if (expression is MethodCallExpression innerCall && innerCall.Object != null)
             {
@@ -443,6 +494,34 @@ namespace Kuery.Linq
                 {
                     var result = TryBuildMathMaxMin(staticCall.Method.Name, staticCall.Arguments[0], staticCall.Arguments[1], table, dialect, parameters);
                     if (result != null) return result;
+                }
+            }
+
+            // Handle Convert.ToXxx(value) → CAST(col AS type)
+            if (expression is MethodCallExpression convertCall && convertCall.Object == null
+                && convertCall.Arguments.Count == 1
+                && convertCall.Method.DeclaringType == typeof(Convert))
+            {
+                var castType = GetCastTypeName(convertCall.Method.Name, dialect);
+                if (castType != null)
+                {
+                    var inner = ResolveInnerSql(convertCall.Arguments[0], table, dialect, parameters);
+                    if (inner != null)
+                    {
+                        return "cast(" + inner + " as " + castType + ")";
+                    }
+                }
+            }
+
+            // Handle x.Prop.ToString() → CAST(col AS text)
+            if (expression is MethodCallExpression toStringCall && toStringCall.Object != null
+                && toStringCall.Method.Name == nameof(object.ToString) && toStringCall.Arguments.Count == 0)
+            {
+                var inner = ResolveInnerSql(toStringCall.Object, table, dialect, parameters);
+                if (inner != null)
+                {
+                    var textType = dialect.Kind == SqlDialectKind.SqlServer ? "nvarchar(max)" : "text";
+                    return "cast(" + inner + " as " + textType + ")";
                 }
             }
 
@@ -785,6 +864,28 @@ namespace Kuery.Linq
                 return "coalesce(" + leftSql + ", " + rightSql + ")";
             }
             throw new NotSupportedException("Unsupported coalesce expression.");
+        }
+
+        private static string GetCastTypeName(string convertMethodName, ISqlDialect dialect)
+        {
+            switch (convertMethodName)
+            {
+                case nameof(Convert.ToInt32):
+                case nameof(Convert.ToInt16):
+                    return dialect.Kind == SqlDialectKind.SqlServer ? "int" : "integer";
+                case nameof(Convert.ToInt64):
+                    return dialect.Kind == SqlDialectKind.SqlServer ? "bigint" : "integer";
+                case nameof(Convert.ToDouble):
+                    return dialect.Kind == SqlDialectKind.SqlServer ? "float" : "real";
+                case nameof(Convert.ToSingle):
+                    return "real";
+                case nameof(Convert.ToBoolean):
+                    return dialect.Kind == SqlDialectKind.SqlServer ? "bit" : "integer";
+                case nameof(Convert.ToString):
+                    return dialect.Kind == SqlDialectKind.SqlServer ? "nvarchar(max)" : "text";
+                default:
+                    return null;
+            }
         }
 
         private static string BuildDateTimeNow(ISqlDialect dialect)
