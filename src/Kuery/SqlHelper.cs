@@ -490,14 +490,14 @@ namespace Kuery
 
             var typeInfo = type.GetTypeInfo();
             var tableAttr = typeInfo.CustomAttributes
-                .Where(x => x.AttributeType == typeof(TableAttribute))
-                .Select(x => (TableAttribute)Orm.InflateAttribute(x))
+                .Where(x => Orm.IsTableAttribute(x.AttributeType))
                 .FirstOrDefault();
 
-            TableName = (tableAttr != null && !string.IsNullOrEmpty(tableAttr.Name)) ?
-                tableAttr.Name :
+            var tableName = tableAttr != null ? Orm.GetAttributeName(tableAttr) : null;
+            TableName = !string.IsNullOrEmpty(tableName) ?
+                tableName :
                 MappedType.Name;
-            WithoutRowId = tableAttr != null ? tableAttr.WithoutRowId : false;
+            WithoutRowId = tableAttr != null && Orm.GetWithoutRowId(tableAttr);
 
             var props = new List<PropertyInfo>();
             var baseType = type;
@@ -611,12 +611,12 @@ namespace Kuery
 
             public Column(Type mappedType, PropertyInfo prop, CreateFlags createFlags = CreateFlags.None)
             {
-                var colAttr = prop.CustomAttributes.FirstOrDefault(x => x.AttributeType == typeof(ColumnAttribute));
+                var colAttr = prop.CustomAttributes.FirstOrDefault(x => Orm.IsColumnAttribute(x.AttributeType));
 
                 _prop = prop;
                 MappedType = mappedType;
                 Name = (colAttr != null && colAttr.ConstructorArguments.Count > 0) ?
-                    colAttr.ConstructorArguments[0].Value?.ToString() :
+                    Orm.GetAttributeName(colAttr) :
                     prop.Name;
 
                 ColumnType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
@@ -797,6 +797,11 @@ namespace Kuery
         public const int DefaultMaxStringLength = 140;
         public const string ImplicitPkName = "Id";
         public const string ImplicitIndexSuffix = "Id";
+        private const string DataAnnotationsSchemaTableAttributeFullName = "System.ComponentModel.DataAnnotations.Schema.TableAttribute";
+        private const string DataAnnotationsSchemaColumnAttributeFullName = "System.ComponentModel.DataAnnotations.Schema.ColumnAttribute";
+        private const string DataAnnotationsRequiredAttributeFullName = "System.ComponentModel.DataAnnotations.RequiredAttribute";
+        private const string DataAnnotationsMaxLengthAttributeFullName = "System.ComponentModel.DataAnnotations.MaxLengthAttribute";
+        private const string DataAnnotationsStringLengthAttributeFullName = "System.ComponentModel.DataAnnotations.StringLengthAttribute";
 
         public static Type GetType(object obj)
         {
@@ -973,6 +978,51 @@ namespace Kuery
             return r;
         }
 
+        public static bool IsTableAttribute(Type attributeType) =>
+            attributeType == typeof(TableAttribute) ||
+            string.Equals(attributeType.FullName, DataAnnotationsSchemaTableAttributeFullName, StringComparison.Ordinal);
+
+        public static bool IsColumnAttribute(Type attributeType) =>
+            attributeType == typeof(ColumnAttribute) ||
+            string.Equals(attributeType.FullName, DataAnnotationsSchemaColumnAttributeFullName, StringComparison.Ordinal);
+
+        private static bool IsRequiredAttribute(Type attributeType) =>
+            string.Equals(attributeType.FullName, DataAnnotationsRequiredAttributeFullName, StringComparison.Ordinal);
+
+        private static bool IsDataAnnotationsMaxLengthAttribute(Type attributeType) =>
+            string.Equals(attributeType.FullName, DataAnnotationsMaxLengthAttributeFullName, StringComparison.Ordinal);
+
+        private static bool IsDataAnnotationsStringLengthAttribute(Type attributeType) =>
+            string.Equals(attributeType.FullName, DataAnnotationsStringLengthAttributeFullName, StringComparison.Ordinal);
+
+        public static string GetAttributeName(CustomAttributeData attribute) =>
+            (attribute.ConstructorArguments.Count > 0 ? attribute.ConstructorArguments[0].Value : null)?.ToString();
+
+        public static bool GetWithoutRowId(CustomAttributeData attribute)
+        {
+            foreach (var namedArgument in attribute.NamedArguments)
+            {
+                if (namedArgument.MemberName == nameof(TableAttribute.WithoutRowId))
+                {
+                    return namedArgument.TypedValue.Value is bool value && value;
+                }
+            }
+            return false;
+        }
+
+        private static int? GetLengthFromAttribute(CustomAttributeData attr)
+        {
+            if (attr.ConstructorArguments.Count > 0)
+            {
+                var value = attr.ConstructorArguments[0].Value;
+                if (value is int intValue)
+                {
+                    return intValue;
+                }
+            }
+            return null;
+        }
+
         public static IEnumerable<IndexedAttribute> GetIndices(MemberInfo p)
         {
             var indexedInfo = typeof(IndexedAttribute).GetTypeInfo();
@@ -989,12 +1039,27 @@ namespace Kuery
                 var attrv = (MaxLengthAttribute)InflateAttribute(attr);
                 return attrv.Value;
             }
+
+            var dataAnnotationsMaxLengthAttr = p.CustomAttributes.FirstOrDefault(x => IsDataAnnotationsMaxLengthAttribute(x.AttributeType));
+            if (dataAnnotationsMaxLengthAttr != null)
+            {
+                return GetLengthFromAttribute(dataAnnotationsMaxLengthAttr);
+            }
+
+            var dataAnnotationsStringLengthAttr = p.CustomAttributes.FirstOrDefault(x => IsDataAnnotationsStringLengthAttribute(x.AttributeType));
+            if (dataAnnotationsStringLengthAttr != null)
+            {
+                return GetLengthFromAttribute(dataAnnotationsStringLengthAttr);
+            }
+
             return null;
         }
 
         public static bool IsMarkedNotNull(MemberInfo p)
         {
-            return p.CustomAttributes.Any(x => x.AttributeType == typeof(NotNullAttribute));
+            return p.CustomAttributes.Any(x =>
+                x.AttributeType == typeof(NotNullAttribute) ||
+                IsRequiredAttribute(x.AttributeType));
         }
     }
 

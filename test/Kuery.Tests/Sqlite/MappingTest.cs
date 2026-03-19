@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.Data.Common;
+using DataAnnotations = System.ComponentModel.DataAnnotations;
+using DataAnnotationsSchema = System.ComponentModel.DataAnnotations.Schema;
 using Xunit;
 
 namespace Kuery.Tests.Sqlite
@@ -178,6 +180,37 @@ namespace Kuery.Tests.Sqlite
             var foo2 = con.Get<OnlyKeyModel>("Foo");
             Assert.Equal("Foo", foo2.MyModelId);
         }
+
+        [DataAnnotationsSchema.Table("DataAnnotationsTable")]
+        class DataAnnotationsMappedModel
+        {
+            [DataAnnotationsSchema.Column("id")]
+            public int Id { get; set; }
+
+            [DataAnnotationsSchema.Column("name")]
+            [DataAnnotations.Required]
+            [DataAnnotations.StringLength(32)]
+            public string Name { get; set; }
+        }
+
+        [Fact]
+        public void DataAnnotationsSchemaAttributesAreMapped()
+        {
+            var mapping = SqlMapper.GetMapping<DataAnnotationsMappedModel>();
+            Assert.Equal("DataAnnotationsTable", mapping.TableName);
+
+            Assert.Equal("id", mapping.Columns[0].Name);
+            Assert.Equal("name", mapping.Columns[1].Name);
+        }
+
+        [Fact]
+        public void DataAnnotationsValidationAttributesAreApplied()
+        {
+            var mapping = SqlMapper.GetMapping<DataAnnotationsMappedModel>();
+            var nameColumn = mapping.FindColumn("name");
+            Assert.NotNull(nameColumn);
+            Assert.False(nameColumn.IsNullable);
+            Assert.Equal(32, nameColumn.MaxStringLength);
+        }
     }
 }
-
