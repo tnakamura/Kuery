@@ -274,6 +274,9 @@ namespace Kuery.Tests.Npgsql
                 .OrderBy(p => p.Price);
 
             Assert.Equal(2, query.Count());
+            Assert.Equal(2L, query.LongCount());
+            Assert.True(query.Any());
+            Assert.True(query.All(p => p.Price >= 10));
             Assert.Equal("B", query.First().Name);
 
             var list = await query.ToListAsync();

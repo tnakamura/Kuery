@@ -1138,6 +1138,10 @@ namespace Kuery.Linq
                     {
                         return "(" + columnSql + " like (" + paramName + " + N'%'))";
                     }
+                    if (dialect.Kind == SqlDialectKind.PostgreSql)
+                    {
+                        return "(" + columnSql + " ilike (" + paramName + " || '%'))";
+                    }
                     return "(" + columnSql + " like (" + paramName + " || '%'))";
                 default:
                     throw new NotSupportedException($"Unsupported StringComparison: {comparison}");
@@ -1160,6 +1164,10 @@ namespace Kuery.Linq
                     if (dialect.Kind == SqlDialectKind.SqlServer)
                     {
                         return "(" + columnSql + " like (N'%' + " + paramName + "))";
+                    }
+                    if (dialect.Kind == SqlDialectKind.PostgreSql)
+                    {
+                        return "(" + columnSql + " ilike ('%' || " + paramName + "))";
                     }
                     return "(" + columnSql + " like ('%' || " + paramName + "))";
                 default:

@@ -306,6 +306,14 @@ namespace Kuery.Linq
 
         private static void AppendOrderBy(StringBuilder sql, SelectQueryModel model, ISqlDialect dialect)
         {
+            if (model.Terminal == QueryTerminalKind.Count
+                || model.Terminal == QueryTerminalKind.LongCount
+                || model.Terminal == QueryTerminalKind.Any
+                || model.Terminal == QueryTerminalKind.All)
+            {
+                return;
+            }
+
             var isLast = model.Terminal == QueryTerminalKind.Last || model.Terminal == QueryTerminalKind.LastOrDefault;
 
             if (model.Orderings.Count == 0)
