@@ -41,6 +41,14 @@ public class Todo
 }
 ```
 
+In addition to Kuery attributes, the mapper also supports these .NET attributes:
+
+- `System.ComponentModel.DataAnnotations.Schema.Table`
+- `System.ComponentModel.DataAnnotations.Schema.Column`
+- `System.ComponentModel.DataAnnotations.Required`
+- `System.ComponentModel.DataAnnotations.MaxLength`
+- `System.ComponentModel.DataAnnotations.StringLength`
+
 ### Synchronous API
 
 You can insrt rows in the database using `Insert`.
@@ -63,6 +71,7 @@ connection.Insert(todo);
 ```
 
 Similar methods exist for `Update` and `Delete`.
+All write methods accept an optional `IDbTransaction`.
 
 The most straightforward way to query for data is using the `Table` method.
 This can take predicates for constraining via WHERE clauses and/or adding ORDER BY clauses:
@@ -72,6 +81,19 @@ List<Todo> todos = connection.Table<Todo>()
     .Where(x => x.Name == "Study English")
     .ToList();
 ```
+
+`Table<T>()` also supports:
+
+- `OrderBy` / `OrderByDescending` / `ThenBy` / `ThenByDescending`
+- `Skip` / `Take` / `ElementAt`
+- `Count` / `First` / `FirstOrDefault`
+- `Delete()` and `Delete(predicate)`
+
+Other synchronous APIs:
+
+- Batch writes: `InsertAll`, `UpdateAll`, `InsertOrReplace`
+- Single row retrieval: `Find(pk)`, `Find(predicate)`, `Get(pk)`, `Get(predicate)`
+- Manual SQL: `Query<T>(sql, param)`, `Query(type, sql, param)`, `FindWithQuery<T>`, `Execute`, `ExecuteScalar<T>`
 
 
 ### Asynchronous API
@@ -109,6 +131,15 @@ List<Todo> todos = await connection.Table<Todo>()
     .ToListAsync();
 ```
 
+Async API also provides:
+
+- Batch writes: `InsertAllAsync`, `UpdateAllAsync`, `InsertOrReplaceAsync`
+- Single row retrieval: `FindAsync(pk)`, `FindAsync(predicate)`, `GetAsync(pk)`, `GetAsync(predicate)`
+- LINQ execution helpers: `ToListAsync`, `CountAsync`, `FirstAsync`, `FirstOrDefaultAsync`
+- Manual SQL: `QueryAsync<T>(sql, param)`, `FindWithQueryAsync<T>`, `ExecuteAsync`, `ExecuteScalarAsync<T>`
+
+Most async methods accept `CancellationToken`.
+
 ### IQueryable API (`Query<T>()`)
 
 You can also compose SQL `SELECT` queries through LINQ by using `Query<T>()`.
@@ -122,16 +153,28 @@ var products = await connection.Query<Product>()
 var deleted = await connection.Query<Product>()
     .Where(p => p.Id == id)
     .ExecuteDeleteAsync();
+
+var updated = await connection.Query<Product>()
+    .Where(p => p.Code == "0001")
+    .ExecuteUpdateAsync(setters => setters
+        .SetProperty(p => p.Name, p => p.Name + " (updated)"));
 ```
 
-In the current implementation, SQL translation supports:
+SQL translation currently supports (including async equivalents where applicable):
 
-- `Where`
-- `OrderBy` / `ThenBy`
-- `Skip` / `Take`
-- `Count`
-- `First` / `FirstOrDefault`
-- `ExecuteDelete` / `ExecuteDeleteAsync` (requires `Where`)
+- Query shape: `Where`, `Select`, `OrderBy`/`ThenBy`, `Skip`, `Take`
+- Retrieval/aggregation: `Count`, `LongCount`, `Any`, `All`, `First`, `FirstOrDefault`, `Single`, `SingleOrDefault`, `Last`, `LastOrDefault`, `Sum`, `Min`, `Max`, `Average`
+- Grouping: `GroupBy` (single key and composite key), `HAVING`
+- Joins: `Join`, composite-key join, chained joins, left join (`GroupJoin + SelectMany + DefaultIfEmpty`)
+- Set operations: `Distinct`, `Concat`, `Union`, `Intersect`, `Except`
+- Subqueries: `Contains` (`IN`), `Any` (`EXISTS`), `SelectMany` (cross join)
+- Data modification: `ExecuteDelete`/`ExecuteDeleteAsync` (requires `Where`), `ExecuteUpdate`/`ExecuteUpdateAsync`
+- Built-in expression translation:
+  - String: `Contains`, `StartsWith`, `EndsWith`, `Replace`, `Substring`, `Trim`, `TrimStart`, `TrimEnd`, `Length`, `IndexOf`, `string.IsNullOrEmpty`, `string.IsNullOrWhiteSpace`
+  - Math: `Math.Abs`, `Math.Round`, `Math.Floor`, `Math.Ceiling`, `Math.Max`, `Math.Min`, `Math.Pow`, `Math.Sqrt`, `Math.Log`, `Math.Log10`
+  - Date/Time: `DateTime.Now`, `DateTime.UtcNow`, `DateTime.Date`, `DateTime.DayOfWeek`, `AddDays`, `AddMonths`, `AddYears`, `AddHours`, `AddMinutes`, `AddSeconds`, and members such as `Year`, `Month`, `Day`, `Hour`, `Minute`, `Second`
+  - Type conversion: `Convert.ToInt16`, `Convert.ToInt32`, `Convert.ToInt64`, `Convert.ToDouble`, `Convert.ToSingle`, `Convert.ToBoolean`, `Convert.ToString`, `.ToString()`
+  - Other: null coalescing (`??`), ternary conditional (`?:`), bitwise operators (`&`, `|`, `^`, `~`), and `KueryFunctions.Like(...)`
 
 Unsupported LINQ operators throw `NotSupportedException`.
 
@@ -142,6 +185,14 @@ using var connection = new Microsoft.Data.Sqlite.SqliteConnection("Your connecti
 connection.Open();
 
 IEnumerable<Todo> todos = connection.Query<Todo>(
+    "SELECT * FROM todo WHERE name = $name",
+    new { name = "Study English" });
+```
+
+You can also use async manual SQL APIs:
+
+```cs
+IEnumerable<Todo> todos = await connection.QueryAsync<Todo>(
     "SELECT * FROM todo WHERE name = $name",
     new { name = "Study English" });
 ```
@@ -161,4 +212,3 @@ IEnumerable<Todo> todos = connection.Query<Todo>(
 ## Author
 
 [tnakamura](https://github.com/tnakamura)
-
