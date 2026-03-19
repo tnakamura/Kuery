@@ -1065,7 +1065,7 @@ namespace Kuery
             }
 
             var namedArg = attribute.NamedArguments.FirstOrDefault(x => x.MemberName == propertyName);
-            if (namedArg.MemberName == propertyName)
+            if (!namedArg.Equals(default(CustomAttributeNamedArgument)))
             {
                 return namedArg.TypedValue.Value?.ToString();
             }
