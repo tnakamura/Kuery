@@ -51,7 +51,7 @@ In addition to Kuery attributes, the mapper also supports these .NET attributes:
 
 ### Synchronous API
 
-You can insrt rows in the database using `Insert`.
+You can insert rows in the database using `Insert`.
 If the table contains an auto-incremented primary key,
 then the value for that key will be available to you after the insert:
 
@@ -117,11 +117,11 @@ await connection.OpenAsync();
 await connection.InsertAsync(todo);
 ```
 
-Simillar methods exist for `UpdateAsync` and `DeleteAsync`.
+Similar methods exist for `UpdateAsync` and `DeleteAsync`.
 
 Querying for data is most straightforwardly done using the `Table` method.
-This will return an `TableQuery` instance back,
-whererupon you can add predicates for constraining via WHERE clauses and/or adding ORDER BY.
+This will return a `TableQuery` instance back,
+whereupon you can add predicates for constraining via WHERE clauses and/or adding ORDER BY.
 The database is not physically touched until one of the special retrieval
 methods - `ToListAsync`, `FirstAsync`, or `FirstOrDefaultAsync` - is called.
 
