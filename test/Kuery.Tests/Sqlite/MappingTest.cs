@@ -198,9 +198,9 @@ namespace Kuery.Tests.Sqlite
         {
             var mapping = SqlMapper.GetMapping<DataAnnotationsMappedModel>();
             Assert.Equal("DataAnnotationsTable", mapping.TableName);
-
-            Assert.Equal("id", mapping.Columns[0].Name);
-            Assert.Equal("name", mapping.Columns[1].Name);
+            Assert.Equal(2, mapping.Columns.Count);
+            Assert.Equal("id", mapping.FindColumn("id").Name);
+            Assert.Equal("name", mapping.FindColumn("name").Name);
         }
 
         [Fact]

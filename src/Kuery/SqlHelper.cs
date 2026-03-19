@@ -494,9 +494,7 @@ namespace Kuery
                 .FirstOrDefault();
 
             var tableName = tableAttr != null ? Orm.GetAttributeName(tableAttr) : null;
-            TableName = !string.IsNullOrEmpty(tableName) ?
-                tableName :
-                MappedType.Name;
+            TableName = !string.IsNullOrEmpty(tableName) ? tableName : MappedType.Name;
             WithoutRowId = tableAttr != null && Orm.GetWithoutRowId(tableAttr);
 
             var props = new List<PropertyInfo>();
@@ -615,9 +613,7 @@ namespace Kuery
 
                 _prop = prop;
                 MappedType = mappedType;
-                Name = (colAttr != null && colAttr.ConstructorArguments.Count > 0) ?
-                    Orm.GetAttributeName(colAttr) :
-                    prop.Name;
+                Name = (colAttr != null ? Orm.GetAttributeName(colAttr) : null) ?? prop.Name;
 
                 ColumnType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
                 Collation = Orm.Collation(prop);
@@ -995,8 +991,30 @@ namespace Kuery
         private static bool IsDataAnnotationsStringLengthAttribute(Type attributeType) =>
             string.Equals(attributeType.FullName, DataAnnotationsStringLengthAttributeFullName, StringComparison.Ordinal);
 
-        public static string GetAttributeName(CustomAttributeData attribute) =>
-            (attribute.ConstructorArguments.Count > 0 ? attribute.ConstructorArguments[0].Value : null)?.ToString();
+        public static string GetAttributeName(CustomAttributeData attribute)
+        {
+            if (attribute == null)
+            {
+                return null;
+            }
+
+            if (!IsTableAttribute(attribute.AttributeType) && !IsColumnAttribute(attribute.AttributeType))
+            {
+                return null;
+            }
+
+            if (attribute.ConstructorArguments.Count == 0)
+            {
+                return null;
+            }
+
+            var nameArgument = attribute.ConstructorArguments[0];
+            if (!(nameArgument.Value is string name))
+            {
+                return null;
+            }
+            return name;
+        }
 
         public static bool GetWithoutRowId(CustomAttributeData attribute)
         {
@@ -1004,7 +1022,7 @@ namespace Kuery
             {
                 if (namedArgument.MemberName == nameof(TableAttribute.WithoutRowId))
                 {
-                    return namedArgument.TypedValue.Value is bool value && value;
+                    return (namedArgument.TypedValue.Value as bool?) == true;
                 }
             }
             return false;
