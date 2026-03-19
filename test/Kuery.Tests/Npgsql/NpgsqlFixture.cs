@@ -6,7 +6,6 @@ namespace Kuery.Tests.Npgsql
     public class NpgsqlFixture : IDisposable
     {
         public string Database { get; }
-        static readonly global::Npgsql.NpgsqlCommandBuilder CommandBuilder = new global::Npgsql.NpgsqlCommandBuilder();
 
         readonly string host;
         readonly int port;
@@ -137,13 +136,25 @@ WHERE datname = @databaseName", "databaseName", Database);
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = commandText;
-                command.Parameters.AddWithValue(parameterName, parameterValue ?? DBNull.Value);
+                if (parameterName == null) throw new ArgumentNullException(nameof(parameterName));
+                var normalizedParameterName = parameterName.StartsWith("@", StringComparison.Ordinal) ? parameterName : "@" + parameterName;
+                command.Parameters.AddWithValue(normalizedParameterName, parameterValue ?? DBNull.Value);
                 command.ExecuteNonQuery();
             }
         }
 
-        private static string QuoteIdentifier(string name) =>
-            CommandBuilder.QuoteIdentifier(name);
+        private static string QuoteIdentifier(string name)
+        {
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            foreach (var c in name)
+            {
+                if (!char.IsLetterOrDigit(c) && c != '_')
+                {
+                    throw new ArgumentException("Database name contains unsupported characters.", nameof(name));
+                }
+            }
+            return $"\"{name}\"";
+        }
 
         private static string ReadStringSetting(string name, string defaultValue)
         {
