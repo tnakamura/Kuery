@@ -137,7 +137,7 @@ WHERE datname = @databaseName", "databaseName", Database);
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = commandText;
-                var normalizedParameterName = parameterName.StartsWith("@", StringComparison.Ordinal) ? parameterName : "@" + parameterName;
+                var normalizedParameterName = parameterName.StartsWith("@", StringComparison.Ordinal) ? parameterName : $"@{parameterName}";
                 command.Parameters.AddWithValue(normalizedParameterName, parameterValue ?? DBNull.Value);
                 command.ExecuteNonQuery();
             }
