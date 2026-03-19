@@ -1733,6 +1733,10 @@ namespace Kuery
                     var startsWithCmpOp = StringComparison.CurrentCulture;
                     if (args.Length == 2)
                     {
+                        if (args[1].CommandText == GetParameterName("p" + queryArgs.Count.ToString()))
+                        {
+                            queryArgs.RemoveAt(queryArgs.Count - 1);
+                        }
                         startsWithCmpOp = (StringComparison)args[1].Value;
                     }
                     switch (startsWithCmpOp)
@@ -1754,6 +1758,10 @@ namespace Kuery
                             {
                                 sqlCall = "(" + obj.Value.CommandText + " like (" + args[0].CommandText + " + N'%'))";
                             }
+                            else if (Connection.IsPostgreSql())
+                            {
+                                sqlCall = "(" + obj.Value.CommandText + " ilike (" + args[0].CommandText + " || '%'))";
+                            }
                             else
                             {
                                 sqlCall = "(" + obj.Value.CommandText + " like (" + args[0].CommandText + " || '%'))";
@@ -1761,11 +1769,15 @@ namespace Kuery
                             break;
                     }
                 }
-                else if (call.Method.Name == nameof(string.EndsWith) && args.Length == 1)
+                else if (call.Method.Name == nameof(string.EndsWith) && args.Length >= 1)
                 {
                     var endsWithCmpOp = StringComparison.CurrentCulture;
                     if (args.Length == 2)
                     {
+                        if (args[1].CommandText == GetParameterName("p" + queryArgs.Count.ToString()))
+                        {
+                            queryArgs.RemoveAt(queryArgs.Count - 1);
+                        }
                         endsWithCmpOp = (StringComparison)args[1].Value;
                     }
                     switch (endsWithCmpOp)
@@ -1806,6 +1818,10 @@ namespace Kuery
                             if (Connection.IsSqlServer())
                             {
                                 sqlCall = "(" + obj.Value.CommandText + " like (N'%' + " + args[0].CommandText + "))";
+                            }
+                            else if (Connection.IsPostgreSql())
+                            {
+                                sqlCall = "(" + obj.Value.CommandText + " ilike ('%' || " + args[0].CommandText + "))";
                             }
                             else
                             {
@@ -2206,6 +2222,15 @@ namespace Kuery
                     if (value is string s)
                     {
                         return TimeSpan.Parse(s);
+                    }
+                    else if (value != null && value.GetType().FullName == "System.TimeOnly")
+                    {
+                        var toTimeSpan = value.GetType().GetMethod("ToTimeSpan", Type.EmptyTypes);
+                        if (toTimeSpan != null)
+                        {
+                            return (TimeSpan)toTimeSpan.Invoke(value, null);
+                        }
+                        return TimeSpan.Parse(value.ToString());
                     }
                     else
                     {

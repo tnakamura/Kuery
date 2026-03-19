@@ -38,6 +38,8 @@ namespace Kuery.Linq
             }
 
             var selectModel = (SelectQueryModel)model;
+            ValidateRootQueryProjection(selectModel, dialect);
+
             var selectGenerated = _sqlGenerator.Generate(selectModel, dialect);
             return ExecuteCore(context.Connection, selectModel, selectGenerated, resultType);
         }
@@ -58,6 +60,8 @@ namespace Kuery.Linq
             }
 
             var selectModel = (SelectQueryModel)model;
+            ValidateRootQueryProjection(selectModel, dialect);
+
             var selectGenerated = _sqlGenerator.Generate(selectModel, dialect);
             return await ExecuteCoreAsync(context.Connection, selectModel, selectGenerated, resultType, cancellationToken).ConfigureAwait(false);
         }
@@ -152,6 +156,16 @@ namespace Kuery.Linq
         public Task<object> ExecuteTerminalAsync(KueryQueryContext context, Expression expression, CancellationToken cancellationToken)
         {
             return ExecuteAsync(context, expression, expression.Type, cancellationToken);
+        }
+
+        private static void ValidateRootQueryProjection(SelectQueryModel model, ISqlDialect dialect)
+        {
+            if (dialect.Kind != SqlDialectKind.Sqlite
+                && model.GroupByColumns == null
+                && model.Projection != null)
+            {
+                throw new NotSupportedException("Select projection is not supported for queries created by Kuery Query<T>().");
+            }
         }
 
         private static object ExecuteCore(IDbConnection connection, SelectQueryModel model, GeneratedSql generated, Type resultType)
