@@ -197,6 +197,50 @@ IEnumerable<Todo> todos = await connection.QueryAsync<Todo>(
     new { name = "Study English" });
 ```
 
+## Running Tests
+
+The test project has three execution modes:
+
+- `fast` (default local workflow): SQLite tests only
+- `integration`: SQL Server + PostgreSQL tests
+- `all`: fast + integration
+
+### Fast (SQLite only)
+
+```bash
+./test/run-fast-tests.sh
+```
+
+### Integration (SQL Server + PostgreSQL)
+
+Requires Docker.
+
+```bash
+./test/run-integration-tests.sh
+```
+
+This script starts test databases via `test/docker-compose.test.yml`, runs SQL Server/PostgreSQL tests, then cleans up containers.
+
+### CI
+
+GitHub Actions runs:
+
+- `fast` job: SQLite-only tests
+- `integration` job: SQL Server + PostgreSQL tests via Docker
+
+### All tests
+
+```bash
+./test/run-all-tests.sh
+```
+
+### Environment variables (optional)
+
+Fixtures now support environment variable overrides.
+
+- PostgreSQL: `KUERY_TEST_PG_HOST`, `KUERY_TEST_PG_PORT`, `KUERY_TEST_PG_USERNAME`, `KUERY_TEST_PG_PASSWORD`, `KUERY_TEST_PG_MASTER_DB`
+- SQL Server: `KUERY_TEST_SQLSERVER_HOST`, `KUERY_TEST_SQLSERVER_INTEGRATED_SECURITY`, `KUERY_TEST_SQLSERVER_USERNAME`, `KUERY_TEST_SQLSERVER_PASSWORD`, `KUERY_TEST_SQLSERVER_MASTER_DB`
+
 ## Contribution
 
 1. Fork it ( http://github.com/tnakamura/Kuery )

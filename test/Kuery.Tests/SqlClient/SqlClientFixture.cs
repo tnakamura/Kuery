@@ -7,17 +7,27 @@ namespace Kuery.Tests.SqlClient
     public class SqlClientFixture : IDisposable
     {
         public string Database { get; }
+        readonly string dataSource;
+        readonly bool integratedSecurity;
+        readonly string username;
+        readonly string password;
+        readonly string masterDatabase;
 
         public SqlConnection CreateConnection() =>
             CreateConnection(Database);
 
-        private static SqlConnection CreateConnection(string database)
+        private SqlConnection CreateConnection(string database)
         {
             var csb = new SqlConnectionStringBuilder();
-            csb.DataSource = "(local)";
+            csb.DataSource = dataSource;
             csb.InitialCatalog = database;
             csb.TrustServerCertificate = true;
-            csb.IntegratedSecurity = true;
+            csb.IntegratedSecurity = integratedSecurity;
+            if (!integratedSecurity)
+            {
+                csb.UserID = username;
+                csb.Password = password;
+            }
             return new SqlConnection(csb.ToString());
         }
 
@@ -55,6 +65,12 @@ namespace Kuery.Tests.SqlClient
 
         public SqlClientFixture()
         {
+            dataSource = ReadStringSetting("KUERY_TEST_SQLSERVER_HOST", "(local)");
+            integratedSecurity = ReadBoolSetting("KUERY_TEST_SQLSERVER_INTEGRATED_SECURITY", true);
+            username = ReadStringSetting("KUERY_TEST_SQLSERVER_USERNAME", "sa");
+            password = ReadStringSetting("KUERY_TEST_SQLSERVER_PASSWORD", "Your_password123");
+            masterDatabase = ReadStringSetting("KUERY_TEST_SQLSERVER_MASTER_DB", "master");
+
             Database = $"kuery_test_{Guid.NewGuid():N}";
 
             DeleteDatabase();
@@ -84,7 +100,7 @@ namespace Kuery.Tests.SqlClient
 
         private void CreateDatabase()
         {
-            using (var connection = CreateConnection("master"))
+            using (var connection = CreateConnection(masterDatabase))
             {
                 connection.Open();
                 using (var command = connection.CreateCommand())
@@ -97,7 +113,7 @@ namespace Kuery.Tests.SqlClient
 
         private void DeleteDatabase()
         {
-            using (var connection = CreateConnection("master"))
+            using (var connection = CreateConnection(masterDatabase))
             {
                 connection.Open();
                 using (var command = connection.CreateCommand())
@@ -115,6 +131,23 @@ END;";
                     command.ExecuteNonQuery();
                 }
             }
+        }
+
+        private static string ReadStringSetting(string name, string defaultValue)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            return string.IsNullOrWhiteSpace(value) ? defaultValue : value;
+        }
+
+        private static bool ReadBoolSetting(string name, bool defaultValue)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            if (bool.TryParse(value, out bool parsed))
+            {
+                return parsed;
+            }
+
+            return defaultValue;
         }
     }
 }

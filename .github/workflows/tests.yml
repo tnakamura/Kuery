@@ -1,0 +1,31 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  fast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: chmod +x test/run-fast-tests.sh test/run-integration-tests.sh test/run-all-tests.sh
+      - run: ./test/run-fast-tests.sh --nologo
+
+  integration:
+    runs-on: ubuntu-latest
+    env:
+      KUERY_TEST_SQLSERVER_PASSWORD: Kuery_test_123!
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: chmod +x test/run-fast-tests.sh test/run-integration-tests.sh test/run-all-tests.sh
+      - run: ./test/run-integration-tests.sh --nologo

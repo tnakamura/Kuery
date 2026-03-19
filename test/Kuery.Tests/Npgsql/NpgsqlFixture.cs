@@ -7,17 +7,22 @@ namespace Kuery.Tests.Npgsql
     {
         public string Database { get; }
 
-        const string MasterDatabase = "postgres";
+        readonly string host;
+        readonly int port;
+        readonly string username;
+        readonly string password;
+        readonly string masterDatabase;
 
         public global::Npgsql.NpgsqlConnection CreateConnection() =>
             CreateConnection(Database);
 
-        private static global::Npgsql.NpgsqlConnection CreateConnection(string database)
+        private global::Npgsql.NpgsqlConnection CreateConnection(string database)
         {
             var csb = new global::Npgsql.NpgsqlConnectionStringBuilder();
-            csb.Username = "postgres";
-            csb.Password = "postgres";
-            csb.Host = "localhost";
+            csb.Username = username;
+            csb.Password = password;
+            csb.Host = host;
+            csb.Port = port;
             csb.Database = database;
             return new global::Npgsql.NpgsqlConnection(csb.ToString());
         }
@@ -56,6 +61,12 @@ namespace Kuery.Tests.Npgsql
 
         public NpgsqlFixture()
         {
+            host = ReadStringSetting("KUERY_TEST_PG_HOST", "localhost");
+            port = ReadIntSetting("KUERY_TEST_PG_PORT", 5432);
+            username = ReadStringSetting("KUERY_TEST_PG_USERNAME", "postgres");
+            password = ReadStringSetting("KUERY_TEST_PG_PASSWORD", "postgres");
+            masterDatabase = ReadStringSetting("KUERY_TEST_PG_MASTER_DB", "postgres");
+
             Database = $"kuery_test_{Guid.NewGuid():N}";
 
             CreateDatabase();
@@ -83,7 +94,7 @@ namespace Kuery.Tests.Npgsql
 
         private void CreateDatabase()
         {
-            using (var connection = CreateConnection(MasterDatabase))
+            using (var connection = CreateConnection(masterDatabase))
             {
                 connection.Open();
                 using (var command = connection.CreateCommand())
@@ -96,7 +107,7 @@ namespace Kuery.Tests.Npgsql
 
         private void DeleteDatabase()
         {
-            using (var connection = CreateConnection(MasterDatabase))
+            using (var connection = CreateConnection(masterDatabase))
             {
                 connection.Open();
                 using (var command = connection.CreateCommand())
@@ -113,6 +124,23 @@ DROP DATABASE IF EXISTS ""{Database}"";";
                     command.ExecuteNonQuery();
                 }
             }
+        }
+
+        private static string ReadStringSetting(string name, string defaultValue)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            return string.IsNullOrWhiteSpace(value) ? defaultValue : value;
+        }
+
+        private static int ReadIntSetting(string name, int defaultValue)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            if (int.TryParse(value, out int parsed))
+            {
+                return parsed;
+            }
+
+            return defaultValue;
         }
     }
 }
