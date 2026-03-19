@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,6 +17,10 @@ namespace Kuery.Linq
         int ExecuteDelete(KueryQueryContext context, Expression expression);
 
         Task<int> ExecuteDeleteAsync(KueryQueryContext context, Expression expression, CancellationToken cancellationToken);
+
+        int ExecuteUpdate(KueryQueryContext context, Expression expression, IReadOnlyList<SetPropertyCall> setters);
+
+        Task<int> ExecuteUpdateAsync(KueryQueryContext context, Expression expression, IReadOnlyList<SetPropertyCall> setters, CancellationToken cancellationToken);
 
         object ExecuteTerminal(KueryQueryContext context, Expression expression);
 

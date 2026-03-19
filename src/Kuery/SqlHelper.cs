@@ -38,6 +38,24 @@ namespace Kuery
             throw new NotSupportedException("ExecuteDelete is supported only for queries created by Kuery Query<T>().");
         }
 
+        public static int ExecuteUpdate<T>(
+            this IQueryable<T> query,
+            Func<SetPropertyCalls<T>, SetPropertyCalls<T>> setPropertyCalls)
+        {
+            Requires.NotNull(query, nameof(query));
+            Requires.NotNull(setPropertyCalls, nameof(setPropertyCalls));
+
+            var setters = setPropertyCalls(new SetPropertyCalls<T>());
+            Requires.NotNull(setters, nameof(setPropertyCalls));
+
+            if (TryGetKueryProvider(query, out var provider))
+            {
+                return provider.ExecuteUpdate(query.Expression, setters.Setters);
+            }
+
+            throw new NotSupportedException("ExecuteUpdate is supported only for queries created by Kuery Query<T>().");
+        }
+
         public static int Insert<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
         {
             return connection.Insert(typeof(T), item, transaction);

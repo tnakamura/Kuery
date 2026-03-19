@@ -80,6 +80,60 @@ namespace Kuery.Linq
             return new GeneratedSql(sql.ToString(), parameters);
         }
 
+        internal GeneratedSql GenerateUpdate(SelectQueryModel model, ISqlDialect dialect, IReadOnlyList<SetPropertyCall> setters)
+        {
+            if (model == null) throw new ArgumentNullException(nameof(model));
+            if (dialect == null) throw new ArgumentNullException(nameof(dialect));
+            if (setters == null) throw new ArgumentNullException(nameof(setters));
+
+            ValidateUpdateModel(model);
+            if (model.Predicate == null)
+            {
+                throw new InvalidOperationException("No condition specified");
+            }
+            if (setters.Count == 0)
+            {
+                throw new InvalidOperationException("No setters specified");
+            }
+
+            var parameters = new List<object>();
+            var sql = new StringBuilder();
+            sql.Append("update ");
+            sql.Append(dialect.EscapeIdentifier(model.Table.TableName));
+            sql.Append(" set ");
+
+            for (var i = 0; i < setters.Count; i++)
+            {
+                var setter = setters[i];
+                var member = ExtractPropertyMember(setter.PropertyExpression);
+                var column = model.Table.FindColumnWithPropertyName(member.Member.Name);
+                if (column == null)
+                {
+                    throw new NotSupportedException($"Unsupported update property: {member.Member.Name}.");
+                }
+
+                if (i > 0)
+                {
+                    sql.Append(", ");
+                }
+
+                sql.Append(dialect.EscapeIdentifier(column.Name));
+                sql.Append(" = ");
+
+                var valueBody = setter.ValueExpression.Body;
+                if (valueBody is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+                {
+                    valueBody = unary.Operand;
+                }
+
+                sql.Append(_predicateTranslator.TranslateColumnOrValueExpression(valueBody, model.Table, dialect, parameters));
+            }
+
+            sql.Append(" where ");
+            sql.Append(_predicateTranslator.Translate(model.Predicate, model.Table, dialect, parameters));
+            return new GeneratedSql(sql.ToString(), parameters);
+        }
+
         internal string GenerateSubquery(SelectQueryModel model, ISqlDialect dialect, List<object> parameters)
         {
             return GenerateCore(model, dialect, parameters);
@@ -580,45 +634,72 @@ namespace Kuery.Linq
 
         private static void ValidateDeleteModel(SelectQueryModel model)
         {
+            ValidateMutationModel(model, "ExecuteDelete");
+        }
+
+        private static void ValidateUpdateModel(SelectQueryModel model)
+        {
+            ValidateMutationModel(model, "ExecuteUpdate");
+        }
+
+        private static void ValidateMutationModel(SelectQueryModel model, string operationName)
+        {
             if (model.Terminal != QueryTerminalKind.Sequence)
             {
-                throw new NotSupportedException("ExecuteDelete does not support terminal operators.");
+                throw new NotSupportedException(operationName + " does not support terminal operators.");
             }
 
             if (model.Joins != null && model.Joins.Count > 0)
             {
-                throw new NotSupportedException("ExecuteDelete does not support Join.");
+                throw new NotSupportedException(operationName + " does not support Join.");
             }
 
             if (model.GroupByColumns != null && model.GroupByColumns.Count > 0)
             {
-                throw new NotSupportedException("ExecuteDelete does not support GroupBy.");
+                throw new NotSupportedException(operationName + " does not support GroupBy.");
             }
 
             if (model.HavingPredicate != null)
             {
-                throw new NotSupportedException("ExecuteDelete does not support Having.");
+                throw new NotSupportedException(operationName + " does not support Having.");
             }
 
             if (model.IsDistinct)
             {
-                throw new NotSupportedException("ExecuteDelete does not support Distinct.");
+                throw new NotSupportedException(operationName + " does not support Distinct.");
             }
 
             if (model.Skip.HasValue || model.Take.HasValue)
             {
-                throw new NotSupportedException("ExecuteDelete does not support Skip/Take.");
+                throw new NotSupportedException(operationName + " does not support Skip/Take.");
             }
 
             if (model.Orderings != null && model.Orderings.Count > 0)
             {
-                throw new NotSupportedException("ExecuteDelete does not support OrderBy.");
+                throw new NotSupportedException(operationName + " does not support OrderBy.");
             }
 
             if (model.Projection != null || (model.ProjectedColumns != null && model.ProjectedColumns.Count > 0))
             {
-                throw new NotSupportedException("ExecuteDelete does not support Select projection.");
+                throw new NotSupportedException(operationName + " does not support Select projection.");
             }
+        }
+
+        private static MemberExpression ExtractPropertyMember(LambdaExpression propertyExpression)
+        {
+            var body = propertyExpression.Body;
+            if (body is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+            {
+                body = unary.Operand;
+            }
+
+            if (body is MemberExpression member
+                && member.Expression is ParameterExpression)
+            {
+                return member;
+            }
+
+            throw new NotSupportedException("SetProperty requires a direct mapped property access.");
         }
     }
 }

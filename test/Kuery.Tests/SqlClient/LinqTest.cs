@@ -370,6 +370,104 @@ namespace Kuery.Tests.SqlClient
         }
 
         [Fact]
+        public void QueryEntryPointExecuteUpdateUpdatesMatchingRows()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateTables(con);
+
+            con.Insert(new Product
+            {
+                Name = "A",
+                Price = 20,
+            });
+
+            con.Insert(new Product
+            {
+                Name = "B",
+                Price = 10,
+            });
+
+            con.Insert(new Product
+            {
+                Name = "C",
+                Price = 5,
+            });
+
+            var updated = con.Query<Product>()
+                .Where(p => p.Price >= 10)
+                .ExecuteUpdate(s => s
+                    .SetProperty(p => p.Name, "Updated")
+                    .SetProperty(p => p.TotalSales, p => p.TotalSales + 1));
+
+            Assert.Equal(2, updated);
+
+            var list = con.Query<Product>()
+                .OrderBy(p => p.Price)
+                .ToList();
+            Assert.Equal("C", list[0].Name);
+            Assert.Equal(0, list[0].TotalSales);
+            Assert.Equal("Updated", list[1].Name);
+            Assert.Equal(1, list[1].TotalSales);
+            Assert.Equal("Updated", list[2].Name);
+            Assert.Equal(1, list[2].TotalSales);
+        }
+
+        [Fact]
+        public async Task QueryEntryPointExecuteUpdateAsyncUpdatesMatchingRows()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateTables(con);
+
+            con.Insert(new Product
+            {
+                Name = "A",
+                Price = 20,
+            });
+
+            con.Insert(new Product
+            {
+                Name = "B",
+                Price = 10,
+            });
+
+            con.Insert(new Product
+            {
+                Name = "C",
+                Price = 5,
+            });
+
+            var updated = await con.Query<Product>()
+                .Where(p => p.Price >= 10)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Name, "AsyncUpdated"));
+
+            Assert.Equal(2, updated);
+
+            var list = con.Query<Product>()
+                .OrderBy(p => p.Price)
+                .ToList();
+            Assert.Equal("C", list[0].Name);
+            Assert.Equal("AsyncUpdated", list[1].Name);
+            Assert.Equal("AsyncUpdated", list[2].Name);
+        }
+
+        [Fact]
+        public void QueryEntryPointExecuteUpdateRequiresWherePredicate()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateTables(con);
+
+            con.Insert(new Product
+            {
+                Name = "A",
+                Price = 20,
+            });
+
+            var ex = Assert.Throws<InvalidOperationException>(() => con.Query<Product>()
+                .ExecuteUpdate(s => s.SetProperty(p => p.Name, "Updated")));
+            Assert.Equal("No condition specified", ex.Message);
+        }
+
+        [Fact]
         public void QueryEntryPointExecuteDeleteRequiresWherePredicate()
         {
             using var con = fixture.OpenNewConnection();

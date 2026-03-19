@@ -100,6 +100,50 @@ namespace Kuery.Linq
             }
         }
 
+        public int ExecuteUpdate(KueryQueryContext context, Expression expression, IReadOnlyList<SetPropertyCall> setters)
+        {
+            Requires.NotNull(context, nameof(context));
+            Requires.NotNull(expression, nameof(expression));
+            Requires.NotNull(setters, nameof(setters));
+
+            var model = BuildQueryModel(context, expression);
+            if (!(model is SelectQueryModel selectModel))
+            {
+                throw new NotSupportedException("ExecuteUpdate does not support set operations.");
+            }
+
+            var dialect = SqlDialectFactory.Create(context.Connection);
+            var generated = _sqlGenerator.GenerateUpdate(selectModel, dialect, setters);
+            using (var command = CreateCommand(context.Connection, generated))
+            {
+                return command.ExecuteNonQuery();
+            }
+        }
+
+        public async Task<int> ExecuteUpdateAsync(
+            KueryQueryContext context,
+            Expression expression,
+            IReadOnlyList<SetPropertyCall> setters,
+            CancellationToken cancellationToken)
+        {
+            Requires.NotNull(context, nameof(context));
+            Requires.NotNull(expression, nameof(expression));
+            Requires.NotNull(setters, nameof(setters));
+
+            var model = BuildQueryModel(context, expression);
+            if (!(model is SelectQueryModel selectModel))
+            {
+                throw new NotSupportedException("ExecuteUpdate does not support set operations.");
+            }
+
+            var dialect = SqlDialectFactory.Create(context.Connection);
+            var generated = _sqlGenerator.GenerateUpdate(selectModel, dialect, setters);
+            using (var command = CreateCommand(context.Connection, generated))
+            {
+                return await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+
         public object ExecuteTerminal(KueryQueryContext context, Expression expression)
         {
             return Execute(context, expression, expression.Type);
