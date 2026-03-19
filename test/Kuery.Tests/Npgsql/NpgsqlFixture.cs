@@ -132,11 +132,17 @@ WHERE datname = {databaseLiteral}");
             }
         }
 
-        private static string QuoteIdentifier(string name) =>
-            $"\"{(name ?? throw new ArgumentNullException(nameof(name))).Replace("\"", "\"\"")}\"";
+        private static string QuoteIdentifier(string name)
+        {
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            return $"\"{name.Replace("\"", "\"\"")}\"";
+        }
 
-        private static string QuoteLiteral(string value) =>
-            $"'{(value ?? throw new ArgumentNullException(nameof(value))).Replace("'", "''")}'";
+        private static string QuoteLiteral(string value)
+        {
+            if (value == null) throw new ArgumentNullException(nameof(value));
+            return $"'{value.Replace("'", "''")}'";
+        }
 
         private static string ReadStringSetting(string name, string defaultValue)
         {
