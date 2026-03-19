@@ -94,12 +94,13 @@ namespace Kuery.Tests.Npgsql
 
         private void CreateDatabase()
         {
+            var databaseIdentifier = QuoteIdentifier(Database);
             using (var connection = CreateConnection(masterDatabase))
             {
                 connection.Open();
                 using (var command = connection.CreateCommand())
                 {
-                    command.CommandText = $"CREATE DATABASE \"{Database}\"";
+                    command.CommandText = $"CREATE DATABASE {databaseIdentifier}";
                     command.ExecuteNonQuery();
                 }
             }
@@ -107,23 +108,53 @@ namespace Kuery.Tests.Npgsql
 
         private void DeleteDatabase()
         {
+            var databaseIdentifier = QuoteIdentifier(Database);
             using (var connection = CreateConnection(masterDatabase))
             {
                 connection.Open();
-                using (var command = connection.CreateCommand())
-                {
-                    command.CommandText = $@"
-UPDATE pg_database SET datallowconn = 'false' WHERE datname = '{Database}';
-ALTER DATABASE ""{Database}"" CONNECTION LIMIT 1;
-
+                ExecuteNonQuery(connection, "UPDATE pg_database SET datallowconn = 'false' WHERE datname = @databaseName", "databaseName", Database);
+                ExecuteNonQuery(connection, $"ALTER DATABASE {databaseIdentifier} CONNECTION LIMIT 1");
+                ExecuteNonQuery(connection, $@"
 SELECT pg_terminate_backend(pg_stat_activity.pid)
 FROM pg_stat_activity
-WHERE datname = '{Database}';
+WHERE datname = @databaseName", "databaseName", Database);
+                ExecuteNonQuery(connection, $"DROP DATABASE IF EXISTS {databaseIdentifier}");
+            }
+        }
 
-DROP DATABASE IF EXISTS ""{Database}"";";
-                    command.ExecuteNonQuery();
+        private static void ExecuteNonQuery(global::Npgsql.NpgsqlConnection connection, string commandText)
+        {
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = commandText;
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void ExecuteNonQuery(global::Npgsql.NpgsqlConnection connection, string commandText, string parameterName, object parameterValue)
+        {
+            if (parameterName == null) throw new ArgumentNullException(nameof(parameterName));
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = commandText;
+                var normalizedParameterName = parameterName.StartsWith("@", StringComparison.Ordinal) ? parameterName : $"@{parameterName}";
+                command.Parameters.AddWithValue(normalizedParameterName, parameterValue ?? DBNull.Value);
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static string QuoteIdentifier(string name)
+        {
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            for (var i = 0; i < name.Length; i++)
+            {
+                var c = name[i];
+                if (!char.IsLetterOrDigit(c) && c != '_')
+                {
+                    throw new ArgumentException($"Database name contains unsupported character '{c}' at index {i}.", nameof(name));
                 }
             }
+            return $"\"{name}\"";
         }
 
         private static string ReadStringSetting(string name, string defaultValue)

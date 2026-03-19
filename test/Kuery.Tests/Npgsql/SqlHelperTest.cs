@@ -619,6 +619,7 @@ namespace Kuery.Tests.Npgsql
                 }
 
                 var result = connection.Table<Customer>()
+                    .OrderBy(x => x.Id)
                     .Take(1)
                     .ToList();
                 Assert.Single(result);
@@ -644,6 +645,7 @@ namespace Kuery.Tests.Npgsql
                 }
 
                 var result = await connection.Table<Customer>()
+                    .OrderBy(x => x.Id)
                     .Take(1)
                     .ToListAsync();
                 Assert.Single(result);
@@ -669,6 +671,7 @@ namespace Kuery.Tests.Npgsql
                 }
 
                 var result = connection.Table<Customer>()
+                    .OrderBy(x => x.Id)
                     .Skip(1)
                     .ToList();
                 Assert.Equal(2, result.Count);
@@ -695,6 +698,7 @@ namespace Kuery.Tests.Npgsql
                 }
 
                 var result = await connection.Table<Customer>()
+                    .OrderBy(x => x.Id)
                     .Skip(1)
                     .ToListAsync();
                 Assert.Equal(2, result.Count);
@@ -721,6 +725,7 @@ namespace Kuery.Tests.Npgsql
                 }
 
                 var result = connection.Table<Customer>()
+                    .OrderBy(x => x.Id)
                     .Skip(1)
                     .Take(1)
                     .ToList();
