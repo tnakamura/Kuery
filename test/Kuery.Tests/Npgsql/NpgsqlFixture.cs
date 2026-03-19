@@ -110,19 +110,22 @@ namespace Kuery.Tests.Npgsql
             using (var connection = CreateConnection(masterDatabase))
             {
                 connection.Open();
-                using (var command = connection.CreateCommand())
-                {
-                    command.CommandText = $@"
-UPDATE pg_database SET datallowconn = 'false' WHERE datname = '{Database}';
-ALTER DATABASE ""{Database}"" CONNECTION LIMIT 1;
-
+                ExecuteNonQuery(connection, $"UPDATE pg_database SET datallowconn = 'false' WHERE datname = '{Database}'");
+                ExecuteNonQuery(connection, $"ALTER DATABASE \"{Database}\" CONNECTION LIMIT 1");
+                ExecuteNonQuery(connection, $@"
 SELECT pg_terminate_backend(pg_stat_activity.pid)
 FROM pg_stat_activity
-WHERE datname = '{Database}';
+WHERE datname = '{Database}'");
+                ExecuteNonQuery(connection, $"DROP DATABASE IF EXISTS \"{Database}\"");
+            }
+        }
 
-DROP DATABASE IF EXISTS ""{Database}"";";
-                    command.ExecuteNonQuery();
-                }
+        private static void ExecuteNonQuery(global::Npgsql.NpgsqlConnection connection, string commandText)
+        {
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = commandText;
+                command.ExecuteNonQuery();
             }
         }
 
