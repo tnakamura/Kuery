@@ -133,10 +133,10 @@ WHERE datname = {databaseLiteral}");
         }
 
         private static string QuoteIdentifier(string name) =>
-            $"\"{name.Replace("\"", "\"\"")}\"";
+            $"\"{(name ?? throw new ArgumentNullException(nameof(name))).Replace("\"", "\"\"")}\"";
 
         private static string QuoteLiteral(string value) =>
-            $"'{value.Replace("'", "''")}'";
+            $"'{(value ?? throw new ArgumentNullException(nameof(value))).Replace("'", "''")}'";
 
         private static string ReadStringSetting(string name, string defaultValue)
         {
