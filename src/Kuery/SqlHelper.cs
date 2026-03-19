@@ -489,15 +489,16 @@ namespace Kuery
             CreateFlags = createFlags;
 
             var typeInfo = type.GetTypeInfo();
-            var tableAttr = typeInfo.CustomAttributes
+            var tableName = Orm.GetTableName(typeInfo);
+            var customTableAttr = typeInfo.CustomAttributes
                 .Where(x => x.AttributeType == typeof(TableAttribute))
                 .Select(x => (TableAttribute)Orm.InflateAttribute(x))
                 .FirstOrDefault();
 
-            TableName = (tableAttr != null && !string.IsNullOrEmpty(tableAttr.Name)) ?
-                tableAttr.Name :
+            TableName = !string.IsNullOrEmpty(tableName) ?
+                tableName :
                 MappedType.Name;
-            WithoutRowId = tableAttr != null ? tableAttr.WithoutRowId : false;
+            WithoutRowId = customTableAttr != null ? customTableAttr.WithoutRowId : false;
 
             var props = new List<PropertyInfo>();
             var baseType = type;
@@ -611,12 +612,11 @@ namespace Kuery
 
             public Column(Type mappedType, PropertyInfo prop, CreateFlags createFlags = CreateFlags.None)
             {
-                var colAttr = prop.CustomAttributes.FirstOrDefault(x => x.AttributeType == typeof(ColumnAttribute));
-
                 _prop = prop;
                 MappedType = mappedType;
-                Name = (colAttr != null && colAttr.ConstructorArguments.Count > 0) ?
-                    colAttr.ConstructorArguments[0].Value?.ToString() :
+                var columnName = Orm.GetColumnName(prop);
+                Name = !string.IsNullOrEmpty(columnName) ?
+                    columnName :
                     prop.Name;
 
                 ColumnType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
@@ -797,6 +797,9 @@ namespace Kuery
         public const int DefaultMaxStringLength = 140;
         public const string ImplicitPkName = "Id";
         public const string ImplicitIndexSuffix = "Id";
+        private const string DataAnnotationsSchemaTableAttributeFullName = "System.ComponentModel.DataAnnotations.Schema.TableAttribute";
+        private const string DataAnnotationsSchemaColumnAttributeFullName = "System.ComponentModel.DataAnnotations.Schema.ColumnAttribute";
+        private const string DataAnnotationsRequiredAttributeFullName = "System.ComponentModel.DataAnnotations.RequiredAttribute";
 
         public static Type GetType(object obj)
         {
@@ -916,6 +919,31 @@ namespace Kuery
             return p.CustomAttributes.Any(x => x.AttributeType == typeof(PrimaryKeyAttribute));
         }
 
+        public static string GetTableName(TypeInfo typeInfo)
+        {
+            var customTableAttr = typeInfo.CustomAttributes
+                .Where(x => x.AttributeType == typeof(TableAttribute))
+                .Select(x => (TableAttribute)InflateAttribute(x))
+                .FirstOrDefault();
+            if (customTableAttr != null && !string.IsNullOrEmpty(customTableAttr.Name))
+            {
+                return customTableAttr.Name;
+            }
+
+            var dataAnnotationsTableAttr = typeInfo.CustomAttributes
+                .FirstOrDefault(x => string.Equals(x.AttributeType.FullName, DataAnnotationsSchemaTableAttributeFullName, StringComparison.Ordinal));
+            if (dataAnnotationsTableAttr != null)
+            {
+                var name = GetAttributeStringValue(dataAnnotationsTableAttr, "Name");
+                if (!string.IsNullOrEmpty(name))
+                {
+                    return name;
+                }
+            }
+
+            return null;
+        }
+
         public static string Collation(MemberInfo p)
         {
             return p.CustomAttributes
@@ -931,6 +959,32 @@ namespace Kuery
         public static bool IsAutoInc(MemberInfo p)
         {
             return p.CustomAttributes.Any(x => x.AttributeType == typeof(AutoIncrementAttribute));
+        }
+
+        public static string GetColumnName(MemberInfo p)
+        {
+            var customColumnAttr = p.CustomAttributes.FirstOrDefault(x => x.AttributeType == typeof(ColumnAttribute));
+            if (customColumnAttr != null && customColumnAttr.ConstructorArguments.Count > 0)
+            {
+                var name = customColumnAttr.ConstructorArguments[0].Value?.ToString();
+                if (!string.IsNullOrEmpty(name))
+                {
+                    return name;
+                }
+            }
+
+            var dataAnnotationsColumnAttr = p.CustomAttributes
+                .FirstOrDefault(x => string.Equals(x.AttributeType.FullName, DataAnnotationsSchemaColumnAttributeFullName, StringComparison.Ordinal));
+            if (dataAnnotationsColumnAttr != null)
+            {
+                var name = GetAttributeStringValue(dataAnnotationsColumnAttr, "Name");
+                if (!string.IsNullOrEmpty(name))
+                {
+                    return name;
+                }
+            }
+
+            return null;
         }
 
         public static FieldInfo GetField(TypeInfo t, string name)
@@ -994,7 +1048,29 @@ namespace Kuery
 
         public static bool IsMarkedNotNull(MemberInfo p)
         {
-            return p.CustomAttributes.Any(x => x.AttributeType == typeof(NotNullAttribute));
+            return p.CustomAttributes.Any(x =>
+                x.AttributeType == typeof(NotNullAttribute) ||
+                string.Equals(x.AttributeType.FullName, DataAnnotationsRequiredAttributeFullName, StringComparison.Ordinal));
+        }
+
+        private static string GetAttributeStringValue(CustomAttributeData attribute, string propertyName)
+        {
+            if (attribute.ConstructorArguments.Count > 0)
+            {
+                var value = attribute.ConstructorArguments[0].Value?.ToString();
+                if (!string.IsNullOrEmpty(value))
+                {
+                    return value;
+                }
+            }
+
+            var namedArg = attribute.NamedArguments.FirstOrDefault(x => x.MemberName == propertyName);
+            if (namedArg.MemberName == propertyName)
+            {
+                return namedArg.TypedValue.Value?.ToString();
+            }
+
+            return null;
         }
     }
 

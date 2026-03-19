@@ -2225,4 +2225,20 @@ namespace Kuery.Tests.Sqlite
         [Column("name")]
         public string Name { get; set; }
     }
+
+    class DataAnnotationsRequiredModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string RequiredName { get; set; }
+    }
+
+    public class OrmAttributeCompatibilityTest
+    {
+        [Fact]
+        public void RequiredAttributeIsMarkedNotNull()
+        {
+            var property = typeof(DataAnnotationsRequiredModel).GetProperty(nameof(DataAnnotationsRequiredModel.RequiredName));
+            Assert.True(Orm.IsMarkedNotNull(property));
+        }
+    }
 }

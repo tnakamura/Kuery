@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Common;
 using Xunit;
 
@@ -30,6 +32,27 @@ namespace Kuery.Tests.Sqlite
             Assert.Equal("AGoodTableName", mapping.TableName);
             Assert.Equal("Id", mapping.Columns[0].Name);
             Assert.Equal("AGoodColumnName", mapping.Columns[1].Name);
+        }
+
+        [Table("DataAnnotationsTable")]
+        class DataAnnotationsModel
+        {
+            [Kuery.Column("CustomId")]
+            public int Id { get; set; }
+
+            [Column("NameByDataAnnotations")]
+            [Required]
+            public string Name { get; set; }
+        }
+
+        [Fact]
+        public void SupportsDataAnnotationsSchemaAndRequired()
+        {
+            var mapping = SqlMapper.GetMapping<DataAnnotationsModel>();
+            Assert.Equal("DataAnnotationsTable", mapping.TableName);
+            Assert.Equal("CustomId", mapping.Columns[0].Name);
+            Assert.Equal("NameByDataAnnotations", mapping.Columns[1].Name);
+            Assert.False(mapping.Columns[1].IsNullable);
         }
 
         class OverrideNamesBase
@@ -180,4 +203,3 @@ namespace Kuery.Tests.Sqlite
         }
     }
 }
-
