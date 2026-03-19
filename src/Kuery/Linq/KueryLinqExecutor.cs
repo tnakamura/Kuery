@@ -62,6 +62,44 @@ namespace Kuery.Linq
             return await ExecuteCoreAsync(context.Connection, selectModel, selectGenerated, resultType, cancellationToken).ConfigureAwait(false);
         }
 
+        public int ExecuteDelete(KueryQueryContext context, Expression expression)
+        {
+            Requires.NotNull(context, nameof(context));
+            Requires.NotNull(expression, nameof(expression));
+
+            var model = BuildQueryModel(context, expression);
+            if (!(model is SelectQueryModel selectModel))
+            {
+                throw new NotSupportedException("ExecuteDelete does not support set operations.");
+            }
+
+            var dialect = SqlDialectFactory.Create(context.Connection);
+            var generated = _sqlGenerator.GenerateDelete(selectModel, dialect);
+            using (var command = CreateCommand(context.Connection, generated))
+            {
+                return command.ExecuteNonQuery();
+            }
+        }
+
+        public async Task<int> ExecuteDeleteAsync(KueryQueryContext context, Expression expression, CancellationToken cancellationToken)
+        {
+            Requires.NotNull(context, nameof(context));
+            Requires.NotNull(expression, nameof(expression));
+
+            var model = BuildQueryModel(context, expression);
+            if (!(model is SelectQueryModel selectModel))
+            {
+                throw new NotSupportedException("ExecuteDelete does not support set operations.");
+            }
+
+            var dialect = SqlDialectFactory.Create(context.Connection);
+            var generated = _sqlGenerator.GenerateDelete(selectModel, dialect);
+            using (var command = CreateCommand(context.Connection, generated))
+            {
+                return await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+
         public object ExecuteTerminal(KueryQueryContext context, Expression expression)
         {
             return Execute(context, expression, expression.Type);

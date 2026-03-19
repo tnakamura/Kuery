@@ -302,5 +302,87 @@ namespace Kuery.Tests.SqlClient
                     .ToList();
             });
         }
+
+        [Fact]
+        public void QueryEntryPointExecuteDeleteDeletesMatchingRows()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateTables(con);
+
+            con.Insert(new Product
+            {
+                Name = "A",
+                Price = 20,
+            });
+
+            con.Insert(new Product
+            {
+                Name = "B",
+                Price = 10,
+            });
+
+            con.Insert(new Product
+            {
+                Name = "C",
+                Price = 5,
+            });
+
+            var deleted = con.Query<Product>()
+                .Where(p => p.Price >= 10)
+                .ExecuteDelete();
+
+            Assert.Equal(2, deleted);
+            Assert.Single(con.Query<Product>().ToList());
+            Assert.Equal("C", con.Query<Product>().First().Name);
+        }
+
+        [Fact]
+        public async Task QueryEntryPointExecuteDeleteAsyncDeletesMatchingRows()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateTables(con);
+
+            con.Insert(new Product
+            {
+                Name = "A",
+                Price = 20,
+            });
+
+            con.Insert(new Product
+            {
+                Name = "B",
+                Price = 10,
+            });
+
+            con.Insert(new Product
+            {
+                Name = "C",
+                Price = 5,
+            });
+
+            var deleted = await con.Query<Product>()
+                .Where(p => p.Price >= 10)
+                .ExecuteDeleteAsync();
+
+            Assert.Equal(2, deleted);
+            Assert.Single(con.Query<Product>().ToList());
+            Assert.Equal("C", con.Query<Product>().First().Name);
+        }
+
+        [Fact]
+        public void QueryEntryPointExecuteDeleteRequiresWherePredicate()
+        {
+            using var con = fixture.OpenNewConnection();
+            CreateTables(con);
+
+            con.Insert(new Product
+            {
+                Name = "A",
+                Price = 20,
+            });
+
+            var ex = Assert.Throws<InvalidOperationException>(() => con.Query<Product>().ExecuteDelete());
+            Assert.Equal("No condition specified", ex.Message);
+        }
     }
 }

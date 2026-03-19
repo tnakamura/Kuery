@@ -118,6 +118,10 @@ var products = await connection.Query<Product>()
     .Where(p => p.Code == "0001")
     .OrderBy(p => p.Code)
     .ToListAsync();
+
+var deleted = await connection.Query<Product>()
+    .Where(p => p.Id == id)
+    .ExecuteDeleteAsync();
 ```
 
 In the current implementation, SQL translation supports:
@@ -127,6 +131,7 @@ In the current implementation, SQL translation supports:
 - `Skip` / `Take`
 - `Count`
 - `First` / `FirstOrDefault`
+- `ExecuteDelete` / `ExecuteDeleteAsync` (requires `Where`)
 
 Unsupported LINQ operators throw `NotSupportedException`.
 

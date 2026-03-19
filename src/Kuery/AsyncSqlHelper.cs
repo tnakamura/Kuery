@@ -481,6 +481,20 @@ namespace Kuery
             return await query.Where(predicate).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        public static async Task<int> ExecuteDeleteAsync<T>(
+            this IQueryable<T> query,
+            CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(query, nameof(query));
+
+            if (TryGetKueryProvider(query, out var provider))
+            {
+                return await provider.ExecuteDeleteAsync(query.Expression, cancellationToken).ConfigureAwait(false);
+            }
+
+            throw new NotSupportedException("ExecuteDeleteAsync is supported only for queries created by Kuery Query<T>().");
+        }
+
         private static bool TryGetKueryProvider<T>(IQueryable<T> query, out KueryQueryProvider provider)
         {
             provider = query.Provider as KueryQueryProvider;

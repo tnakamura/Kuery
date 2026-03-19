@@ -60,6 +60,26 @@ namespace Kuery.Linq
             return new GeneratedSql(sql, parameters);
         }
 
+        internal GeneratedSql GenerateDelete(SelectQueryModel model, ISqlDialect dialect)
+        {
+            if (model == null) throw new ArgumentNullException(nameof(model));
+            if (dialect == null) throw new ArgumentNullException(nameof(dialect));
+
+            ValidateDeleteModel(model);
+            if (model.Predicate == null)
+            {
+                throw new InvalidOperationException("No condition specified");
+            }
+
+            var parameters = new List<object>();
+            var sql = new StringBuilder();
+            sql.Append("delete from ");
+            sql.Append(dialect.EscapeIdentifier(model.Table.TableName));
+            sql.Append(" where ");
+            sql.Append(_predicateTranslator.Translate(model.Predicate, model.Table, dialect, parameters));
+            return new GeneratedSql(sql.ToString(), parameters);
+        }
+
         internal string GenerateSubquery(SelectQueryModel model, ISqlDialect dialect, List<object> parameters)
         {
             return GenerateCore(model, dialect, parameters);
@@ -555,6 +575,49 @@ namespace Kuery.Linq
                 case ExpressionType.LessThanOrEqual: return "<=";
                 default:
                     throw new NotSupportedException($"Unsupported operator: {expressionType}.");
+            }
+        }
+
+        private static void ValidateDeleteModel(SelectQueryModel model)
+        {
+            if (model.Terminal != QueryTerminalKind.Sequence)
+            {
+                throw new NotSupportedException("ExecuteDelete does not support terminal operators.");
+            }
+
+            if (model.Joins != null && model.Joins.Count > 0)
+            {
+                throw new NotSupportedException("ExecuteDelete does not support Join.");
+            }
+
+            if (model.GroupByColumns != null && model.GroupByColumns.Count > 0)
+            {
+                throw new NotSupportedException("ExecuteDelete does not support GroupBy.");
+            }
+
+            if (model.HavingPredicate != null)
+            {
+                throw new NotSupportedException("ExecuteDelete does not support Having.");
+            }
+
+            if (model.IsDistinct)
+            {
+                throw new NotSupportedException("ExecuteDelete does not support Distinct.");
+            }
+
+            if (model.Skip.HasValue || model.Take.HasValue)
+            {
+                throw new NotSupportedException("ExecuteDelete does not support Skip/Take.");
+            }
+
+            if (model.Orderings != null && model.Orderings.Count > 0)
+            {
+                throw new NotSupportedException("ExecuteDelete does not support OrderBy.");
+            }
+
+            if (model.Projection != null || (model.ProjectedColumns != null && model.ProjectedColumns.Count > 0))
+            {
+                throw new NotSupportedException("ExecuteDelete does not support Select projection.");
             }
         }
     }

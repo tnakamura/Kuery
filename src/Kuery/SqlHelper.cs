@@ -26,6 +26,18 @@ namespace Kuery
             return new KueryQueryable<T>(provider);
         }
 
+        public static int ExecuteDelete<T>(this IQueryable<T> query)
+        {
+            Requires.NotNull(query, nameof(query));
+
+            if (TryGetKueryProvider(query, out var provider))
+            {
+                return provider.ExecuteDelete(query.Expression);
+            }
+
+            throw new NotSupportedException("ExecuteDelete is supported only for queries created by Kuery Query<T>().");
+        }
+
         public static int Insert<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
         {
             return connection.Insert(typeof(T), item, transaction);

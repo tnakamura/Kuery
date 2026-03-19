@@ -52,6 +52,18 @@ namespace Kuery
             return (TResult)_executor.Execute(_context, expression, typeof(TResult));
         }
 
+        internal int ExecuteDelete(Expression expression)
+        {
+            Requires.NotNull(expression, nameof(expression));
+            return _executor.ExecuteDelete(_context, expression);
+        }
+
+        internal Task<int> ExecuteDeleteAsync(Expression expression, CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(expression, nameof(expression));
+            return _executor.ExecuteDeleteAsync(_context, expression, cancellationToken);
+        }
+
         internal object BuildQueryModel(Expression expression)
         {
             Requires.NotNull(expression, nameof(expression));

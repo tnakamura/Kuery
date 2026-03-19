@@ -13,6 +13,10 @@ namespace Kuery.Linq
 
         Task<object> ExecuteAsync(KueryQueryContext context, Expression expression, Type resultType, CancellationToken cancellationToken);
 
+        int ExecuteDelete(KueryQueryContext context, Expression expression);
+
+        Task<int> ExecuteDeleteAsync(KueryQueryContext context, Expression expression, CancellationToken cancellationToken);
+
         object ExecuteTerminal(KueryQueryContext context, Expression expression);
 
         Task<object> ExecuteTerminalAsync(KueryQueryContext context, Expression expression, CancellationToken cancellationToken);
