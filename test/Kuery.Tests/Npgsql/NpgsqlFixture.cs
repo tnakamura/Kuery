@@ -109,25 +109,28 @@ namespace Kuery.Tests.Npgsql
         private void DeleteDatabase()
         {
             var databaseIdentifier = QuoteIdentifier(Database);
-            var databaseLiteral = QuoteLiteral(Database);
             using (var connection = CreateConnection(masterDatabase))
             {
                 connection.Open();
-                ExecuteNonQuery(connection, $"UPDATE pg_database SET datallowconn = 'false' WHERE datname = {databaseLiteral}");
+                ExecuteNonQuery(connection, "UPDATE pg_database SET datallowconn = 'false' WHERE datname = @databaseName", Database);
                 ExecuteNonQuery(connection, $"ALTER DATABASE {databaseIdentifier} CONNECTION LIMIT 1");
                 ExecuteNonQuery(connection, $@"
 SELECT pg_terminate_backend(pg_stat_activity.pid)
 FROM pg_stat_activity
-WHERE datname = {databaseLiteral}");
+WHERE datname = @databaseName", Database);
                 ExecuteNonQuery(connection, $"DROP DATABASE IF EXISTS {databaseIdentifier}");
             }
         }
 
-        private static void ExecuteNonQuery(global::Npgsql.NpgsqlConnection connection, string commandText)
+        private static void ExecuteNonQuery(global::Npgsql.NpgsqlConnection connection, string commandText, string parameterValue = null)
         {
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = commandText;
+                if (parameterValue != null)
+                {
+                    command.Parameters.AddWithValue("databaseName", parameterValue);
+                }
                 command.ExecuteNonQuery();
             }
         }
@@ -135,13 +138,14 @@ WHERE datname = {databaseLiteral}");
         private static string QuoteIdentifier(string name)
         {
             if (name == null) throw new ArgumentNullException(nameof(name));
+            foreach (var c in name)
+            {
+                if (!(char.IsLetterOrDigit(c) || c == '_'))
+                {
+                    throw new ArgumentException("Database name contains unsupported characters.", nameof(name));
+                }
+            }
             return $"\"{name.Replace("\"", "\"\"")}\"";
-        }
-
-        private static string QuoteLiteral(string value)
-        {
-            if (value == null) throw new ArgumentNullException(nameof(value));
-            return $"'{value.Replace("'", "''")}'";
         }
 
         private static string ReadStringSetting(string name, string defaultValue)
