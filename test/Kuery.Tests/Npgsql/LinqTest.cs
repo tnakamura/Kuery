@@ -286,7 +286,7 @@ namespace Kuery.Tests.Npgsql
         }
 
         [Fact]
-        public void QueryEntryPointThrowsForUnsupportedSelect()
+        public void QueryEntryPointSupportsSelect()
         {
             using var con = fixture.OpenNewConnection();
             CreateTables(con);
@@ -297,12 +297,12 @@ namespace Kuery.Tests.Npgsql
                 Price = 20,
             });
 
-            Assert.Throws<NotSupportedException>(() =>
-            {
-                var values = con.Query<Product>()
-                    .Select(x => x.Name)
-                    .ToList();
-            });
+            var values = con.Query<Product>()
+                .Select(x => x.Name)
+                .ToList();
+
+            Assert.Single(values);
+            Assert.Equal("A", values[0]);
         }
 
         [Fact]
