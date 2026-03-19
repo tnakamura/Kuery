@@ -6,6 +6,7 @@ namespace Kuery.Tests.Npgsql
     public class NpgsqlFixture : IDisposable
     {
         public string Database { get; }
+        static readonly global::Npgsql.NpgsqlCommandBuilder CommandBuilder = new global::Npgsql.NpgsqlCommandBuilder();
 
         readonly string host;
         readonly int port;
@@ -142,7 +143,7 @@ WHERE datname = @databaseName", "databaseName", Database);
         }
 
         private static string QuoteIdentifier(string name) =>
-            new global::Npgsql.NpgsqlCommandBuilder().QuoteIdentifier(name);
+            CommandBuilder.QuoteIdentifier(name);
 
         private static string ReadStringSetting(string name, string defaultValue)
         {
