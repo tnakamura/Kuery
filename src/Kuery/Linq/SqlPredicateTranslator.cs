@@ -19,6 +19,16 @@ namespace Kuery.Linq
             return TranslateCore(expression, table, dialect, parameters);
         }
 
+        internal string TranslateColumnOrValueExpression(Expression expression, TableMapping table, ISqlDialect dialect, List<object> parameters)
+        {
+            if (expression == null) throw new ArgumentNullException(nameof(expression));
+            if (table == null) throw new ArgumentNullException(nameof(table));
+            if (dialect == null) throw new ArgumentNullException(nameof(dialect));
+            if (parameters == null) throw new ArgumentNullException(nameof(parameters));
+
+            return TranslateColumnOrValue(expression, table, dialect, parameters);
+        }
+
         private static string TranslateCore(Expression expression, TableMapping table, ISqlDialect dialect, List<object> parameters)
         {
             switch (expression.NodeType)

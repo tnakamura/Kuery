@@ -495,6 +495,25 @@ namespace Kuery
             throw new NotSupportedException("ExecuteDeleteAsync is supported only for queries created by Kuery Query<T>().");
         }
 
+        public static async Task<int> ExecuteUpdateAsync<T>(
+            this IQueryable<T> query,
+            Func<SetPropertyCalls<T>, SetPropertyCalls<T>> setPropertyCalls,
+            CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(query, nameof(query));
+            Requires.NotNull(setPropertyCalls, nameof(setPropertyCalls));
+
+            var setters = setPropertyCalls(new SetPropertyCalls<T>());
+            Requires.NotNull(setters, nameof(setPropertyCalls));
+
+            if (TryGetKueryProvider(query, out var provider))
+            {
+                return await provider.ExecuteUpdateAsync(query.Expression, setters.Setters, cancellationToken).ConfigureAwait(false);
+            }
+
+            throw new NotSupportedException("ExecuteUpdateAsync is supported only for queries created by Kuery Query<T>().");
+        }
+
         private static bool TryGetKueryProvider<T>(IQueryable<T> query, out KueryQueryProvider provider)
         {
             provider = query.Provider as KueryQueryProvider;
@@ -707,4 +726,3 @@ namespace Kuery
         }
     }
 }
-

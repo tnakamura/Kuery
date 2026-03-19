@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
@@ -62,6 +63,23 @@ namespace Kuery
         {
             Requires.NotNull(expression, nameof(expression));
             return _executor.ExecuteDeleteAsync(_context, expression, cancellationToken);
+        }
+
+        internal int ExecuteUpdate(Expression expression, IReadOnlyList<SetPropertyCall> setters)
+        {
+            Requires.NotNull(expression, nameof(expression));
+            Requires.NotNull(setters, nameof(setters));
+            return _executor.ExecuteUpdate(_context, expression, setters);
+        }
+
+        internal Task<int> ExecuteUpdateAsync(
+            Expression expression,
+            IReadOnlyList<SetPropertyCall> setters,
+            CancellationToken cancellationToken = default)
+        {
+            Requires.NotNull(expression, nameof(expression));
+            Requires.NotNull(setters, nameof(setters));
+            return _executor.ExecuteUpdateAsync(_context, expression, setters, cancellationToken);
         }
 
         internal object BuildQueryModel(Expression expression)
