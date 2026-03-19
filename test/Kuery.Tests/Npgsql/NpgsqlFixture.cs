@@ -122,31 +122,27 @@ WHERE datname = @databaseName", "databaseName", Database);
             }
         }
 
-        private static void ExecuteNonQuery(global::Npgsql.NpgsqlConnection connection, string commandText, string parameterName = null, string parameterValue = null)
+        private static void ExecuteNonQuery(global::Npgsql.NpgsqlConnection connection, string commandText)
         {
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = commandText;
-                if (parameterName != null)
-                {
-                    command.Parameters.AddWithValue(parameterName, parameterValue ?? (object)DBNull.Value);
-                }
                 command.ExecuteNonQuery();
             }
         }
 
-        private static string QuoteIdentifier(string name)
+        private static void ExecuteNonQuery(global::Npgsql.NpgsqlConnection connection, string commandText, string parameterName, object parameterValue)
         {
-            if (name == null) throw new ArgumentNullException(nameof(name));
-            foreach (var c in name)
+            using (var command = connection.CreateCommand())
             {
-                if (!char.IsLetterOrDigit(c) && c != '_')
-                {
-                    throw new ArgumentException("Database name contains unsupported characters.", nameof(name));
-                }
+                command.CommandText = commandText;
+                command.Parameters.AddWithValue(parameterName, parameterValue ?? DBNull.Value);
+                command.ExecuteNonQuery();
             }
-            return $"\"{name}\"";
         }
+
+        private static string QuoteIdentifier(string name) =>
+            new global::Npgsql.NpgsqlCommandBuilder().QuoteIdentifier(name);
 
         private static string ReadStringSetting(string name, string defaultValue)
         {
