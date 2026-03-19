@@ -94,12 +94,13 @@ namespace Kuery.Tests.Npgsql
 
         private void CreateDatabase()
         {
+            var databaseIdentifier = QuoteIdentifier(Database);
             using (var connection = CreateConnection(masterDatabase))
             {
                 connection.Open();
                 using (var command = connection.CreateCommand())
                 {
-                    command.CommandText = $"CREATE DATABASE \"{Database}\"";
+                    command.CommandText = $"CREATE DATABASE {databaseIdentifier}";
                     command.ExecuteNonQuery();
                 }
             }
@@ -107,16 +108,18 @@ namespace Kuery.Tests.Npgsql
 
         private void DeleteDatabase()
         {
+            var databaseIdentifier = QuoteIdentifier(Database);
+            var databaseLiteral = QuoteLiteral(Database);
             using (var connection = CreateConnection(masterDatabase))
             {
                 connection.Open();
-                ExecuteNonQuery(connection, $"UPDATE pg_database SET datallowconn = 'false' WHERE datname = '{Database}'");
-                ExecuteNonQuery(connection, $"ALTER DATABASE \"{Database}\" CONNECTION LIMIT 1");
+                ExecuteNonQuery(connection, $"UPDATE pg_database SET datallowconn = 'false' WHERE datname = {databaseLiteral}");
+                ExecuteNonQuery(connection, $"ALTER DATABASE {databaseIdentifier} CONNECTION LIMIT 1");
                 ExecuteNonQuery(connection, $@"
 SELECT pg_terminate_backend(pg_stat_activity.pid)
 FROM pg_stat_activity
-WHERE datname = '{Database}'");
-                ExecuteNonQuery(connection, $"DROP DATABASE IF EXISTS \"{Database}\"");
+WHERE datname = {databaseLiteral}");
+                ExecuteNonQuery(connection, $"DROP DATABASE IF EXISTS {databaseIdentifier}");
             }
         }
 
@@ -128,6 +131,12 @@ WHERE datname = '{Database}'");
                 command.ExecuteNonQuery();
             }
         }
+
+        private static string QuoteIdentifier(string name) =>
+            $"\"{name.Replace("\"", "\"\"")}\"";
+
+        private static string QuoteLiteral(string value) =>
+            $"'{value.Replace("'", "''")}'";
 
         private static string ReadStringSetting(string name, string defaultValue)
         {
