@@ -145,7 +145,7 @@ WHERE datname = @databaseName", Database);
                     throw new ArgumentException("Database name contains unsupported characters.", nameof(name));
                 }
             }
-            return $"\"{name.Replace("\"", "\"\"")}\"";
+            return $"\"{name}\"";
         }
 
         private static string ReadStringSetting(string name, string defaultValue)
