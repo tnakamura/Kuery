@@ -133,10 +133,10 @@ WHERE datname = @databaseName", "databaseName", Database);
 
         private static void ExecuteNonQuery(global::Npgsql.NpgsqlConnection connection, string commandText, string parameterName, object parameterValue)
         {
+            if (parameterName == null) throw new ArgumentNullException(nameof(parameterName));
             using (var command = connection.CreateCommand())
             {
                 command.CommandText = commandText;
-                if (parameterName == null) throw new ArgumentNullException(nameof(parameterName));
                 var normalizedParameterName = parameterName.StartsWith("@", StringComparison.Ordinal) ? parameterName : "@" + parameterName;
                 command.Parameters.AddWithValue(normalizedParameterName, parameterValue ?? DBNull.Value);
                 command.ExecuteNonQuery();
@@ -146,11 +146,12 @@ WHERE datname = @databaseName", "databaseName", Database);
         private static string QuoteIdentifier(string name)
         {
             if (name == null) throw new ArgumentNullException(nameof(name));
-            foreach (var c in name)
+            for (var i = 0; i < name.Length; i++)
             {
+                var c = name[i];
                 if (!char.IsLetterOrDigit(c) && c != '_')
                 {
-                    throw new ArgumentException("Database name contains unsupported characters.", nameof(name));
+                    throw new ArgumentException($"Database name contains unsupported character '{c}' at index {i}.", nameof(name));
                 }
             }
             return $"\"{name}\"";
