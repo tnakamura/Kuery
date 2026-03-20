@@ -385,7 +385,8 @@ namespace Kuery.Linq
                     }
                     else if (dialect.Kind == SqlDialectKind.MySql)
                     {
-                        sql.Append(" limit 18446744073709551615");
+                        sql.Append(" limit ");
+                        sql.Append(SqlConstants.MySqlOffsetWithoutLimitMax);
                     }
                     else
                     {

@@ -21,6 +21,10 @@ namespace Kuery.Tests.MySql
         {
             var csb = new MySqlConnectionStringBuilder();
             csb.Server = host;
+            if (port < 0 || port > ushort.MaxValue)
+            {
+                throw new InvalidOperationException($"Invalid MySQL port '{port}'. Expected a value between 0 and {ushort.MaxValue}.");
+            }
             csb.Port = (uint)port;
             csb.UserID = username;
             csb.Password = password;

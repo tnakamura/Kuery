@@ -1123,6 +1123,7 @@ namespace Kuery.Linq
             }
             if (dialect.Kind == SqlDialectKind.MySql)
             {
+                // MySQL returns integer date parts via EXTRACT(...), cast with SIGNED for integral CLR members.
                 var sqlPart = partName.ToUpper();
                 return "cast(EXTRACT(" + sqlPart + " from " + columnSql + ") as signed)";
             }

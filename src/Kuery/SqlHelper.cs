@@ -1583,7 +1583,8 @@ namespace Kuery
             {
                 if (!_limit.HasValue)
                 {
-                    commandText.Append(" limit 18446744073709551615");
+                    commandText.Append(" limit ");
+                    commandText.Append(SqlConstants.MySqlOffsetWithoutLimitMax);
                 }
                 commandText.Append(" offset ");
                 commandText.Append(_offset.Value);
