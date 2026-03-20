@@ -5,6 +5,7 @@ namespace Kuery.Linq
         Sqlite,
         SqlServer,
         PostgreSql,
+        MySql,
     }
 
     internal interface ISqlDialect

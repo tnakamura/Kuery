@@ -51,6 +51,10 @@ namespace Kuery
             {
                 commandText = "SELECT LASTVAL();";
             }
+            else if (connection.IsMySql())
+            {
+                commandText = "SELECT LAST_INSERT_ID();";
+            }
             else
             {
                 commandText = "select @@IDENTITY";
@@ -195,6 +199,10 @@ namespace Kuery
             {
                 return "\"" + name + "\"";
             }
+            if (connection.IsMySql())
+            {
+                return "`" + name + "`";
+            }
             return "[" + name + "]";
         }
 
@@ -233,6 +241,17 @@ namespace Kuery
             }
         }
 
+        internal static bool IsMySql(this IDbConnection connection)
+        {
+            switch (connection.GetType().FullName)
+            {
+                case "MySqlConnector.MySqlConnection":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         internal static string GetParameterPrefix(this IDbConnection connection)
         {
             if (connection.IsSqlite())
@@ -240,6 +259,8 @@ namespace Kuery
             else if (connection.IsSqlServer())
                 return "@";
             else if (connection.IsPostgreSql())
+                return "@";
+            else if (connection.IsMySql())
                 return "@";
             else
                 return "@";
@@ -294,6 +315,10 @@ namespace Kuery
             else if (connection.IsPostgreSql())
             {
                 return connection.CreateInsertOrReplaceCommandForPostgreSql(item, type);
+            }
+            else if (connection.IsMySql())
+            {
+                return connection.CreateInsertOrReplaceCommandForMySql(item, type);
             }
             else
             {
@@ -497,6 +522,73 @@ WHEN NOT MATCHED THEN
                     + ") values ("
                     + values.ToString()
                     + ");";
+            }
+
+            return command;
+        }
+
+        private static IDbCommand CreateInsertOrReplaceCommandForMySql(this IDbConnection connection, object item, Type type)
+        {
+            var map = SqlMapper.GetMapping(type);
+            var command = connection.CreateCommand();
+
+            if (map.InsertOrReplaceColumns.Count == 0 && map.Columns.Count > 0 && map.HasAutoIncPK)
+            {
+                command.CommandText = "insert into "
+                    + "`" + map.TableName + "`"
+                    + " () values ()"
+                    + " on duplicate key update "
+                    + "`" + map.PK.Name + "` = " + "`" + map.PK.Name + "`;";
+            }
+            else
+            {
+                var insertColumns = new StringBuilder();
+                var updateColumns = new StringBuilder();
+                var values = new StringBuilder();
+                for (var i = 0; i < map.InsertOrReplaceColumns.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        insertColumns.Append(",");
+                        updateColumns.Append(",");
+                        values.Append(",");
+                    }
+
+                    var col = map.InsertOrReplaceColumns[i];
+                    insertColumns.Append("`");
+                    insertColumns.Append(col.Name);
+                    insertColumns.Append("`");
+                    updateColumns.Append("`");
+                    updateColumns.Append(col.Name);
+                    updateColumns.Append("` = ");
+
+                    var value = col.GetValue(item);
+                    if (value is null && col.IsNullable)
+                    {
+                        values.Append("NULL");
+                    }
+                    else
+                    {
+                        var parameter = command.CreateParameter();
+                        parameter.ParameterName = connection.GetParameterName(col.Name);
+                        parameter.Value = col.GetValue(item);
+                        command.Parameters.Add(parameter);
+
+                        values.Append(parameter.ParameterName);
+                        updateColumns.Append(parameter.ParameterName);
+                    }
+                }
+
+                command.CommandText = "insert into "
+                    + "`" + map.TableName + "`"
+                    + " ("
+                    + insertColumns.ToString()
+                    + ") values ("
+                    + values.ToString()
+                    + ")"
+                    + " on duplicate key update "
+                    + updateColumns.ToString()
+                    + ";";
             }
 
             return command;

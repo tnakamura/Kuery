@@ -1059,8 +1059,15 @@ namespace Kuery.Linq
             }
             if (leftSql != null && rightSql != null)
             {
-                var concatOp = dialect.Kind == SqlDialectKind.SqlServer ? " + " : " || ";
-                return "(" + leftSql + concatOp + rightSql + ")";
+                if (dialect.Kind == SqlDialectKind.SqlServer)
+                {
+                    return "(" + leftSql + " + " + rightSql + ")";
+                }
+                if (dialect.Kind == SqlDialectKind.MySql)
+                {
+                    return "concat(" + leftSql + ", " + rightSql + ")";
+                }
+                return "(" + leftSql + " || " + rightSql + ")";
             }
             return null;
         }
@@ -1074,6 +1081,10 @@ namespace Kuery.Linq
             if (dialect.Kind == SqlDialectKind.PostgreSql)
             {
                 return "(strpos(" + columnSql + ", " + paramName + ") > 0)";
+            }
+            if (dialect.Kind == SqlDialectKind.MySql)
+            {
+                return "(instr(" + columnSql + ", " + paramName + ") > 0)";
             }
             return "(instr(" + columnSql + ", " + paramName + ") > 0)";
         }
@@ -1091,6 +1102,10 @@ namespace Kuery.Linq
             {
                 return "(strpos(" + columnSql + ", " + paramName + ") - 1)";
             }
+            if (dialect.Kind == SqlDialectKind.MySql)
+            {
+                return "(instr(" + columnSql + ", " + paramName + ") - 1)";
+            }
             return "(instr(" + columnSql + ", " + paramName + ") - 1)";
         }
 
@@ -1105,6 +1120,11 @@ namespace Kuery.Linq
             {
                 var sqlPart = partName.ToLower();
                 return "cast(EXTRACT(" + sqlPart + " from " + columnSql + ") as integer)";
+            }
+            if (dialect.Kind == SqlDialectKind.MySql)
+            {
+                var sqlPart = partName.ToUpper();
+                return "cast(EXTRACT(" + sqlPart + " from " + columnSql + ") as signed)";
             }
             // SQLite: use strftime
             string format;
@@ -1142,6 +1162,10 @@ namespace Kuery.Linq
                     {
                         return "(" + columnSql + " ilike (" + paramName + " || '%'))";
                     }
+                    if (dialect.Kind == SqlDialectKind.MySql)
+                    {
+                        return "(" + columnSql + " like concat(" + paramName + ", '%'))";
+                    }
                     return "(" + columnSql + " like (" + paramName + " || '%'))";
                 default:
                     throw new NotSupportedException($"Unsupported StringComparison: {comparison}");
@@ -1168,6 +1192,10 @@ namespace Kuery.Linq
                     if (dialect.Kind == SqlDialectKind.PostgreSql)
                     {
                         return "(" + columnSql + " ilike ('%' || " + paramName + "))";
+                    }
+                    if (dialect.Kind == SqlDialectKind.MySql)
+                    {
+                        return "(" + columnSql + " like concat('%', " + paramName + "))";
                     }
                     return "(" + columnSql + " like ('%' || " + paramName + "))";
                 default:
@@ -1220,6 +1248,7 @@ namespace Kuery.Linq
         {
             if (dialect.Kind == SqlDialectKind.SqlServer) return "FLOOR(" + inner + ")";
             if (dialect.Kind == SqlDialectKind.PostgreSql) return "floor(" + inner + ")";
+            if (dialect.Kind == SqlDialectKind.MySql) return "FLOOR(" + inner + ")";
             return "(case when " + inner + " = cast(" + inner + " as integer) then cast(" + inner + " as integer) when " + inner + " < 0 then cast(" + inner + " as integer) - 1 else cast(" + inner + " as integer) end)";
         }
 
@@ -1227,6 +1256,7 @@ namespace Kuery.Linq
         {
             if (dialect.Kind == SqlDialectKind.SqlServer) return "CEILING(" + inner + ")";
             if (dialect.Kind == SqlDialectKind.PostgreSql) return "ceil(" + inner + ")";
+            if (dialect.Kind == SqlDialectKind.MySql) return "CEILING(" + inner + ")";
             return "(case when " + inner + " = cast(" + inner + " as integer) then cast(" + inner + " as integer) when " + inner + " > 0 then cast(" + inner + " as integer) + 1 else cast(" + inner + " as integer) end)";
         }
 
@@ -1263,6 +1293,7 @@ namespace Kuery.Linq
         {
             if (dialect.Kind == SqlDialectKind.SqlServer) return "LOG(" + inner + ")";
             if (dialect.Kind == SqlDialectKind.PostgreSql) return "ln(" + inner + ")";
+            if (dialect.Kind == SqlDialectKind.MySql) return "LOG(" + inner + ")";
             return "ln(" + inner + ")";
         }
 
@@ -1277,12 +1308,17 @@ namespace Kuery.Linq
             {
                 return "(ln(" + inner + ") / ln(" + baseParam + "))";
             }
+            if (dialect.Kind == SqlDialectKind.MySql)
+            {
+                return "LOG(" + baseParam + ", " + inner + ")";
+            }
             return "(ln(" + inner + ") / ln(" + baseParam + "))";
         }
 
         private static string BuildLog10(string inner, ISqlDialect dialect)
         {
             if (dialect.Kind == SqlDialectKind.SqlServer) return "LOG10(" + inner + ")";
+            if (dialect.Kind == SqlDialectKind.MySql) return "LOG10(" + inner + ")";
             return "log10(" + inner + ")";
         }
 
@@ -1295,6 +1331,10 @@ namespace Kuery.Linq
             if (dialect.Kind == SqlDialectKind.PostgreSql)
             {
                 return "date_trunc('day', " + columnSql + ")";
+            }
+            if (dialect.Kind == SqlDialectKind.MySql)
+            {
+                return "cast(date(" + columnSql + ") as datetime)";
             }
             // SQLite: use strftime to produce datetime format consistent with parameter format
             return "strftime('%Y-%m-%d 00:00:00', " + columnSql + ")";
@@ -1312,6 +1352,11 @@ namespace Kuery.Linq
             {
                 // PostgreSQL EXTRACT(dow FROM ...) returns 0=Sunday..6=Saturday (same as .NET)
                 return "cast(EXTRACT(dow from " + columnSql + ") as integer)";
+            }
+            if (dialect.Kind == SqlDialectKind.MySql)
+            {
+                // MySQL DAYOFWEEK(...) returns 1=Sunday..7=Saturday
+                return "(DAYOFWEEK(" + columnSql + ") - 1)";
             }
             // SQLite: strftime('%w', ...) returns 0=Sunday..6=Saturday (same as .NET)
             return "cast(strftime('%w', " + columnSql + ") as integer)";
@@ -1343,15 +1388,15 @@ namespace Kuery.Linq
                 case nameof(Convert.ToInt16):
                     return dialect.Kind == SqlDialectKind.SqlServer ? "int" : "integer";
                 case nameof(Convert.ToInt64):
-                    return dialect.Kind == SqlDialectKind.SqlServer ? "bigint" : "integer";
+                    return dialect.Kind == SqlDialectKind.SqlServer || dialect.Kind == SqlDialectKind.MySql ? "bigint" : "integer";
                 case nameof(Convert.ToDouble):
-                    return dialect.Kind == SqlDialectKind.SqlServer ? "float" : "real";
+                    return dialect.Kind == SqlDialectKind.SqlServer ? "float" : dialect.Kind == SqlDialectKind.MySql ? "double" : "real";
                 case nameof(Convert.ToSingle):
                     return "real";
                 case nameof(Convert.ToBoolean):
-                    return dialect.Kind == SqlDialectKind.SqlServer ? "bit" : "integer";
+                    return dialect.Kind == SqlDialectKind.SqlServer ? "bit" : dialect.Kind == SqlDialectKind.MySql ? "unsigned" : "integer";
                 case nameof(Convert.ToString):
-                    return dialect.Kind == SqlDialectKind.SqlServer ? "nvarchar(max)" : "text";
+                    return dialect.Kind == SqlDialectKind.SqlServer ? "nvarchar(max)" : dialect.Kind == SqlDialectKind.MySql ? "char" : "text";
                 default:
                     return null;
             }
@@ -1361,6 +1406,7 @@ namespace Kuery.Linq
         {
             if (dialect.Kind == SqlDialectKind.SqlServer) return "GETDATE()";
             if (dialect.Kind == SqlDialectKind.PostgreSql) return "LOCALTIMESTAMP";
+            if (dialect.Kind == SqlDialectKind.MySql) return "NOW()";
             return "datetime('now', 'localtime')";
         }
 
@@ -1368,6 +1414,7 @@ namespace Kuery.Linq
         {
             if (dialect.Kind == SqlDialectKind.SqlServer) return "GETUTCDATE()";
             if (dialect.Kind == SqlDialectKind.PostgreSql) return "(NOW() AT TIME ZONE 'UTC')";
+            if (dialect.Kind == SqlDialectKind.MySql) return "UTC_TIMESTAMP()";
             return "datetime('now')";
         }
 
@@ -1394,6 +1441,22 @@ namespace Kuery.Linq
                     default: throw new NotSupportedException($"Unsupported date part: {partName}");
                 }
                 return "(" + columnSql + " + make_interval(" + unit + " => " + paramName + "))";
+            }
+            if (dialect.Kind == SqlDialectKind.MySql)
+            {
+                var paramName = AddParameter(dialect, parameters, amount);
+                string unit;
+                switch (partName)
+                {
+                    case "day": unit = "DAY"; break;
+                    case "month": unit = "MONTH"; break;
+                    case "year": unit = "YEAR"; break;
+                    case "hour": unit = "HOUR"; break;
+                    case "minute": unit = "MINUTE"; break;
+                    case "second": unit = "SECOND"; break;
+                    default: throw new NotSupportedException($"Unsupported date part: {partName}");
+                }
+                return "DATE_ADD(" + columnSql + ", INTERVAL " + paramName + " " + unit + ")";
             }
             // SQLite
             var n = Convert.ToDouble(amount);

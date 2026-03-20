@@ -1,6 +1,7 @@
 ﻿#nullable enable
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
+using MySqlConnector;
 
 namespace Kuery.Tests
 {
@@ -31,6 +32,15 @@ namespace Kuery.Tests
             {
                 command.CommandText = $@"
                     drop table if exists [{tableName}];";
+                command.ExecuteNonQuery();
+            }
+        }
+
+        public static void DropTable(this MySqlConnection connection, string tableName)
+        {
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = $"drop table if exists `{tableName}`;";
                 command.ExecuteNonQuery();
             }
         }

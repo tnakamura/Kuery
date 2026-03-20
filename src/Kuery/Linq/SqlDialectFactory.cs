@@ -19,6 +19,11 @@ namespace Kuery.Linq
                 return new PostgreSqlDialect();
             }
 
+            if (connection.IsMySql())
+            {
+                return new MySqlDialect();
+            }
+
             return new SqliteDialect();
         }
     }

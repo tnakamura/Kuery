@@ -23,6 +23,12 @@ export KUERY_TEST_SQLSERVER_USERNAME="${KUERY_TEST_SQLSERVER_USERNAME:-sa}"
 export KUERY_TEST_SQLSERVER_PASSWORD="${KUERY_TEST_SQLSERVER_PASSWORD:-${SQL_PASSWORD}}"
 export KUERY_TEST_SQLSERVER_MASTER_DB="${KUERY_TEST_SQLSERVER_MASTER_DB:-master}"
 
+export KUERY_TEST_MYSQL_HOST="localhost"
+export KUERY_TEST_MYSQL_PORT="33060"
+export KUERY_TEST_MYSQL_USERNAME="${KUERY_TEST_MYSQL_USERNAME:-root}"
+export KUERY_TEST_MYSQL_PASSWORD="${KUERY_TEST_MYSQL_PASSWORD:-mysql}"
+export KUERY_TEST_MYSQL_MASTER_DB="${KUERY_TEST_MYSQL_MASTER_DB:-mysql}"
+
 cleanup() {
   docker compose -f "${COMPOSE_FILE}" down --volumes --remove-orphans >/dev/null 2>&1 || true
 }
@@ -31,4 +37,4 @@ trap cleanup EXIT
 docker compose -f "${COMPOSE_FILE}" up -d --wait
 
 cd "${REPO_ROOT}"
-dotnet test test/Kuery.Tests/Kuery.Tests.csproj --filter "(FullyQualifiedName~Kuery.Tests.SqlClient|FullyQualifiedName~Kuery.Tests.Npgsql)" "$@"
+dotnet test test/Kuery.Tests/Kuery.Tests.csproj --filter "(FullyQualifiedName~Kuery.Tests.SqlClient|FullyQualifiedName~Kuery.Tests.Npgsql|FullyQualifiedName~Kuery.Tests.MySql)" "$@"
