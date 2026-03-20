@@ -100,6 +100,7 @@ namespace Kuery
                 {
                     return (long)d;
                 }
+                // MySQL may return UInt64 for LAST_INSERT_ID(), so use conversion instead of direct cast.
                 return Convert.ToInt64(result);
             }
         }
