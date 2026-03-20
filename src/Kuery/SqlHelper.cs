@@ -100,7 +100,8 @@ namespace Kuery
                 {
                     return (long)d;
                 }
-                return (long)command.ExecuteScalar();
+                // MySQL may return UInt64 for LAST_INSERT_ID(), so use conversion instead of direct cast.
+                return Convert.ToInt64(result);
             }
         }
 
@@ -1362,6 +1363,10 @@ namespace Kuery
             {
                 return GenerateCommandForPostgreSql(selectionList);
             }
+            else if (Connection.IsMySql())
+            {
+                return GenerateCommandForMySql(selectionList);
+            }
             else
             {
                 return GenerateCommandForSqlite(selectionList);
@@ -1502,6 +1507,85 @@ namespace Kuery
                 if (!_limit.HasValue)
                 {
                     commandText.Append(" limit -1 ");
+                }
+                commandText.Append(" offset ");
+                commandText.Append(_offset.Value);
+            }
+
+            var cmd = Connection.CreateCommand();
+            cmd.CommandText = commandText.ToString();
+            if (args != null)
+            {
+                for (var i = 0; i < args.Count; i++)
+                {
+                    var a = args[i];
+                    if (a == null)
+                    {
+                        continue;
+                    }
+                    var p = cmd.CreateParameter();
+                    p.Value = a;
+                    p.ParameterName = GetParameterName("p" + (i + 1).ToString());
+                    cmd.Parameters.Add(p);
+                }
+            }
+            return cmd;
+        }
+
+        private IDbCommand GenerateCommandForMySql(string selectionList)
+        {
+            if (_joinInner != null && _joinOuter != null)
+            {
+                throw new NotSupportedException("Joins are not supported.");
+            }
+
+            var commandText = new StringBuilder();
+            commandText.Append("select ");
+            commandText.Append(selectionList);
+            commandText.Append(" from ");
+            commandText.Append(EscapeLiteral(Table.TableName));
+            commandText.Append(" ");
+
+            List<object> args = null;
+            if (_where != null)
+            {
+                args = new List<object>();
+                var w = CompileExpr(_where, args);
+                commandText.Append(" where ");
+                commandText.Append(w.CommandText);
+            }
+
+            if (_orderBys != null && _orderBys.Count > 0)
+            {
+                commandText.Append(" order by ");
+                commandText.Append(EscapeLiteral(_orderBys[0].ColumnName));
+                if (!_orderBys[0].Ascending)
+                {
+                    commandText.Append(" desc ");
+                }
+                for (var i = 1; i < _orderBys.Count; i++)
+                {
+                    commandText.Append(", ");
+                    commandText.Append(EscapeLiteral(_orderBys[i].ColumnName));
+                    if (!_orderBys[i].Ascending)
+                    {
+                        commandText.Append(" desc ");
+                    }
+                }
+            }
+
+            if (_limit.HasValue)
+            {
+                commandText.Append(" limit ");
+                commandText.Append(_limit.Value);
+            }
+
+            if (_offset.HasValue)
+            {
+                if (!_limit.HasValue)
+                {
+                    commandText.Append(" limit ");
+                    commandText.Append(SqlConstants.MySqlOffsetWithoutLimitMax);
                 }
                 commandText.Append(" offset ");
                 commandText.Append(_offset.Value);
@@ -1762,6 +1846,10 @@ namespace Kuery
                             {
                                 sqlCall = "(" + obj.Value.CommandText + " ilike (" + args[0].CommandText + " || '%'))";
                             }
+                            else if (Connection.IsMySql())
+                            {
+                                sqlCall = "(" + obj.Value.CommandText + " like concat(" + args[0].CommandText + ", '%'))";
+                            }
                             else
                             {
                                 sqlCall = "(" + obj.Value.CommandText + " like (" + args[0].CommandText + " || '%'))";
@@ -1822,6 +1910,10 @@ namespace Kuery
                             else if (Connection.IsPostgreSql())
                             {
                                 sqlCall = "(" + obj.Value.CommandText + " ilike ('%' || " + args[0].CommandText + "))";
+                            }
+                            else if (Connection.IsMySql())
+                            {
+                                sqlCall = "(" + obj.Value.CommandText + " like concat('%', " + args[0].CommandText + "))";
                             }
                             else
                             {

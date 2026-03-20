@@ -202,7 +202,7 @@ IEnumerable<Todo> todos = await connection.QueryAsync<Todo>(
 The test project has three execution modes:
 
 - `fast` (default local workflow): SQLite tests only
-- `integration`: SQL Server + PostgreSQL tests
+- `integration`: SQL Server + PostgreSQL + MySQL tests
 - `all`: fast + integration
 
 ### Fast (SQLite only)
@@ -211,7 +211,7 @@ The test project has three execution modes:
 ./test/run-fast-tests.sh
 ```
 
-### Integration (SQL Server + PostgreSQL)
+### Integration (SQL Server + PostgreSQL + MySQL)
 
 Requires Docker.
 
@@ -219,7 +219,7 @@ Requires Docker.
 ./test/run-integration-tests.sh
 ```
 
-This script starts test databases via `test/docker-compose.test.yml`, runs SQL Server/PostgreSQL tests, then cleans up containers.
+This script starts test databases via `test/docker-compose.test.yml`, runs SQL Server/PostgreSQL/MySQL tests, then cleans up containers.
 
 ### CI
 
@@ -240,6 +240,7 @@ Fixtures now support environment variable overrides.
 
 - PostgreSQL: `KUERY_TEST_PG_HOST`, `KUERY_TEST_PG_PORT`, `KUERY_TEST_PG_USERNAME`, `KUERY_TEST_PG_PASSWORD`, `KUERY_TEST_PG_MASTER_DB`
 - SQL Server: `KUERY_TEST_SQLSERVER_HOST`, `KUERY_TEST_SQLSERVER_INTEGRATED_SECURITY`, `KUERY_TEST_SQLSERVER_USERNAME`, `KUERY_TEST_SQLSERVER_PASSWORD`, `KUERY_TEST_SQLSERVER_MASTER_DB`
+- MySQL: `KUERY_TEST_MYSQL_HOST`, `KUERY_TEST_MYSQL_PORT`, `KUERY_TEST_MYSQL_USERNAME`, `KUERY_TEST_MYSQL_PASSWORD`, `KUERY_TEST_MYSQL_MASTER_DB`
 
 ## Contribution
 
