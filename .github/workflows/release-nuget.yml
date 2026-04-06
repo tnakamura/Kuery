@@ -30,7 +30,7 @@ jobs:
         run: dotnet build --configuration Release --no-restore /p:Version=${{ env.PACKAGE_VERSION }}
 
       - name: Pack
-        run: dotnet pack /home/runner/work/Kuery/Kuery/src/Kuery/Kuery.csproj --configuration Release --no-build --output /home/runner/work/Kuery/Kuery/artifacts /p:Version=${{ env.PACKAGE_VERSION }}
+        run: dotnet pack src/Kuery/Kuery.csproj --configuration Release --no-build --output "${{ github.workspace }}/artifacts" /p:Version=${{ env.PACKAGE_VERSION }}
 
       - name: Push packages to NuGet.org
-        run: dotnet nuget push "/home/runner/work/Kuery/Kuery/artifacts/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push "${{ github.workspace }}/artifacts/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
