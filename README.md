@@ -227,6 +227,7 @@ GitHub Actions runs:
 
 - `fast` job: SQLite-only tests
 - `integration` job: SQL Server + PostgreSQL tests via Docker
+- `Release NuGet Package` workflow: runs when a GitHub Release is published and pushes package(s) to NuGet.org using `NUGET_API_KEY` secret
 
 ### All tests
 
