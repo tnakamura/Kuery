@@ -155,6 +155,14 @@ namespace Kuery.Linq
                 effectiveTake = model.Terminal == QueryTerminalKind.Single || model.Terminal == QueryTerminalKind.SingleOrDefault ? 2 : 1;
             }
 
+            var isLastTerminal = model.Terminal == QueryTerminalKind.Last || model.Terminal == QueryTerminalKind.LastOrDefault;
+            // Skip(n).Last()/LastOrDefault() with no explicit Take is equivalent to plain
+            // Last(): skipping from the front never changes which element is last, so the
+            // offset must not be applied to the reversed-order query built for Last below
+            // (that would instead return an earlier row). Skip(n).Take(m).Last() still needs
+            // its offset since Take bounds the window Last() picks from.
+            var effectiveSkip = (isLastTerminal && !model.Take.HasValue) ? null : model.Skip;
+
             sql.Append("select ");
             if (model.Terminal == QueryTerminalKind.Count || model.Terminal == QueryTerminalKind.LongCount
                 || model.Terminal == QueryTerminalKind.Any || model.Terminal == QueryTerminalKind.All)
@@ -173,7 +181,7 @@ namespace Kuery.Linq
             }
             else
             {
-                if (dialect.Kind == SqlDialectKind.SqlServer && effectiveTake.HasValue && !model.Skip.HasValue)
+                if (dialect.Kind == SqlDialectKind.SqlServer && effectiveTake.HasValue && !effectiveSkip.HasValue)
                 {
                     sql.Append("TOP (");
                     sql.Append(effectiveTake.Value);
@@ -268,14 +276,14 @@ namespace Kuery.Linq
                     ? Expression.AndAlso(model.Predicate, negated)
                     : (Expression)negated;
                 sql.Append(" where ");
-                var predicateSql = _predicateTranslator.Translate(allWhere, model.Table, dialect, parameters);
-                sql.Append(model.Joins != null && model.Joins.Count > 0 ? QualifyColumns(predicateSql, model.Table, dialect) : predicateSql);
+                var predicateSql = _predicateTranslator.Translate(allWhere, model.ElementTable, dialect, parameters);
+                sql.Append(model.Joins != null && model.Joins.Count > 0 ? QualifyColumns(predicateSql, model.ElementTable, dialect) : predicateSql);
             }
             else if (model.Predicate != null)
             {
                 sql.Append(" where ");
-                var predicateSql = _predicateTranslator.Translate(model.Predicate, model.Table, dialect, parameters);
-                sql.Append(model.Joins != null && model.Joins.Count > 0 ? QualifyColumns(predicateSql, model.Table, dialect) : predicateSql);
+                var predicateSql = _predicateTranslator.Translate(model.Predicate, model.ElementTable, dialect, parameters);
+                sql.Append(model.Joins != null && model.Joins.Count > 0 ? QualifyColumns(predicateSql, model.ElementTable, dialect) : predicateSql);
             }
 
             if (model.GroupByColumns != null && model.GroupByColumns.Count > 0)
@@ -298,36 +306,37 @@ namespace Kuery.Linq
                 sql.Append(havingSql);
             }
 
-            AppendOrderBy(sql, model, dialect);
-            AppendPaging(sql, model, effectiveTake, dialect);
+            var didOrder = AppendOrderBy(sql, model, effectiveSkip, dialect);
+            AppendPaging(sql, model, effectiveTake, effectiveSkip, didOrder, dialect);
 
             return sql.ToString();
         }
 
-        private static void AppendOrderBy(StringBuilder sql, SelectQueryModel model, ISqlDialect dialect)
+        private static bool AppendOrderBy(StringBuilder sql, SelectQueryModel model, int? effectiveSkip, ISqlDialect dialect)
         {
             if (model.Terminal == QueryTerminalKind.Count
                 || model.Terminal == QueryTerminalKind.LongCount
                 || model.Terminal == QueryTerminalKind.Any
                 || model.Terminal == QueryTerminalKind.All)
             {
-                return;
+                return false;
             }
 
             var isLast = model.Terminal == QueryTerminalKind.Last || model.Terminal == QueryTerminalKind.LastOrDefault;
 
             if (model.Orderings.Count == 0)
             {
-                if ((model.Skip.HasValue || isLast) && model.Table.PK != null)
+                if ((effectiveSkip.HasValue || isLast) && model.ElementTable.PK != null)
                 {
                     sql.Append(" order by ");
-                    sql.Append(dialect.EscapeIdentifier(model.Table.PK.Name));
+                    sql.Append(dialect.EscapeIdentifier(model.ElementTable.PK.Name));
                     if (isLast)
                     {
                         sql.Append(" desc");
                     }
+                    return true;
                 }
-                return;
+                return false;
             }
 
             sql.Append(" order by ");
@@ -347,16 +356,26 @@ namespace Kuery.Linq
                     sql.Append(" desc");
                 }
             }
+            return true;
         }
 
-        private static void AppendPaging(StringBuilder sql, SelectQueryModel model, int? effectiveTake, ISqlDialect dialect)
+        private static void AppendPaging(StringBuilder sql, SelectQueryModel model, int? effectiveTake, int? effectiveSkip, bool didOrder, ISqlDialect dialect)
         {
             if (dialect.Kind == SqlDialectKind.SqlServer)
             {
-                if (model.Skip.HasValue)
+                if (effectiveSkip.HasValue)
                 {
+                    if (!didOrder)
+                    {
+                        // SQL Server requires an ORDER BY whenever OFFSET/FETCH is used; without
+                        // one (e.g. a table with no primary key and no explicit OrderBy), emitting
+                        // OFFSET here would produce invalid SQL that fails at execution time.
+                        throw new NotSupportedException(
+                            "Skip requires either an explicit OrderBy or a table with a primary key when targeting SQL Server.");
+                    }
+
                     sql.Append(" OFFSET ");
-                    sql.Append(model.Skip.Value);
+                    sql.Append(effectiveSkip.Value);
                     sql.Append(" ROWS");
                     if (effectiveTake.HasValue)
                     {
@@ -375,7 +394,7 @@ namespace Kuery.Linq
                 sql.Append(effectiveTake.Value);
             }
 
-            if (model.Skip.HasValue)
+            if (effectiveSkip.HasValue)
             {
                 if (!effectiveTake.HasValue)
                 {
@@ -395,7 +414,7 @@ namespace Kuery.Linq
                 }
 
                 sql.Append(" offset ");
-                sql.Append(model.Skip.Value);
+                sql.Append(effectiveSkip.Value);
             }
         }
 
@@ -411,7 +430,7 @@ namespace Kuery.Linq
 
                 if (body is MemberExpression member && member.Expression?.NodeType == ExpressionType.Parameter)
                 {
-                    var col = model.Table.FindColumnWithPropertyName(member.Member.Name);
+                    var col = model.ElementTable.FindColumnWithPropertyName(member.Member.Name);
                     if (col != null)
                     {
                         return dialect.EscapeIdentifier(col.Name);
@@ -506,6 +525,30 @@ namespace Kuery.Linq
                 return TranslateHavingOperand(unary.Operand, groupParam, model, dialect, parameters);
             }
 
+            // Where() applied after GroupBy(...).Select(g => new { ... }): the predicate's
+            // parameter is the projected DTO, not the IGrouping. Resolve dto.Member against
+            // the GroupBySelectItem it was projected from instead of the g.Key/g.Count()
+            // patterns below, which only apply before that Select() runs.
+            if (model.GroupBySelectItems != null
+                && expression is MemberExpression dtoMember
+                && dtoMember.Expression == groupParam)
+            {
+                var item = model.GroupBySelectItems.FirstOrDefault(x => x.TargetMemberName == dtoMember.Member.Name);
+                if (item == null)
+                {
+                    throw new NotSupportedException($"Unknown property '{dtoMember.Member.Name}' in Where clause after GroupBy/Select.");
+                }
+                if (item.IsKey)
+                {
+                    return dialect.EscapeIdentifier(item.SourceColumn.Name);
+                }
+                if (item.SourceColumn == null)
+                {
+                    return item.AggregateFunction + "(*)";
+                }
+                return item.AggregateFunction + "(" + dialect.EscapeIdentifier(item.SourceColumn.Name) + ")";
+            }
+
             // Aggregate method calls: g.Count(), g.Sum(x => x.Prop), etc.
             if (expression is MethodCallExpression methodCall
                 && methodCall.Method.DeclaringType == typeof(Enumerable))
@@ -532,7 +575,7 @@ namespace Kuery.Linq
                 && innerMember.Expression == groupParam)
             {
                 var propName = outerMember.Member.Name;
-                var col = model.Table.FindColumnWithPropertyName(propName);
+                var col = model.ElementTable.FindColumnWithPropertyName(propName);
                 if (col != null)
                 {
                     return dialect.EscapeIdentifier(col.Name);
@@ -587,7 +630,7 @@ namespace Kuery.Linq
 
                     if (selectorBody is MemberExpression selectorMember && selectorMember.Expression?.NodeType == ExpressionType.Parameter)
                     {
-                        var col = model.Table.FindColumnWithPropertyName(selectorMember.Member.Name);
+                        var col = model.ElementTable.FindColumnWithPropertyName(selectorMember.Member.Name);
                         if (col != null)
                         {
                             return funcName + "(" + dialect.EscapeIdentifier(col.Name) + ")";

@@ -24,7 +24,14 @@ namespace Kuery.Linq
                 return new MySqlDialect();
             }
 
-            return new SqliteDialect();
+            if (connection.IsSqlite())
+            {
+                return new SqliteDialect();
+            }
+
+            throw new NotSupportedException(
+                $"Unsupported connection type '{connection.GetType().FullName}'. " +
+                "Kuery's LINQ provider supports Microsoft.Data.SqlClient/System.Data.SqlClient, Npgsql, MySqlConnector, and Microsoft.Data.Sqlite/System.Data.Sqlite connections.");
         }
     }
 }

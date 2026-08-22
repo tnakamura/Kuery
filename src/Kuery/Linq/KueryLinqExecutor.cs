@@ -184,7 +184,7 @@ namespace Kuery.Linq
                     case QueryTerminalKind.Min:
                     case QueryTerminalKind.Max:
                     case QueryTerminalKind.Average:
-                        return ExecuteAggregate(command, resultType);
+                        return ExecuteAggregate(command, resultType, model.Terminal);
                     case QueryTerminalKind.First:
                         return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: true);
                     case QueryTerminalKind.FirstOrDefault:
@@ -241,7 +241,7 @@ namespace Kuery.Linq
                     case QueryTerminalKind.Min:
                     case QueryTerminalKind.Max:
                     case QueryTerminalKind.Average:
-                        return await ExecuteAggregateAsync(command, resultType, cancellationToken).ConfigureAwait(false);
+                        return await ExecuteAggregateAsync(command, resultType, model.Terminal, cancellationToken).ConfigureAwait(false);
                     case QueryTerminalKind.First:
                         return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
                     case QueryTerminalKind.FirstOrDefault:
@@ -269,7 +269,7 @@ namespace Kuery.Linq
         {
             using (var command = CreateCommand(connection, generated))
             {
-                return ExecuteSequence(command, model.Table, null, resultType);
+                return ExecuteSequence(command, model.Table, model.Projection, resultType);
             }
         }
 
@@ -282,7 +282,7 @@ namespace Kuery.Linq
         {
             using (var command = CreateCommand(connection, generated))
             {
-                return await ExecuteSequenceAsync(command, model.Table, null, resultType, cancellationToken).ConfigureAwait(false);
+                return await ExecuteSequenceAsync(command, model.Table, model.Projection, resultType, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -853,24 +853,34 @@ namespace Kuery.Linq
             return item;
         }
 
-        private static object ExecuteAggregate(IDbCommand command, Type resultType)
+        private static object ExecuteAggregate(IDbCommand command, Type resultType, QueryTerminalKind terminal)
         {
             var result = command.ExecuteScalar();
-            return ConvertScalar(result, resultType);
+            return ConvertScalar(result, resultType, terminal);
         }
 
-        private static async Task<object> ExecuteAggregateAsync(IDbCommand command, Type resultType, CancellationToken cancellationToken)
+        private static async Task<object> ExecuteAggregateAsync(IDbCommand command, Type resultType, QueryTerminalKind terminal, CancellationToken cancellationToken)
         {
             var result = await command.TryExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-            return ConvertScalar(result, resultType);
+            return ConvertScalar(result, resultType, terminal);
         }
 
-        private static object ConvertScalar(object result, Type resultType)
+        private static object ConvertScalar(object result, Type resultType, QueryTerminalKind terminal)
         {
             if (result is null || result is DBNull)
             {
                 if (resultType.IsValueType)
                 {
+                    // Min/Max/Average over a non-nullable selector match Enumerable's contract
+                    // and throw on an empty sequence; Sum, and any nullable-typed selector,
+                    // return the type's default (0, or null boxed as Nullable<T>) instead.
+                    var isNonNullableMinMaxAvg =
+                        (terminal == QueryTerminalKind.Min || terminal == QueryTerminalKind.Max || terminal == QueryTerminalKind.Average)
+                        && Nullable.GetUnderlyingType(resultType) == null;
+                    if (isNonNullableMinMaxAvg)
+                    {
+                        throw new InvalidOperationException("Sequence contains no elements");
+                    }
                     return Activator.CreateInstance(resultType);
                 }
                 return null;

@@ -125,11 +125,25 @@ namespace Kuery.Linq
         internal SelectQueryModel(TableMapping table)
         {
             Table = table ?? throw new ArgumentNullException(nameof(table));
+            ElementTable = table;
             Orderings = new List<QueryOrdering>();
             Terminal = QueryTerminalKind.Sequence;
         }
 
         internal TableMapping Table { get; }
+
+        /// <summary>
+        /// The table that subsequent Where/OrderBy/Select/GroupBy member accesses should
+        /// resolve column names against. Equal to <see cref="Table"/> until a Join or
+        /// SelectMany whose result selector passes a single side of the join straight
+        /// through (e.g. <c>(o, ol) =&gt; ol</c>) switches the query's effective element type.
+        /// </summary>
+        internal TableMapping ElementTable { get; private set; }
+
+        internal void SetElementTable(TableMapping table)
+        {
+            ElementTable = table ?? throw new ArgumentNullException(nameof(table));
+        }
 
         internal List<JoinClause> Joins { get; private set; }
 
@@ -143,10 +157,15 @@ namespace Kuery.Linq
 
         internal Dictionary<string, TableMapping> JoinShape { get; private set; }
 
-        internal void SetJoinShapeMember(string memberName, TableMapping table)
+        /// <summary>
+        /// Replaces the entire join shape with <paramref name="newShape"/>. Each Join's
+        /// result selector fully determines the query's current composite element shape,
+        /// so members from an earlier join that the latest result selector dropped or
+        /// renamed must not linger.
+        /// </summary>
+        internal void ReplaceJoinShape(Dictionary<string, TableMapping> newShape)
         {
-            if (JoinShape == null) JoinShape = new Dictionary<string, TableMapping>();
-            JoinShape[memberName] = table ?? throw new ArgumentNullException(nameof(table));
+            JoinShape = newShape;
         }
 
         internal LambdaExpression JoinResultSelector { get; private set; }

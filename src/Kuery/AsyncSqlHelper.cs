@@ -97,7 +97,8 @@ namespace Kuery
                 {
                     return (long)d;
                 }
-                return (long)result;
+                // MySQL may return UInt64 for LAST_INSERT_ID(), so use conversion instead of direct cast.
+                return Convert.ToInt64(result);
             }
         }
 
@@ -272,18 +273,20 @@ namespace Kuery
         public static async Task<T> FindAsync<T>(
             this DbConnection connection,
             object pk,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             Requires.NotNull(pk, nameof(pk));
 
             var map = SqlMapper.GetMapping(typeof(T));
-            return await connection.FindAsync<T>(map, pk, cancellationToken).ConfigureAwait(false);
+            return await connection.FindAsync<T>(map, pk, transaction, cancellationToken).ConfigureAwait(false);
         }
 
         private static async Task<T> FindAsync<T>(
             this DbConnection connection,
             TableMapping mapping,
             object pk,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             Requires.NotNull(pk, nameof(pk));
@@ -291,6 +294,7 @@ namespace Kuery
 
             using (var command = connection.CreateGetByPrimaryKeyCommand(mapping, pk))
             {
+                command.Transaction = transaction;
                 var result = await ExecuteQueryAsync<T>(command, mapping, cancellationToken).ConfigureAwait(false);
                 return result.FirstOrDefault();
             }
@@ -319,18 +323,20 @@ namespace Kuery
         public static async Task<T> GetAsync<T>(
             this DbConnection connection,
             object pk,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             Requires.NotNull(pk, nameof(pk));
 
             var map = SqlMapper.GetMapping(typeof(T));
-            return await connection.GetAsync<T>(map, pk, cancellationToken).ConfigureAwait(false);
+            return await connection.GetAsync<T>(map, pk, transaction, cancellationToken).ConfigureAwait(false);
         }
 
         private static async Task<T> GetAsync<T>(
             this DbConnection connection,
             TableMapping mapping,
             object pk,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             Requires.NotNull(pk, nameof(pk));
@@ -338,6 +344,7 @@ namespace Kuery
 
             using (var command = connection.CreateGetByPrimaryKeyCommand(mapping, pk))
             {
+                command.Transaction = transaction;
                 var result = await ExecuteQueryAsync<T>(command, mapping, cancellationToken).ConfigureAwait(false);
                 return result.First();
             }
@@ -383,10 +390,12 @@ namespace Kuery
             this DbConnection connection,
             string sql,
             object param = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
+                command.Transaction = transaction;
                 var map = SqlMapper.GetMapping<T>();
                 return await ExecuteQueryAsync<T>(command, map, cancellationToken).ConfigureAwait(false);
             }
@@ -530,10 +539,11 @@ namespace Kuery
             Type type,
             string sql,
             object param = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             var map = SqlMapper.GetMapping(type);
-            return await connection.QueryAsync(map, sql, param, cancellationToken).ConfigureAwait(false);
+            return await connection.QueryAsync(map, sql, param, transaction, cancellationToken).ConfigureAwait(false);
         }
 
         private static async Task<IEnumerable<object>> QueryAsync(
@@ -541,12 +551,14 @@ namespace Kuery
             TableMapping mapping,
             string sql,
             object param = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             Requires.NotNull(mapping, nameof(mapping));
 
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
+                command.Transaction = transaction;
                 return await ExecuteQueryAsync<object>(command, mapping, cancellationToken).ConfigureAwait(false);
             }
         }
@@ -555,10 +567,12 @@ namespace Kuery
             this DbConnection connection,
             string sql,
             object param = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
+                command.Transaction = transaction;
                 var map = SqlMapper.GetMapping<T>();
                 return await ExecuteQueryFirstOrDefaultAsync<T>(command, map, cancellationToken).ConfigureAwait(false);
             }
@@ -569,10 +583,11 @@ namespace Kuery
             Type type,
             string sql,
             object param = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             var map = SqlMapper.GetMapping(type);
-            return await connection.FindWithQueryAsync(map, sql, param, cancellationToken).ConfigureAwait(false);
+            return await connection.FindWithQueryAsync(map, sql, param, transaction, cancellationToken).ConfigureAwait(false);
         }
 
         private static async Task<object> FindWithQueryAsync(
@@ -580,10 +595,12 @@ namespace Kuery
             TableMapping mapping,
             string sql,
             object param = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
+                command.Transaction = transaction;
                 return await ExecuteQueryFirstOrDefaultAsync<object>(command, mapping, cancellationToken).ConfigureAwait(false);
             }
         }
@@ -592,10 +609,12 @@ namespace Kuery
             this DbConnection connection,
             string sql,
             object param = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
+                command.Transaction = transaction;
                 return await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
         }
@@ -604,10 +623,12 @@ namespace Kuery
             this DbConnection connection,
             string sql,
             object param = null,
+            DbTransaction transaction = null,
             CancellationToken cancellationToken = default)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
+                command.Transaction = transaction;
                 var result = await command.TryExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
                 if (result is null || result is DBNull)
                 {
