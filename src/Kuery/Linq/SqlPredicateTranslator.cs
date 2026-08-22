@@ -153,10 +153,11 @@ namespace Kuery.Linq
                 if (columnSql != null)
                 {
                     var value = EvaluateExpression(call.Arguments[0]);
-                    var paramName = AddParameter(dialect, parameters, value);
                     var comparison = call.Arguments.Count == 2
                         ? (StringComparison)EvaluateExpression(call.Arguments[1])
                         : StringComparison.CurrentCulture;
+                    var isLikePattern = comparison == StringComparison.OrdinalIgnoreCase || comparison == StringComparison.CurrentCultureIgnoreCase;
+                    var paramName = AddParameter(dialect, parameters, isLikePattern ? EscapeLikeWildcards(value?.ToString()) : value);
                     return BuildStartsWith(columnSql, paramName, value?.ToString()?.Length ?? 0, comparison, dialect);
                 }
             }
@@ -168,10 +169,11 @@ namespace Kuery.Linq
                 if (columnSql != null)
                 {
                     var value = EvaluateExpression(call.Arguments[0]);
-                    var paramName = AddParameter(dialect, parameters, value);
                     var comparison = call.Arguments.Count == 2
                         ? (StringComparison)EvaluateExpression(call.Arguments[1])
                         : StringComparison.CurrentCulture;
+                    var isLikePattern = comparison == StringComparison.OrdinalIgnoreCase || comparison == StringComparison.CurrentCultureIgnoreCase;
+                    var paramName = AddParameter(dialect, parameters, isLikePattern ? EscapeLikeWildcards(value?.ToString()) : value);
                     return BuildEndsWith(columnSql, paramName, value?.ToString()?.Length ?? 0, comparison, dialect);
                 }
             }
@@ -543,26 +545,27 @@ namespace Kuery.Linq
                     return "(" + left + op + right + ")";
                 }
 
-                var leftSql = TranslateCorrelatedOperand(binary.Left, innerParam, innerTable, outerTable, dialect, parameters);
-                var rightSql = TranslateCorrelatedOperand(binary.Right, innerParam, innerTable, outerTable, dialect, parameters);
-                var sqlOp = ToSqlOperator(binary.NodeType);
+                var leftIsColumn = TryTranslateCorrelatedColumn(binary.Left, innerParam, innerTable, outerTable, dialect, out var leftColumn);
+                var rightIsColumn = TryTranslateCorrelatedColumn(binary.Right, innerParam, innerTable, outerTable, dialect, out var rightColumn);
 
-                // Handle null comparison
-                if (binary.NodeType == ExpressionType.Equal || binary.NodeType == ExpressionType.NotEqual)
+                if (leftIsColumn && !rightIsColumn)
                 {
-                    if (leftSql == null || rightSql == null)
-                    {
-                        var colSide = leftSql ?? rightSql;
-                        if (colSide != null)
-                        {
-                            return binary.NodeType == ExpressionType.Equal
-                                ? "(" + colSide + " is null)"
-                                : "(" + colSide + " is not null)";
-                        }
-                    }
+                    return BuildColumnValueComparison(leftColumn, binary.NodeType, EvaluateExpression(binary.Right), dialect, parameters);
                 }
 
-                return "(" + leftSql + " " + sqlOp + " " + rightSql + ")";
+                if (!leftIsColumn && rightIsColumn)
+                {
+                    return BuildColumnValueComparison(rightColumn, SwapBinaryType(binary.NodeType), EvaluateExpression(binary.Left), dialect, parameters);
+                }
+
+                if (leftIsColumn && rightIsColumn)
+                {
+                    return "(" + leftColumn + " " + ToSqlOperator(binary.NodeType) + " " + rightColumn + ")";
+                }
+
+                var leftValueSql = AddParameter(dialect, parameters, EvaluateExpression(binary.Left));
+                var rightValueSql = AddParameter(dialect, parameters, EvaluateExpression(binary.Right));
+                return "(" + leftValueSql + " " + ToSqlOperator(binary.NodeType) + " " + rightValueSql + ")";
             }
 
             if (expression is UnaryExpression unary && unary.NodeType == ExpressionType.Not)
@@ -573,6 +576,46 @@ namespace Kuery.Linq
             // Boolean column reference
             var boolSql = TranslateCorrelatedOperand(expression, innerParam, innerTable, outerTable, dialect, parameters);
             return "(" + boolSql + " = 1)";
+        }
+
+        private static bool TryTranslateCorrelatedColumn(
+            Expression expression,
+            ParameterExpression innerParam,
+            TableMapping innerTable,
+            TableMapping outerTable,
+            ISqlDialect dialect,
+            out string columnSql)
+        {
+            if (expression is UnaryExpression convert && convert.NodeType == ExpressionType.Convert)
+            {
+                return TryTranslateCorrelatedColumn(convert.Operand, innerParam, innerTable, outerTable, dialect, out columnSql);
+            }
+
+            if (expression is MemberExpression member && member.Expression is ParameterExpression param)
+            {
+                if (param == innerParam)
+                {
+                    var col = innerTable.FindColumnWithPropertyName(member.Member.Name);
+                    if (col != null)
+                    {
+                        columnSql = dialect.EscapeIdentifier(innerTable.TableName) + "." + dialect.EscapeIdentifier(col.Name);
+                        return true;
+                    }
+                }
+
+                var outerCol = outerTable.FindColumnWithPropertyName(member.Member.Name);
+                if (outerCol != null)
+                {
+                    columnSql = dialect.EscapeIdentifier(outerTable.TableName) + "." + dialect.EscapeIdentifier(outerCol.Name);
+                    return true;
+                }
+
+                throw new NotSupportedException(
+                    $"Cannot resolve property '{member.Member.Name}' in correlated subquery.");
+            }
+
+            columnSql = null;
+            return false;
         }
 
         private static string TranslateCorrelatedOperand(
@@ -1157,17 +1200,17 @@ namespace Kuery.Linq
                 case StringComparison.CurrentCultureIgnoreCase:
                     if (dialect.Kind == SqlDialectKind.SqlServer)
                     {
-                        return "(" + columnSql + " like (" + paramName + " + N'%'))";
+                        return "(" + columnSql + " like (" + paramName + " + N'%') escape '" + LikeEscapeChar + "')";
                     }
                     if (dialect.Kind == SqlDialectKind.PostgreSql)
                     {
-                        return "(" + columnSql + " ilike (" + paramName + " || '%'))";
+                        return "(" + columnSql + " ilike (" + paramName + " || '%') escape '" + LikeEscapeChar + "')";
                     }
                     if (dialect.Kind == SqlDialectKind.MySql)
                     {
-                        return "(" + columnSql + " like concat(" + paramName + ", '%'))";
+                        return "(" + columnSql + " like concat(" + paramName + ", '%') escape '" + LikeEscapeChar + "')";
                     }
-                    return "(" + columnSql + " like (" + paramName + " || '%'))";
+                    return "(" + columnSql + " like (" + paramName + " || '%') escape '" + LikeEscapeChar + "')";
                 default:
                     throw new NotSupportedException($"Unsupported StringComparison: {comparison}");
             }
@@ -1188,35 +1231,62 @@ namespace Kuery.Linq
                 case StringComparison.CurrentCultureIgnoreCase:
                     if (dialect.Kind == SqlDialectKind.SqlServer)
                     {
-                        return "(" + columnSql + " like (N'%' + " + paramName + "))";
+                        return "(" + columnSql + " like (N'%' + " + paramName + ") escape '" + LikeEscapeChar + "')";
                     }
                     if (dialect.Kind == SqlDialectKind.PostgreSql)
                     {
-                        return "(" + columnSql + " ilike ('%' || " + paramName + "))";
+                        return "(" + columnSql + " ilike ('%' || " + paramName + ") escape '" + LikeEscapeChar + "')";
                     }
                     if (dialect.Kind == SqlDialectKind.MySql)
                     {
-                        return "(" + columnSql + " like concat('%', " + paramName + "))";
+                        return "(" + columnSql + " like concat('%', " + paramName + ") escape '" + LikeEscapeChar + "')";
                     }
-                    return "(" + columnSql + " like ('%' || " + paramName + "))";
+                    return "(" + columnSql + " like ('%' || " + paramName + ") escape '" + LikeEscapeChar + "')";
                 default:
                     throw new NotSupportedException($"Unsupported StringComparison: {comparison}");
             }
         }
 
+        private const string LikeEscapeChar = "!";
+
+        private static string EscapeLikeWildcards(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return value;
+            }
+
+            return value
+                .Replace(LikeEscapeChar, LikeEscapeChar + LikeEscapeChar)
+                .Replace("%", LikeEscapeChar + "%")
+                .Replace("_", LikeEscapeChar + "_");
+        }
+
         private static string BuildInClause(string columnSql, IEnumerable collection, ISqlDialect dialect, List<object> parameters)
         {
+            var items = new StringBuilder();
+            var first = true;
+            var hasAny = false;
+            foreach (var item in collection)
+            {
+                if (!first) items.Append(", ");
+                items.Append(AddParameter(dialect, parameters, item));
+                first = false;
+                hasAny = true;
+            }
+
+            if (!hasAny)
+            {
+                // "col in ()" is invalid SQL on every supported dialect; an empty
+                // collection can never contain a match, so short-circuit to false.
+                return "(1 = 0)";
+            }
+
             var sb = new StringBuilder();
             sb.Append("(");
             sb.Append(columnSql);
             sb.Append(" in (");
-            var first = true;
-            foreach (var item in collection)
-            {
-                if (!first) sb.Append(", ");
-                sb.Append(AddParameter(dialect, parameters, item));
-                first = false;
-            }
+            sb.Append(items);
             sb.Append("))");
             return sb.ToString();
         }

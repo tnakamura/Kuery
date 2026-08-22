@@ -11,32 +11,25 @@ namespace Kuery
     {
         internal static IDbCommand CreateGetByPrimaryKeyCommand(this IDbConnection connection, TableMapping map, object pk)
         {
+            if (map.PK == null)
+            {
+                throw new NotSupportedException(
+                    $"Cannot get {map.TableName} by primary key: it has no PK");
+            }
+
             var command = connection.CreateCommand();
 
-            string commandText;
-            if (map.PK != null)
-            {
-                commandText = $"select * from " +
-                    connection.EscapeLiteral(map.TableName) +
-                    $" where " +
-                    connection.EscapeLiteral(map.PK.Name) +
-                    $" = " +
-                    connection.GetParameterName(map.PK.Name);
-            }
-            else
-            {
-                commandText = "select top 1 * from " +
-                    connection.EscapeLiteral(map.TableName);
-            }
+            command.CommandText = "select * from " +
+                connection.EscapeLiteral(map.TableName) +
+                " where " +
+                connection.EscapeLiteral(map.PK.Name) +
+                " = " +
+                connection.GetParameterName(map.PK.Name);
 
-            command.CommandText = commandText;
-            if (map.PK != null)
-            {
-                var pkParameter = command.CreateParameter();
-                pkParameter.ParameterName = connection.GetParameterName(map.PK.Name);
-                pkParameter.Value = pk;
-                command.Parameters.Add(pkParameter);
-            }
+            var pkParameter = command.CreateParameter();
+            pkParameter.ParameterName = connection.GetParameterName(map.PK.Name);
+            pkParameter.Value = pk ?? (object)DBNull.Value;
+            command.Parameters.Add(pkParameter);
             return command;
         }
 
@@ -99,7 +92,11 @@ namespace Kuery
                     {
                         var parameter = command.CreateParameter();
                         parameter.ParameterName = connection.GetParameterName(col.Name);
-                        if (col.ColumnType.IsEnum)
+                        if (value is null)
+                        {
+                            parameter.Value = DBNull.Value;
+                        }
+                        else if (col.ColumnType.IsEnum)
                         {
                             if (col.StoreAsText)
                             {
@@ -159,7 +156,7 @@ namespace Kuery
                 var col = cols[i];
                 var parameter = command.CreateParameter();
                 parameter.ParameterName = connection.GetParameterName(col.Name);
-                parameter.Value = col.GetValue(item);
+                parameter.Value = col.GetValue(item) ?? (object)DBNull.Value;
                 command.Parameters.Add(parameter);
 
                 if (i == 0)
@@ -185,7 +182,7 @@ namespace Kuery
             {
                 var pkParamter = command.CreateParameter();
                 pkParamter.ParameterName = pkParameterName;
-                pkParamter.Value = mapping.PK.GetValue(item);
+                pkParamter.Value = mapping.PK.GetValue(item) ?? (object)DBNull.Value;
                 command.Parameters.Add(pkParamter);
             }
 
@@ -197,13 +194,13 @@ namespace Kuery
         {
             if (connection.IsPostgreSql())
             {
-                return "\"" + name + "\"";
+                return "\"" + name.Replace("\"", "\"\"") + "\"";
             }
             if (connection.IsMySql())
             {
-                return "`" + name + "`";
+                return "`" + name.Replace("`", "``") + "`";
             }
-            return "[" + name + "]";
+            return "[" + name.Replace("]", "]]") + "]";
         }
 
         internal static bool IsSqlite(this IDbConnection connection)
@@ -300,7 +297,7 @@ namespace Kuery
 
             var pkParameter = command.CreateParameter();
             pkParameter.ParameterName = pkParamName;
-            pkParameter.Value = primaryKey;
+            pkParameter.Value = primaryKey ?? (object)DBNull.Value;
             command.Parameters.Add(pkParameter);
 
             return command;
@@ -341,7 +338,7 @@ WHEN NOT MATCHED THEN
 ";
                 var parameter = command.CreateParameter();
                 parameter.ParameterName = "@" + map.PK.Name;
-                parameter.Value = map.PK.GetValue(item);
+                parameter.Value = map.PK.GetValue(item) ?? (object)DBNull.Value;
                 command.Parameters.Add(parameter);
             }
             else
@@ -350,7 +347,7 @@ WHEN NOT MATCHED THEN
                 {
                     var pkParameter = command.CreateParameter();
                     pkParameter.ParameterName = "@" + map.PK.Name;
-                    pkParameter.Value = map.PK.GetValue(item);
+                    pkParameter.Value = map.PK.GetValue(item) ?? (object)DBNull.Value;
                     command.Parameters.Add(pkParameter);
                 }
 
@@ -383,7 +380,7 @@ WHEN NOT MATCHED THEN
                     {
                         var parameter = command.CreateParameter();
                         parameter.ParameterName = connection.GetParameterName(col.Name);
-                        parameter.Value = col.GetValue(item);
+                        parameter.Value = col.GetValue(item) ?? (object)DBNull.Value;
                         command.Parameters.Add(parameter);
 
                         values.Append(parameter.ParameterName);
@@ -448,7 +445,7 @@ WHEN NOT MATCHED THEN
                     {
                         var parameter = command.CreateParameter();
                         parameter.ParameterName = connection.GetParameterName(col.Name);
-                        parameter.Value = col.GetValue(item);
+                        parameter.Value = col.GetValue(item) ?? (object)DBNull.Value;
                         command.Parameters.Add(parameter);
 
                         values.Append(parameter.ParameterName);
@@ -509,7 +506,7 @@ WHEN NOT MATCHED THEN
                     {
                         var parameter = command.CreateParameter();
                         parameter.ParameterName = connection.GetParameterName(col.Name);
-                        parameter.Value = col.GetValue(item);
+                        parameter.Value = col.GetValue(item) ?? (object)DBNull.Value;
                         command.Parameters.Add(parameter);
                         values.Append(parameter.ParameterName);
                     }
@@ -571,7 +568,7 @@ WHEN NOT MATCHED THEN
                     {
                         var parameter = command.CreateParameter();
                         parameter.ParameterName = connection.GetParameterName(col.Name);
-                        parameter.Value = col.GetValue(item);
+                        parameter.Value = col.GetValue(item) ?? (object)DBNull.Value;
                         command.Parameters.Add(parameter);
 
                         values.Append(parameter.ParameterName);
@@ -607,7 +604,7 @@ WHEN NOT MATCHED THEN
                     {
                         var parameter = command.CreateParameter();
                         parameter.ParameterName = connection.GetParameterName(kvp.Key);
-                        parameter.Value = kvp.Value;
+                        parameter.Value = kvp.Value ?? (object)DBNull.Value;
                         command.Parameters.Add(parameter);
                     }
                 }
@@ -619,7 +616,7 @@ WHEN NOT MATCHED THEN
                     {
                         var parameter = command.CreateParameter();
                         parameter.ParameterName = connection.GetParameterName(property.Name);
-                        parameter.Value = property.GetValue(param);
+                        parameter.Value = property.GetValue(param) ?? (object)DBNull.Value;
                         command.Parameters.Add(parameter);
                     }
                     var fields = paramType.GetFields(BindingFlags.Public | BindingFlags.Instance);
@@ -627,7 +624,7 @@ WHEN NOT MATCHED THEN
                     {
                         var parameter = command.CreateParameter();
                         parameter.ParameterName = connection.GetParameterName(field.Name);
-                        parameter.Value = field.GetValue(param);
+                        parameter.Value = field.GetValue(param) ?? (object)DBNull.Value;
                         command.Parameters.Add(parameter);
                     }
                 }

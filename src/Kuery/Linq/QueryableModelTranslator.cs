@@ -100,6 +100,8 @@ namespace Kuery.Linq
             var joinClause = new JoinClause(innerTable, keyPairs, rewritten, isLeftJoin: true);
             model.AddJoin(joinClause);
             model.SetJoinResultSelector(rewritten);
+            UpdateJoinShape(model, rewritten, innerTable);
+            UpdateElementTable(model, rewritten, innerTable);
             return model;
         }
 
@@ -109,8 +111,12 @@ namespace Kuery.Linq
             switch (name)
             {
                 case nameof(Queryable.Where):
-                    if (model.GroupByColumns != null && model.GroupByColumns.Count > 0)
+                    if ((model.GroupBySelectItems != null && model.GroupBySelectItems.Count > 0)
+                        || (model.GroupByColumns != null && model.GroupByColumns.Count > 0))
                     {
+                        // Applies both before GroupBy(...).Select(...) (predicate parameter is
+                        // the IGrouping) and after it (predicate parameter is the projected DTO);
+                        // TranslateHavingOperand tells the two cases apart via GroupBySelectItems.
                         var havingLambda = GetLambda(methodCall.Arguments[1]);
                         model.AddHavingPredicate(havingLambda.Body, havingLambda.Parameters[0]);
                     }
@@ -132,10 +138,13 @@ namespace Kuery.Linq
                     AddOrdering(model, GetLambda(methodCall.Arguments[1]), false);
                     break;
                 case nameof(Queryable.Skip):
-                    model.Skip = GetIntValue(methodCall.Arguments[1]);
+                    // Enumerable.Skip treats a non-positive count as "skip nothing".
+                    model.Skip = Math.Max(0, GetIntValue(methodCall.Arguments[1]));
                     break;
                 case nameof(Queryable.Take):
-                    model.Take = GetIntValue(methodCall.Arguments[1]);
+                    // Enumerable.Take treats a non-positive count as "take nothing";
+                    // clamping to 0 keeps LIMIT/TOP/FETCH generation valid on every dialect.
+                    model.Take = Math.Max(0, GetIntValue(methodCall.Arguments[1]));
                     break;
                 case nameof(Queryable.Count):
                     model.SetTerminal(QueryTerminalKind.Count);
@@ -275,7 +284,7 @@ namespace Kuery.Linq
 
             if (body is MemberExpression singleMember && singleMember.Expression?.NodeType == ExpressionType.Parameter)
             {
-                var col = model.Table.FindColumnWithPropertyName(singleMember.Member.Name);
+                var col = model.ElementTable.FindColumnWithPropertyName(singleMember.Member.Name);
                 if (col == null)
                 {
                     throw new NotSupportedException($"Unknown property '{singleMember.Member.Name}' in Select.");
@@ -297,7 +306,7 @@ namespace Kuery.Linq
                         throw new NotSupportedException($"Unsupported Select expression: {arg}. Only direct member access is supported.");
                     }
 
-                    var col = model.Table.FindColumnWithPropertyName(member.Member.Name);
+                    var col = model.ElementTable.FindColumnWithPropertyName(member.Member.Name);
                     if (col == null)
                     {
                         throw new NotSupportedException($"Unknown property '{member.Member.Name}' in Select.");
@@ -327,7 +336,7 @@ namespace Kuery.Linq
                         throw new NotSupportedException($"Unsupported Select expression: {arg}. Only direct member access is supported.");
                     }
 
-                    var col = model.Table.FindColumnWithPropertyName(member.Member.Name);
+                    var col = model.ElementTable.FindColumnWithPropertyName(member.Member.Name);
                     if (col == null)
                     {
                         throw new NotSupportedException($"Unknown property '{member.Member.Name}' in Select.");
@@ -355,7 +364,7 @@ namespace Kuery.Linq
 
             if (body is MemberExpression member && member.Expression?.NodeType == ExpressionType.Parameter)
             {
-                var col = model.Table.FindColumnWithPropertyName(member.Member.Name);
+                var col = model.ElementTable.FindColumnWithPropertyName(member.Member.Name);
                 if (col == null)
                 {
                     throw new NotSupportedException($"Unknown property '{member.Member.Name}' in GroupBy.");
@@ -377,7 +386,7 @@ namespace Kuery.Linq
                         throw new NotSupportedException($"Unsupported GroupBy expression: {arg}. Only direct member access is supported.");
                     }
 
-                    var col = model.Table.FindColumnWithPropertyName(argMember.Member.Name);
+                    var col = model.ElementTable.FindColumnWithPropertyName(argMember.Member.Name);
                     if (col == null)
                     {
                         throw new NotSupportedException($"Unknown property '{argMember.Member.Name}' in GroupBy.");
@@ -457,7 +466,7 @@ namespace Kuery.Linq
                     }
                 }
             }
-            return model.Table.FindColumnWithPropertyName(propertyName);
+            return model.ElementTable.FindColumnWithPropertyName(propertyName);
         }
 
         private static GroupBySelectItem TranslateGroupByAggregate(SelectQueryModel model, MethodCallExpression methodCall, string targetName)
@@ -503,7 +512,7 @@ namespace Kuery.Linq
 
                     if (selectorBody is MemberExpression member && member.Expression?.NodeType == ExpressionType.Parameter)
                     {
-                        var col = model.Table.FindColumnWithPropertyName(member.Member.Name);
+                        var col = model.ElementTable.FindColumnWithPropertyName(member.Member.Name);
                         if (col == null)
                         {
                             throw new NotSupportedException($"Unknown property '{member.Member.Name}' in aggregate.");
@@ -545,6 +554,7 @@ namespace Kuery.Linq
 
             // Update JoinShape AFTER the rewrite, so future chained joins can resolve outer keys.
             UpdateJoinShape(model, resultSelector, innerTable);
+            UpdateElementTable(model, resultSelector, innerTable);
         }
 
         private static void ApplySelectMany(SelectQueryModel model, MethodCallExpression methodCall)
@@ -563,7 +573,7 @@ namespace Kuery.Linq
             {
                 // No result selector: return the inner entity
                 // Create a synthetic (outer, inner) => inner
-                var outerParam = Expression.Parameter(model.Table.MappedType, "outer");
+                var outerParam = Expression.Parameter(model.ElementTable.MappedType, "outer");
                 var innerParam = Expression.Parameter(innerTable.MappedType, "inner");
                 resultSelector = Expression.Lambda(innerParam, outerParam, innerParam);
             }
@@ -572,6 +582,29 @@ namespace Kuery.Linq
             model.AddJoin(joinClause);
             model.SetJoinResultSelector(resultSelector);
             UpdateJoinShape(model, resultSelector, innerTable);
+            UpdateElementTable(model, resultSelector, innerTable);
+        }
+
+        /// <summary>
+        /// If a Join/SelectMany result selector passes a single side straight through
+        /// (e.g. <c>(o, ol) =&gt; ol</c>), subsequent Where/OrderBy/Select/GroupBy member
+        /// accesses refer to that side's table, not the original outer table.
+        /// </summary>
+        private static void UpdateElementTable(SelectQueryModel model, LambdaExpression resultSelector, TableMapping innerTable)
+        {
+            if (resultSelector.Body is ParameterExpression paramBody && resultSelector.Parameters.Count > 1)
+            {
+                if (paramBody == resultSelector.Parameters[1])
+                {
+                    model.SetElementTable(innerTable);
+                    // A bare pass-through selector discards any earlier composite shape.
+                    model.ReplaceJoinShape(null);
+                }
+                else if (paramBody == resultSelector.Parameters[0])
+                {
+                    model.ReplaceJoinShape(null);
+                }
+            }
         }
 
         private static TableMapping GetInnerTableFromLambdaBody(Expression body)
@@ -679,14 +712,14 @@ namespace Kuery.Linq
         {
             if (body is MemberExpression member)
             {
-                // Simple: outerParam.Prop → outer table
+                // Simple: outerParam.Prop → current element table
                 if (member.Expression?.NodeType == ExpressionType.Parameter)
                 {
-                    var col = model.Table.FindColumnWithPropertyName(member.Member.Name);
+                    var col = model.ElementTable.FindColumnWithPropertyName(member.Member.Name);
                     if (col != null)
                     {
                         column = col;
-                        return model.Table;
+                        return model.ElementTable;
                     }
                 }
 
@@ -764,7 +797,7 @@ namespace Kuery.Linq
                     if (param == firstParam)
                     {
                         // First join: param is the outer entity directly
-                        newShape[memberName] = model.Table;
+                        newShape[memberName] = model.ElementTable;
                     }
                     else if (param == secondParam)
                     {
@@ -782,10 +815,10 @@ namespace Kuery.Linq
                 }
             }
 
-            foreach (var kv in newShape)
-            {
-                model.SetJoinShapeMember(kv.Key, kv.Value);
-            }
+            // Replace (not merge) so members the latest result selector dropped or
+            // renamed from an earlier join's shape don't linger and desync a later
+            // chained join's expected delegate arity.
+            model.ReplaceJoinShape(newShape);
         }
 
         /// <summary>
@@ -953,7 +986,7 @@ namespace Kuery.Linq
                 throw new NotSupportedException($"Unsupported ordering expression: {lambda}. Only direct member access is supported.");
             }
 
-            var column = model.Table.FindColumnWithPropertyName(member.Member.Name);
+            var column = model.ElementTable.FindColumnWithPropertyName(member.Member.Name);
             if (column == null)
             {
                 throw new NotSupportedException($"Unknown property '{member.Member.Name}' for ordering.");

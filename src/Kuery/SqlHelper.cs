@@ -226,21 +226,22 @@ namespace Kuery
         }
 
 
-        public static T Find<T>(this IDbConnection connection, object pk)
+        public static T Find<T>(this IDbConnection connection, object pk, IDbTransaction transaction = null)
         {
             Requires.NotNull(pk, nameof(pk));
 
             var map = SqlMapper.GetMapping(typeof(T));
-            return connection.Find<T>(map, pk);
+            return connection.Find<T>(map, pk, transaction);
         }
 
-        private static T Find<T>(this IDbConnection connection, TableMapping mapping, object pk)
+        private static T Find<T>(this IDbConnection connection, TableMapping mapping, object pk, IDbTransaction transaction = null)
         {
             Requires.NotNull(pk, nameof(pk));
             Requires.NotNull(mapping, nameof(mapping));
 
             using (var command = connection.CreateGetByPrimaryKeyCommand(mapping, pk))
             {
+                command.Transaction = transaction;
                 return ExecuteQueryFirstOrDefault<T>(command, mapping);
             }
         }
@@ -255,27 +256,28 @@ namespace Kuery
             return connection.Table<T>().First(predicate);
         }
 
-        public static T Get<T>(this IDbConnection connection, object pk)
+        public static T Get<T>(this IDbConnection connection, object pk, IDbTransaction transaction = null)
         {
             Requires.NotNull(pk, nameof(pk));
 
             var map = SqlMapper.GetMapping(typeof(T));
-            return connection.Get<T>(map, pk);
+            return connection.Get<T>(map, pk, transaction);
         }
 
-        public static T Get<T>(this IDbConnection connection, Type type, object pk)
+        public static T Get<T>(this IDbConnection connection, Type type, object pk, IDbTransaction transaction = null)
         {
             var map = SqlMapper.GetMapping(type);
-            return connection.Get<T>(map, pk);
+            return connection.Get<T>(map, pk, transaction);
         }
 
-        private static T Get<T>(this IDbConnection connection, TableMapping mapping, object pk)
+        private static T Get<T>(this IDbConnection connection, TableMapping mapping, object pk, IDbTransaction transaction = null)
         {
             Requires.NotNull(pk, nameof(pk));
             Requires.NotNull(mapping, nameof(mapping));
 
             using (var command = connection.CreateGetByPrimaryKeyCommand(mapping, pk))
             {
+                command.Transaction = transaction;
                 var result = ExecuteQuery<T>(command, mapping);
                 return result.First();
             }
@@ -297,66 +299,72 @@ namespace Kuery
             }
         }
 
-        public static IEnumerable<T> Query<T>(this IDbConnection connection, string sql, object param = null)
+        public static IEnumerable<T> Query<T>(this IDbConnection connection, string sql, object param = null, IDbTransaction transaction = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
+                command.Transaction = transaction;
                 var map = SqlMapper.GetMapping<T>();
                 return ExecuteQuery<T>(command, map);
             }
         }
 
-        public static IEnumerable<object> Query(this IDbConnection connection, Type type, string sql, object param = null)
+        public static IEnumerable<object> Query(this IDbConnection connection, Type type, string sql, object param = null, IDbTransaction transaction = null)
         {
             var map = SqlMapper.GetMapping(type);
-            return connection.Query(map, sql, param);
+            return connection.Query(map, sql, param, transaction);
         }
 
-        private static IEnumerable<object> Query(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
+        private static IEnumerable<object> Query(this IDbConnection connection, TableMapping mapping, string sql, object param = null, IDbTransaction transaction = null)
         {
             Requires.NotNull(mapping, nameof(mapping));
 
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
+                command.Transaction = transaction;
                 return ExecuteQuery<object>(command, mapping);
             }
         }
 
-        public static T FindWithQuery<T>(this IDbConnection connection, string sql, object param = null)
+        public static T FindWithQuery<T>(this IDbConnection connection, string sql, object param = null, IDbTransaction transaction = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
+                command.Transaction = transaction;
                 var map = SqlMapper.GetMapping<T>();
                 return ExecuteQueryFirstOrDefault<T>(command, map);
             }
         }
 
-        public static object FindWithQuery(this IDbConnection connection, Type type, string sql, object param = null)
+        public static object FindWithQuery(this IDbConnection connection, Type type, string sql, object param = null, IDbTransaction transaction = null)
         {
             var map = SqlMapper.GetMapping(type);
-            return connection.FindWithQuery(map, sql, param);
+            return connection.FindWithQuery(map, sql, param, transaction);
         }
 
-        private static object FindWithQuery(this IDbConnection connection, TableMapping mapping, string sql, object param = null)
+        private static object FindWithQuery(this IDbConnection connection, TableMapping mapping, string sql, object param = null, IDbTransaction transaction = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
+                command.Transaction = transaction;
                 return ExecuteQueryFirstOrDefault<object>(command, mapping);
             }
         }
 
-        public static int Execute(this IDbConnection connection, string sql, object param = null)
+        public static int Execute(this IDbConnection connection, string sql, object param = null, IDbTransaction transaction = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
+                command.Transaction = transaction;
                 return command.ExecuteNonQuery();
             }
         }
 
-        public static T ExecuteScalar<T>(this IDbConnection connection, string sql, object param = null)
+        public static T ExecuteScalar<T>(this IDbConnection connection, string sql, object param = null, IDbTransaction transaction = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
             {
+                command.Transaction = transaction;
                 var result = command.ExecuteScalar();
                 if (result is null || result is DBNull)
                 {
