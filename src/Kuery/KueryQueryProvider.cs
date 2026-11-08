@@ -15,6 +15,8 @@ namespace Kuery
 
         readonly IKueryLinqExecutor _executor;
 
+        internal IDbConnection Connection => _context.Connection;
+
         internal KueryQueryProvider(IDbConnection connection)
             : this(new KueryQueryContext(connection), new KueryLinqExecutor())
         {
@@ -82,29 +84,11 @@ namespace Kuery
             return _executor.ExecuteUpdateAsync(_context, expression, setters, cancellationToken);
         }
 
-        internal object BuildQueryModel(Expression expression)
-        {
-            Requires.NotNull(expression, nameof(expression));
-            return _executor.BuildQueryModel(_context, expression);
-        }
-
-        internal object ExecuteTerminal(Expression expression)
-        {
-            Requires.NotNull(expression, nameof(expression));
-            return _executor.ExecuteTerminal(_context, expression);
-        }
-
         internal async Task<TResult> ExecuteAsync<TResult>(Expression expression, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(expression, nameof(expression));
             var result = await _executor.ExecuteAsync(_context, expression, typeof(TResult), cancellationToken).ConfigureAwait(false);
             return (TResult)result;
-        }
-
-        internal Task<object> ExecuteTerminalAsync(Expression expression, CancellationToken cancellationToken = default)
-        {
-            Requires.NotNull(expression, nameof(expression));
-            return _executor.ExecuteTerminalAsync(_context, expression, cancellationToken);
         }
 
         static Type GetElementType(Type sequenceType)

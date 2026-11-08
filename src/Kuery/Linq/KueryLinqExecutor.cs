@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
-using System.Linq;
+using System.Data.Common;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,878 +11,139 @@ namespace Kuery.Linq
 {
     internal sealed class KueryLinqExecutor : IKueryLinqExecutor
     {
-        readonly QueryableModelTranslator _translator = new QueryableModelTranslator();
-
-        readonly SelectSqlGenerator _sqlGenerator = new SelectSqlGenerator();
-
-        public object BuildQueryModel(KueryQueryContext context, Expression expression)
+        internal RelationalCommand Prepare(KueryQueryContext context, Expression expression, Type resultType, bool async,
+            out RelationalQueryPlan plan, string operation = "select", IReadOnlyList<SetPropertyCall> setters = null)
         {
-            Requires.NotNull(context, nameof(context));
-            Requires.NotNull(expression, nameof(expression));
-            return _translator.Translate(expression);
+            var normalizer = new QueryNormalizer(context.Connection);
+            var normalized = normalizer.Visit(expression);
+            var dialect = SqlDialectFactory.Create(context.Connection);
+            var key = QueryPlanCache.Key(normalized, dialect.Kind, resultType, operation, async);
+            List<SetPropertyCall> normalizedSetters = null;
+            if (setters != null)
+            {
+                normalizedSetters = new List<SetPropertyCall>();
+                foreach (var setter in setters)
+                {
+                    var property = (LambdaExpression)normalizer.Visit(setter.PropertyExpression);
+                    var value = (LambdaExpression)normalizer.Visit(setter.ValueExpression);
+                    normalizedSetters.Add(new SetPropertyCall(property, value));
+                    key += QueryPlanCache.Key(property, dialect.Kind, resultType, "property", async)
+                        + QueryPlanCache.Key(value, dialect.Kind, resultType, "value", async);
+                }
+            }
+            plan = QueryPlanCache.GetOrAdd(key, () => operation == "select"
+                ? new RelationalQueryCompiler().Compile(normalized)
+                : new RelationalQueryCompiler().CompileMutation(normalized, operation, normalizedSetters));
+            return RelationalSqlGenerator.GenerateCached(plan, dialect, normalizer.Values);
         }
 
         public object Execute(KueryQueryContext context, Expression expression, Type resultType)
         {
-            Requires.NotNull(context, nameof(context));
-            Requires.NotNull(expression, nameof(expression));
-            Requires.NotNull(resultType, nameof(resultType));
-
-            var model = BuildQueryModel(context, expression);
-            var dialect = SqlDialectFactory.Create(context.Connection);
-
-            if (model is SetOperationQueryModel setModel)
-            {
-                var generated = _sqlGenerator.GenerateSetOperation(setModel, dialect);
-                return ExecuteSetOperationCore(context.Connection, setModel, generated, resultType);
-            }
-
-            var selectModel = (SelectQueryModel)model;
-
-            var selectGenerated = _sqlGenerator.Generate(selectModel, dialect);
-            return ExecuteCore(context.Connection, selectModel, selectGenerated, resultType);
+            var generated = Prepare(context, expression, resultType, false, out var plan);
+            using (var command = CreateCommand(context.Connection, generated))
+            using (var reader = command.ExecuteReader()) return Read(reader, plan);
         }
 
         public async Task<object> ExecuteAsync(KueryQueryContext context, Expression expression, Type resultType, CancellationToken cancellationToken)
         {
-            Requires.NotNull(context, nameof(context));
-            Requires.NotNull(expression, nameof(expression));
-            Requires.NotNull(resultType, nameof(resultType));
-
-            var model = BuildQueryModel(context, expression);
-            var dialect = SqlDialectFactory.Create(context.Connection);
-
-            if (model is SetOperationQueryModel setModel)
-            {
-                var generated = _sqlGenerator.GenerateSetOperation(setModel, dialect);
-                return await ExecuteSetOperationCoreAsync(context.Connection, setModel, generated, resultType, cancellationToken).ConfigureAwait(false);
-            }
-
-            var selectModel = (SelectQueryModel)model;
-
-            var selectGenerated = _sqlGenerator.Generate(selectModel, dialect);
-            return await ExecuteCoreAsync(context.Connection, selectModel, selectGenerated, resultType, cancellationToken).ConfigureAwait(false);
-        }
-
-        public int ExecuteDelete(KueryQueryContext context, Expression expression)
-        {
-            Requires.NotNull(context, nameof(context));
-            Requires.NotNull(expression, nameof(expression));
-
-            var model = BuildQueryModel(context, expression);
-            if (!(model is SelectQueryModel selectModel))
-            {
-                throw new NotSupportedException("ExecuteDelete does not support set operations.");
-            }
-
-            var dialect = SqlDialectFactory.Create(context.Connection);
-            var generated = _sqlGenerator.GenerateDelete(selectModel, dialect);
+            cancellationToken.ThrowIfCancellationRequested();
+            var generated = Prepare(context, expression, resultType, true, out var plan);
             using (var command = CreateCommand(context.Connection, generated))
             {
-                return command.ExecuteNonQuery();
-            }
-        }
-
-        public async Task<int> ExecuteDeleteAsync(KueryQueryContext context, Expression expression, CancellationToken cancellationToken)
-        {
-            Requires.NotNull(context, nameof(context));
-            Requires.NotNull(expression, nameof(expression));
-
-            var model = BuildQueryModel(context, expression);
-            if (!(model is SelectQueryModel selectModel))
-            {
-                throw new NotSupportedException("ExecuteDelete does not support set operations.");
-            }
-
-            var dialect = SqlDialectFactory.Create(context.Connection);
-            var generated = _sqlGenerator.GenerateDelete(selectModel, dialect);
-            using (var command = CreateCommand(context.Connection, generated))
-            {
-                return await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
-
-        public int ExecuteUpdate(KueryQueryContext context, Expression expression, IReadOnlyList<SetPropertyCall> setters)
-        {
-            Requires.NotNull(context, nameof(context));
-            Requires.NotNull(expression, nameof(expression));
-            Requires.NotNull(setters, nameof(setters));
-
-            var model = BuildQueryModel(context, expression);
-            if (!(model is SelectQueryModel selectModel))
-            {
-                throw new NotSupportedException("ExecuteUpdate does not support set operations.");
-            }
-
-            var dialect = SqlDialectFactory.Create(context.Connection);
-            var generated = _sqlGenerator.GenerateUpdate(selectModel, dialect, setters);
-            using (var command = CreateCommand(context.Connection, generated))
-            {
-                return command.ExecuteNonQuery();
-            }
-        }
-
-        public async Task<int> ExecuteUpdateAsync(
-            KueryQueryContext context,
-            Expression expression,
-            IReadOnlyList<SetPropertyCall> setters,
-            CancellationToken cancellationToken)
-        {
-            Requires.NotNull(context, nameof(context));
-            Requires.NotNull(expression, nameof(expression));
-            Requires.NotNull(setters, nameof(setters));
-
-            var model = BuildQueryModel(context, expression);
-            if (!(model is SelectQueryModel selectModel))
-            {
-                throw new NotSupportedException("ExecuteUpdate does not support set operations.");
-            }
-
-            var dialect = SqlDialectFactory.Create(context.Connection);
-            var generated = _sqlGenerator.GenerateUpdate(selectModel, dialect, setters);
-            using (var command = CreateCommand(context.Connection, generated))
-            {
-                return await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
-
-        public object ExecuteTerminal(KueryQueryContext context, Expression expression)
-        {
-            return Execute(context, expression, expression.Type);
-        }
-
-        public Task<object> ExecuteTerminalAsync(KueryQueryContext context, Expression expression, CancellationToken cancellationToken)
-        {
-            return ExecuteAsync(context, expression, expression.Type, cancellationToken);
-        }
-
-        private static object ExecuteCore(IDbConnection connection, SelectQueryModel model, GeneratedSql generated, Type resultType)
-        {
-            if (model.Joins != null && model.Joins.Count > 0)
-            {
-                return ExecuteJoinCore(connection, model, generated, resultType);
-            }
-
-            if (model.GroupBySelectItems != null && model.GroupBySelectItems.Count > 0)
-            {
-                return ExecuteGroupByCore(connection, model, generated, resultType);
-            }
-
-            using (var command = CreateCommand(connection, generated))
-            {
-                switch (model.Terminal)
+                if (!(command is DbCommand dbCommand))
                 {
-                    case QueryTerminalKind.Count:
-                        return ExecuteCount(command);
-                    case QueryTerminalKind.LongCount:
-                        return ExecuteLongCount(command);
-                    case QueryTerminalKind.Any:
-                        return ExecuteCount(command) > 0;
-                    case QueryTerminalKind.All:
-                        return ExecuteCount(command) == 0;
-                    case QueryTerminalKind.Sum:
-                    case QueryTerminalKind.Min:
-                    case QueryTerminalKind.Max:
-                    case QueryTerminalKind.Average:
-                        return ExecuteAggregate(command, resultType);
-                    case QueryTerminalKind.First:
-                        return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: true);
-                    case QueryTerminalKind.FirstOrDefault:
-                        return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: false);
-                    case QueryTerminalKind.Last:
-                        return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: true);
-                    case QueryTerminalKind.LastOrDefault:
-                        return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: false);
-                    case QueryTerminalKind.ElementAt:
-                        return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: true);
-                    case QueryTerminalKind.ElementAtOrDefault:
-                        return ExecuteFirst(command, model.Table, model.Projection, throwIfEmpty: false);
-                    case QueryTerminalKind.Single:
-                        return ExecuteSingle(command, model.Table, model.Projection, throwIfEmpty: true);
-                    case QueryTerminalKind.SingleOrDefault:
-                        return ExecuteSingle(command, model.Table, model.Projection, throwIfEmpty: false);
-                    case QueryTerminalKind.Sequence:
-                    default:
-                        return ExecuteSequence(command, model.Table, model.Projection, resultType);
+                    using (var reader = command.ExecuteReader()) return Read(reader, plan, cancellationToken);
                 }
-            }
-        }
-
-        private static async Task<object> ExecuteCoreAsync(
-            IDbConnection connection,
-            SelectQueryModel model,
-            GeneratedSql generated,
-            Type resultType,
-            CancellationToken cancellationToken)
-        {
-            if (model.Joins != null && model.Joins.Count > 0)
-            {
-                return await ExecuteJoinCoreAsync(connection, model, generated, resultType, cancellationToken).ConfigureAwait(false);
-            }
-
-            if (model.GroupBySelectItems != null && model.GroupBySelectItems.Count > 0)
-            {
-                return await ExecuteGroupByCoreAsync(connection, model, generated, resultType, cancellationToken).ConfigureAwait(false);
-            }
-
-            using (var command = CreateCommand(connection, generated))
-            {
-                switch (model.Terminal)
-                {
-                    case QueryTerminalKind.Count:
-                        return await ExecuteCountAsync(command, cancellationToken).ConfigureAwait(false);
-                    case QueryTerminalKind.LongCount:
-                        return await ExecuteLongCountAsync(command, cancellationToken).ConfigureAwait(false);
-                    case QueryTerminalKind.Any:
-                        return await ExecuteCountAsync(command, cancellationToken).ConfigureAwait(false) > 0;
-                    case QueryTerminalKind.All:
-                        return await ExecuteCountAsync(command, cancellationToken).ConfigureAwait(false) == 0;
-                    case QueryTerminalKind.Sum:
-                    case QueryTerminalKind.Min:
-                    case QueryTerminalKind.Max:
-                    case QueryTerminalKind.Average:
-                        return await ExecuteAggregateAsync(command, resultType, cancellationToken).ConfigureAwait(false);
-                    case QueryTerminalKind.First:
-                        return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
-                    case QueryTerminalKind.FirstOrDefault:
-                        return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: false, cancellationToken).ConfigureAwait(false);
-                    case QueryTerminalKind.Last:
-                        return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
-                    case QueryTerminalKind.LastOrDefault:
-                        return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: false, cancellationToken).ConfigureAwait(false);
-                    case QueryTerminalKind.ElementAt:
-                        return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
-                    case QueryTerminalKind.ElementAtOrDefault:
-                        return await ExecuteFirstAsync(command, model.Table, model.Projection, throwIfEmpty: false, cancellationToken).ConfigureAwait(false);
-                    case QueryTerminalKind.Single:
-                        return await ExecuteSingleAsync(command, model.Table, model.Projection, throwIfEmpty: true, cancellationToken).ConfigureAwait(false);
-                    case QueryTerminalKind.SingleOrDefault:
-                        return await ExecuteSingleAsync(command, model.Table, model.Projection, throwIfEmpty: false, cancellationToken).ConfigureAwait(false);
-                    case QueryTerminalKind.Sequence:
-                    default:
-                        return await ExecuteSequenceAsync(command, model.Table, model.Projection, resultType, cancellationToken).ConfigureAwait(false);
-                }
-            }
-        }
-
-        private static object ExecuteSetOperationCore(IDbConnection connection, SetOperationQueryModel model, GeneratedSql generated, Type resultType)
-        {
-            using (var command = CreateCommand(connection, generated))
-            {
-                return ExecuteSequence(command, model.Table, null, resultType);
-            }
-        }
-
-        private static async Task<object> ExecuteSetOperationCoreAsync(
-            IDbConnection connection,
-            SetOperationQueryModel model,
-            GeneratedSql generated,
-            Type resultType,
-            CancellationToken cancellationToken)
-        {
-            using (var command = CreateCommand(connection, generated))
-            {
-                return await ExecuteSequenceAsync(command, model.Table, null, resultType, cancellationToken).ConfigureAwait(false);
-            }
-        }
-
-        private static IDbCommand CreateCommand(IDbConnection connection, GeneratedSql generated)
-        {
-            var command = connection.CreateCommand();
-            command.CommandText = generated.CommandText;
-            for (var i = 0; i < generated.Parameters.Count; i++)
-            {
-                var parameter = command.CreateParameter();
-                parameter.ParameterName = connection.GetParameterName("p" + (i + 1).ToString());
-                parameter.Value = generated.Parameters[i] ?? DBNull.Value;
-                command.Parameters.Add(parameter);
-            }
-
-            return command;
-        }
-
-        private static object ExecuteJoinCore(IDbConnection connection, SelectQueryModel model, GeneratedSql generated, Type resultType)
-        {
-            using (var command = CreateCommand(connection, generated))
-            {
-                switch (model.Terminal)
-                {
-                    case QueryTerminalKind.Count:
-                    case QueryTerminalKind.LongCount:
-                    case QueryTerminalKind.Any:
-                    case QueryTerminalKind.All:
-                        var countResult = model.Terminal == QueryTerminalKind.LongCount
-                            ? (object)ExecuteLongCount(command)
-                            : ExecuteCount(command);
-                        if (model.Terminal == QueryTerminalKind.Any)
-                            return (int)countResult > 0;
-                        if (model.Terminal == QueryTerminalKind.All)
-                            return (int)countResult == 0;
-                        return countResult;
-                    default:
-                        return ExecuteJoinSequence(command, model, resultType);
-                }
-            }
-        }
-
-        private static async Task<object> ExecuteJoinCoreAsync(
-            IDbConnection connection,
-            SelectQueryModel model,
-            GeneratedSql generated,
-            Type resultType,
-            CancellationToken cancellationToken)
-        {
-            using (var command = CreateCommand(connection, generated))
-            {
-                switch (model.Terminal)
-                {
-                    case QueryTerminalKind.Count:
-                    case QueryTerminalKind.LongCount:
-                    case QueryTerminalKind.Any:
-                    case QueryTerminalKind.All:
-                        var countResult = model.Terminal == QueryTerminalKind.LongCount
-                            ? (object)await ExecuteLongCountAsync(command, cancellationToken).ConfigureAwait(false)
-                            : await ExecuteCountAsync(command, cancellationToken).ConfigureAwait(false);
-                        if (model.Terminal == QueryTerminalKind.Any)
-                            return (int)countResult > 0;
-                        if (model.Terminal == QueryTerminalKind.All)
-                            return (int)countResult == 0;
-                        return countResult;
-                    default:
-                        return await ExecuteJoinSequenceAsync(command, model, resultType, cancellationToken).ConfigureAwait(false);
-                }
-            }
-        }
-
-        private static object ExecuteJoinSequence(IDbCommand command, SelectQueryModel model, Type resultType)
-        {
-            var outerTable = model.Table;
-            var joins = model.Joins;
-            var resultSelector = model.JoinResultSelector.Compile();
-
-            var results = new List<object>();
-            using (var reader = command.ExecuteReader())
-            {
-                while (reader.Read())
-                {
-                    var args = ReadJoinRow(reader, outerTable, joins);
-                    results.Add(resultSelector.DynamicInvoke(args));
-                }
-            }
-
-            return HandleJoinTerminal(results, model.Terminal, resultType);
-        }
-
-        private static async Task<object> ExecuteJoinSequenceAsync(IDbCommand command, SelectQueryModel model, Type resultType, CancellationToken cancellationToken)
-        {
-            var outerTable = model.Table;
-            var joins = model.Joins;
-            var resultSelector = model.JoinResultSelector.Compile();
-
-            var results = new List<object>();
-            if (command is System.Data.Common.DbCommand dbCommand)
-            {
                 using (var reader = await dbCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 {
+                    var rows = CreateList(plan);
                     while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                     {
-                        var args = ReadJoinRow(reader, outerTable, joins);
-                        results.Add(resultSelector.DynamicInvoke(args));
+                        rows.Add(plan.Materialize(reader));
+                        if (Finished(plan, rows.Count)) break;
                     }
+                    return Result(plan, rows);
                 }
             }
-            else
-            {
-                using (var reader = command.ExecuteReader())
-                {
-                    while (reader.Read())
-                    {
-                        var args = ReadJoinRow(reader, outerTable, joins);
-                        results.Add(resultSelector.DynamicInvoke(args));
-                    }
-                }
-            }
-
-            return HandleJoinTerminal(results, model.Terminal, resultType);
         }
 
-        /// <summary>
-        /// Reads a row from the result set and returns an object array: [outerEntity, inner1, inner2, ...].
-        /// For LEFT JOIN, inner entities are null when all their columns are NULL.
-        /// </summary>
-        private static object[] ReadJoinRow(IDataReader reader, TableMapping outerTable, IReadOnlyList<JoinClause> joins)
+        static IList CreateList(RelationalQueryPlan plan) => (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(plan.ElementType));
+        static bool Finished(RelationalQueryPlan plan, int count) => plan.ResultKind != QueryResultKind.Sequence
+            && (plan.ResultKind == QueryResultKind.Single || plan.ResultKind == QueryResultKind.SingleOrDefault ? count == 2 : count == 1);
+
+        static object Read(IDataReader reader, RelationalQueryPlan plan, CancellationToken cancellationToken = default)
         {
-            var args = new object[joins.Count + 1];
-            args[0] = ReadObject(reader, outerTable, 0);
-            var offset = outerTable.Columns.Count;
-            for (var i = 0; i < joins.Count; i++)
+            var rows = CreateList(plan);
+            while (reader.Read())
             {
-                var join = joins[i];
-                args[i + 1] = join.IsLeftJoin
-                    ? ReadNullableObject(reader, join.InnerTable, offset)
-                    : ReadObject(reader, join.InnerTable, offset);
-                offset += join.InnerTable.Columns.Count;
+                cancellationToken.ThrowIfCancellationRequested();
+                rows.Add(plan.Materialize(reader));
+                if (Finished(plan, rows.Count)) break;
             }
-            return args;
+            return Result(plan, rows);
         }
 
-        /// <summary>
-        /// Reads an entity from the reader at the given column offset.
-        /// Returns null if all columns in the range are NULL (for LEFT JOIN support).
-        /// </summary>
-        private static object ReadNullableObject(IDataReader reader, TableMapping table, int startOrdinal)
+        static object Result(RelationalQueryPlan plan, IList rows)
         {
-            var allNull = true;
-            for (var i = 0; i < table.Columns.Count; i++)
-            {
-                if (!reader.IsDBNull(startOrdinal + i))
-                {
-                    allNull = false;
-                    break;
-                }
-            }
-
-            if (allNull) return null;
-            return ReadObject(reader, table, startOrdinal);
-        }
-
-        private static object ExecuteGroupByCore(IDbConnection connection, SelectQueryModel model, GeneratedSql generated, Type resultType)
-        {
-            using (var command = CreateCommand(connection, generated))
-            {
-                var results = ReadGroupByResults(command, model);
-                return HandleGroupByTerminal(results, model.Terminal, resultType);
-            }
-        }
-
-        private static async Task<object> ExecuteGroupByCoreAsync(
-            IDbConnection connection,
-            SelectQueryModel model,
-            GeneratedSql generated,
-            Type resultType,
-            CancellationToken cancellationToken)
-        {
-            using (var command = CreateCommand(connection, generated))
-            {
-                List<object> results;
-                if (command is System.Data.Common.DbCommand dbCommand)
-                {
-                    results = new List<object>();
-                    using (var reader = await dbCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
-                    {
-                        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                        {
-                            results.Add(ReadGroupByRow(reader, model));
-                        }
-                    }
-                }
-                else
-                {
-                    results = ReadGroupByResults(command, model);
-                }
-
-                return HandleGroupByTerminal(results, model.Terminal, resultType);
-            }
-        }
-
-        private static List<object> ReadGroupByResults(IDbCommand command, SelectQueryModel model)
-        {
-            var results = new List<object>();
-            using (var reader = command.ExecuteReader())
-            {
-                while (reader.Read())
-                {
-                    results.Add(ReadGroupByRow(reader, model));
-                }
-            }
-            return results;
-        }
-
-        private static object ReadGroupByRow(IDataReader reader, SelectQueryModel model)
-        {
-            var constructor = model.GroupByResultConstructor;
-            var selectItems = model.GroupBySelectItems;
-            var parameters = constructor.GetParameters();
-            var args = new object[selectItems.Count];
-
-            for (var i = 0; i < selectItems.Count; i++)
-            {
-                var val = reader.GetValue(i);
-                if (val is DBNull)
-                {
-                    val = null;
-                }
-
-                var targetType = parameters[i].ParameterType;
-                var underlying = Nullable.GetUnderlyingType(targetType) ?? targetType;
-
-                if (val != null)
-                {
-                    args[i] = Convert.ChangeType(val, underlying);
-                }
-                else if (targetType.IsValueType && Nullable.GetUnderlyingType(targetType) == null)
-                {
-                    args[i] = Activator.CreateInstance(targetType);
-                }
-            }
-
-            return constructor.Invoke(args);
-        }
-
-        private static object HandleGroupByTerminal(List<object> results, QueryTerminalKind terminal, Type resultType)
-        {
-            switch (terminal)
-            {
-                case QueryTerminalKind.First:
-                    if (results.Count == 0)
-                        throw new InvalidOperationException("Sequence contains no elements");
-                    return results[0];
-                case QueryTerminalKind.FirstOrDefault:
-                    return results.Count > 0 ? results[0] : null;
-                case QueryTerminalKind.Single:
-                    if (results.Count == 0)
-                        throw new InvalidOperationException("Sequence contains no elements");
-                    if (results.Count > 1)
-                        throw new InvalidOperationException("Sequence contains more than one element");
-                    return results[0];
-                case QueryTerminalKind.SingleOrDefault:
-                    if (results.Count > 1)
-                        throw new InvalidOperationException("Sequence contains more than one element");
-                    return results.Count > 0 ? results[0] : null;
-                case QueryTerminalKind.Sequence:
-                default:
-                    if (resultType.IsGenericType)
-                    {
-                        var elementType = resultType.GetGenericArguments()[0];
-                        var listType = typeof(List<>).MakeGenericType(elementType);
-                        var typedList = (IList)Activator.CreateInstance(listType);
-                        foreach (var item in results)
-                        {
-                            typedList.Add(item);
-                        }
-                        return typedList;
-                    }
-                    return results;
-            }
-        }
-
-        private static object ReadObject(IDataReader reader, TableMapping table, int startOrdinal)
-        {
-            var obj = Activator.CreateInstance(table.MappedType);
-            for (var i = 0; i < table.Columns.Count; i++)
-            {
-                var col = table.Columns[i];
-                var val = reader.GetValue(startOrdinal + i);
-                if (val is DBNull)
-                {
-                    val = null;
-                }
-                if (val != null)
-                {
-                    col.SetValue(obj, val);
-                }
-            }
-            return obj;
-        }
-
-        private static object HandleJoinTerminal(List<object> results, QueryTerminalKind terminal, Type resultType)
-        {
-            switch (terminal)
-            {
-                case QueryTerminalKind.First:
-                    if (results.Count == 0)
-                        throw new InvalidOperationException("Sequence contains no elements");
-                    return results[0];
-                case QueryTerminalKind.FirstOrDefault:
-                    return results.Count > 0 ? results[0] : null;
-                case QueryTerminalKind.Last:
-                    if (results.Count == 0)
-                        throw new InvalidOperationException("Sequence contains no elements");
-                    return results[results.Count - 1];
-                case QueryTerminalKind.LastOrDefault:
-                    return results.Count > 0 ? results[results.Count - 1] : null;
-                case QueryTerminalKind.Single:
-                    if (results.Count == 0)
-                        throw new InvalidOperationException("Sequence contains no elements");
-                    if (results.Count > 1)
-                        throw new InvalidOperationException("Sequence contains more than one element");
-                    return results[0];
-                case QueryTerminalKind.SingleOrDefault:
-                    if (results.Count > 1)
-                        throw new InvalidOperationException("Sequence contains more than one element");
-                    return results.Count > 0 ? results[0] : null;
-                case QueryTerminalKind.Sequence:
-                default:
-                    if (resultType.IsGenericType)
-                    {
-                        var elementType = resultType.GetGenericArguments()[0];
-                        var listType = typeof(List<>).MakeGenericType(elementType);
-                        var typedList = (IList)Activator.CreateInstance(listType);
-                        foreach (var item in results)
-                        {
-                            typedList.Add(item);
-                        }
-                        return typedList;
-                    }
-                    return results;
-            }
-        }
-
-        private static object ExecuteSequence(IDbCommand command, TableMapping table, LambdaExpression projection, Type resultType)
-        {
-            var method = typeof(SqlHelper)
-                .GetMethod(nameof(SqlHelper.ExecuteQuery), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
-                .MakeGenericMethod(table.MappedType);
-            var result = method.Invoke(null, new object[] { command, table });
-
-            if (projection != null)
-            {
-                return ApplyProjectionToSequence((IEnumerable)result, projection, resultType);
-            }
-
-            if (resultType.IsAssignableFrom(result.GetType()))
-            {
-                return result;
-            }
-
-            if (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(System.Collections.Generic.IEnumerable<>))
-            {
-                return result;
-            }
-
-            return ((IEnumerable)result).Cast<object>().ToList();
-        }
-
-        private static async Task<object> ExecuteSequenceAsync(IDbCommand command, TableMapping table, LambdaExpression projection, Type resultType, CancellationToken cancellationToken)
-        {
-            var method = typeof(SqlHelper)
-                .GetMethod("ExecuteQueryAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
-                .MakeGenericMethod(table.MappedType);
-            var task = (Task)method.Invoke(null, new object[] { command, table, cancellationToken });
-            await task.ConfigureAwait(false);
-            var result = task.GetType().GetProperty("Result").GetValue(task);
-
-            if (projection != null)
-            {
-                return ApplyProjectionToSequence((IEnumerable)result, projection, resultType);
-            }
-
-            if (resultType.IsAssignableFrom(result.GetType()))
-            {
-                return result;
-            }
-
-            if (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(System.Collections.Generic.IEnumerable<>))
-            {
-                return result;
-            }
-
-            return ((IEnumerable)result).Cast<object>().ToList();
-        }
-
-        private static int ExecuteCount(IDbCommand command)
-        {
-            var result = command.ExecuteScalar();
-            if (result is long l)
-            {
-                return (int)l;
-            }
-
-            return (int)result;
-        }
-
-        private static long ExecuteLongCount(IDbCommand command)
-        {
-            var result = command.ExecuteScalar();
-            if (result is int i)
-            {
-                return i;
-            }
-
-            return (long)result;
-        }
-
-        private static async Task<int> ExecuteCountAsync(IDbCommand command, CancellationToken cancellationToken)
-        {
-            var result = await command.TryExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-            if (result is long l)
-            {
-                return (int)l;
-            }
-
-            return (int)result;
-        }
-
-        private static async Task<long> ExecuteLongCountAsync(IDbCommand command, CancellationToken cancellationToken)
-        {
-            var result = await command.TryExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-            if (result is int i)
-            {
-                return i;
-            }
-
-            return (long)result;
-        }
-
-        private static object ExecuteFirst(IDbCommand command, TableMapping table, LambdaExpression projection, bool throwIfEmpty)
-        {
-            var method = typeof(SqlHelper)
-                .GetMethod(nameof(SqlHelper.ExecuteQuery), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
-                .MakeGenericMethod(table.MappedType);
-            var list = (IEnumerable)method.Invoke(null, new object[] { command, table });
-            var first = list.Cast<object>().FirstOrDefault();
-            if (first == null && throwIfEmpty)
-            {
-                throw new InvalidOperationException("Sequence contains no elements");
-            }
-
-            if (first != null && projection != null)
-            {
-                var compiled = projection.Compile();
-                return compiled.DynamicInvoke(first);
-            }
-
-            return first;
-        }
-
-        private static async Task<object> ExecuteFirstAsync(IDbCommand command, TableMapping table, LambdaExpression projection, bool throwIfEmpty, CancellationToken cancellationToken)
-        {
-            var method = typeof(SqlHelper)
-                .GetMethod("ExecuteQueryAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
-                .MakeGenericMethod(table.MappedType);
-            var task = (Task)method.Invoke(null, new object[] { command, table, cancellationToken });
-            await task.ConfigureAwait(false);
-            var list = (IEnumerable)task.GetType().GetProperty("Result").GetValue(task);
-            var first = list.Cast<object>().FirstOrDefault();
-            if (first == null && throwIfEmpty)
-            {
-                throw new InvalidOperationException("Sequence contains no elements");
-            }
-
-            if (first != null && projection != null)
-            {
-                var compiled = projection.Compile();
-                return compiled.DynamicInvoke(first);
-            }
-
-            return first;
-        }
-
-        private static object ApplyProjectionToSequence(IEnumerable source, LambdaExpression projection, Type resultType)
-        {
-            var compiled = projection.Compile();
-            var projected = new List<object>();
-            foreach (var item in source)
-            {
-                projected.Add(compiled.DynamicInvoke(item));
-            }
-
-            var elementType = resultType;
-            if (resultType.IsGenericType)
-            {
-                var genDef = resultType.GetGenericTypeDefinition();
-                if (genDef == typeof(IEnumerable<>) || genDef == typeof(List<>))
-                {
-                    elementType = resultType.GetGenericArguments()[0];
-                }
-            }
-
-            var listType = typeof(List<>).MakeGenericType(elementType);
-            var typedList = (IList)Activator.CreateInstance(listType);
-            foreach (var item in projected)
-            {
-                typedList.Add(item);
-            }
-
-            return typedList;
-        }
-
-        private static object ExecuteSingle(IDbCommand command, TableMapping table, LambdaExpression projection, bool throwIfEmpty)
-        {
-            var method = typeof(SqlHelper)
-                .GetMethod(nameof(SqlHelper.ExecuteQuery), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
-                .MakeGenericMethod(table.MappedType);
-            var list = ((IEnumerable)method.Invoke(null, new object[] { command, table })).Cast<object>().ToList();
-
-            if (list.Count > 1)
-            {
+            if (plan.ResultKind == QueryResultKind.Sequence) return rows;
+            if ((plan.ResultKind == QueryResultKind.Single || plan.ResultKind == QueryResultKind.SingleOrDefault) && rows.Count > 1)
                 throw new InvalidOperationException("Sequence contains more than one element");
-            }
-
-            var item = list.Count == 1 ? list[0] : null;
-            if (item == null && throwIfEmpty)
-            {
-                throw new InvalidOperationException("Sequence contains no elements");
-            }
-
-            if (item != null && projection != null)
-            {
-                var compiled = projection.Compile();
-                return compiled.DynamicInvoke(item);
-            }
-
-            return item;
+            if (rows.Count != 0) return rows[0];
+            if (plan.ResultKind == QueryResultKind.FirstOrDefault || plan.ResultKind == QueryResultKind.SingleOrDefault || plan.ResultKind == QueryResultKind.ElementAtOrDefault)
+                return plan.ElementType.IsValueType ? Activator.CreateInstance(plan.ElementType) : null;
+            if (plan.ResultKind == QueryResultKind.ElementAt) throw new ArgumentOutOfRangeException("index");
+            throw new InvalidOperationException("Sequence contains no elements");
         }
 
-        private static async Task<object> ExecuteSingleAsync(IDbCommand command, TableMapping table, LambdaExpression projection, bool throwIfEmpty, CancellationToken cancellationToken)
+        static IDbCommand CreateCommand(IDbConnection connection, RelationalCommand generated)
         {
-            var method = typeof(SqlHelper)
-                .GetMethod("ExecuteQueryAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
-                .MakeGenericMethod(table.MappedType);
-            var task = (Task)method.Invoke(null, new object[] { command, table, cancellationToken });
-            await task.ConfigureAwait(false);
-            var list = ((IEnumerable)task.GetType().GetProperty("Result").GetValue(task)).Cast<object>().ToList();
-
-            if (list.Count > 1)
+            var command = connection.CreateCommand();
+            try
             {
-                throw new InvalidOperationException("Sequence contains more than one element");
-            }
-
-            var item = list.Count == 1 ? list[0] : null;
-            if (item == null && throwIfEmpty)
-            {
-                throw new InvalidOperationException("Sequence contains no elements");
-            }
-
-            if (item != null && projection != null)
-            {
-                var compiled = projection.Compile();
-                return compiled.DynamicInvoke(item);
-            }
-
-            return item;
-        }
-
-        private static object ExecuteAggregate(IDbCommand command, Type resultType)
-        {
-            var result = command.ExecuteScalar();
-            return ConvertScalar(result, resultType);
-        }
-
-        private static async Task<object> ExecuteAggregateAsync(IDbCommand command, Type resultType, CancellationToken cancellationToken)
-        {
-            var result = await command.TryExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-            return ConvertScalar(result, resultType);
-        }
-
-        private static object ConvertScalar(object result, Type resultType)
-        {
-            if (result is null || result is DBNull)
-            {
-                if (resultType.IsValueType)
+                command.CommandText = generated.CommandText;
+                foreach (var bound in generated.Parameters)
                 {
-                    return Activator.CreateInstance(resultType);
+                    var parameter = command.CreateParameter();
+                    parameter.ParameterName = bound.Name;
+                    parameter.Value = bound.Value ?? DBNull.Value;
+                    var type = Nullable.GetUnderlyingType(bound.Type) ?? bound.Type;
+                    if (type == typeof(int)) parameter.DbType = DbType.Int32;
+                    else if (type == typeof(long)) parameter.DbType = DbType.Int64;
+                    else if (type == typeof(short)) parameter.DbType = DbType.Int16;
+                    else if (type == typeof(bool)) parameter.DbType = DbType.Boolean;
+                    else if (type == typeof(string)) parameter.DbType = DbType.String;
+                    else if (type == typeof(double)) parameter.DbType = DbType.Double;
+                    else if (type == typeof(float)) parameter.DbType = DbType.Single;
+                    else if (type == typeof(decimal)) parameter.DbType = DbType.Decimal;
+                    else if (type == typeof(Guid)) parameter.DbType = DbType.Guid;
+                    else if (type == typeof(DateTime)) parameter.DbType = DbType.DateTime;
+                    else if (type == typeof(DateTimeOffset)) parameter.DbType = DbType.DateTimeOffset;
+                    command.Parameters.Add(parameter);
                 }
-                return null;
+                return command;
             }
-
-            var targetType = resultType;
-            if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(Nullable<>))
-            {
-                targetType = targetType.GetGenericArguments()[0];
-            }
-
-            return Convert.ChangeType(result, targetType);
+            catch { command.Dispose(); throw; }
         }
+
+        public int ExecuteDelete(KueryQueryContext context, Expression expression) => Mutate(context, expression, "delete", null);
+        public Task<int> ExecuteDeleteAsync(KueryQueryContext context, Expression expression, CancellationToken cancellationToken)
+            => MutateAsync(context, expression, "delete", null, cancellationToken);
+        public int ExecuteUpdate(KueryQueryContext context, Expression expression, IReadOnlyList<SetPropertyCall> setters) => Mutate(context, expression, "update", setters);
+        public Task<int> ExecuteUpdateAsync(KueryQueryContext context, Expression expression, IReadOnlyList<SetPropertyCall> setters, CancellationToken cancellationToken)
+            => MutateAsync(context, expression, "update", setters, cancellationToken);
+
+        int Mutate(KueryQueryContext context, Expression expression, string operation, IReadOnlyList<SetPropertyCall> setters)
+        {
+            var generated = Prepare(context, expression, typeof(int), false, out _, operation, setters);
+            using (var command = CreateCommand(context.Connection, generated)) return command.ExecuteNonQuery();
+        }
+
+        async Task<int> MutateAsync(KueryQueryContext context, Expression expression, string operation, IReadOnlyList<SetPropertyCall> setters, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var generated = Prepare(context, expression, typeof(int), true, out _, operation, setters);
+            using (var command = CreateCommand(context.Connection, generated)) return await command.TryExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
     }
 }

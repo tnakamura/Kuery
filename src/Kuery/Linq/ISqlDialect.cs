@@ -15,5 +15,9 @@ namespace Kuery.Linq
         string EscapeIdentifier(string identifier);
 
         string FormatParameterName(string parameterName);
+
+        string CastType(System.Type type);
+
+        string Function(string operation, string[] arguments);
     }
 }

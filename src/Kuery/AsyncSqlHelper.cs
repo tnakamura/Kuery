@@ -414,7 +414,7 @@ namespace Kuery
 
             if (TryGetKueryProvider(query, out var provider))
             {
-                return await provider.ExecuteAsync<int>(query.Expression, cancellationToken).ConfigureAwait(false);
+                return await provider.ExecuteAsync<int>(CreateTerminalExpression(query, nameof(Queryable.Count)), cancellationToken).ConfigureAwait(false);
             }
 
             return query.Count();
@@ -439,7 +439,7 @@ namespace Kuery
 
             if (TryGetKueryProvider(query, out var provider))
             {
-                return await provider.ExecuteAsync<T>(query.Expression, cancellationToken).ConfigureAwait(false);
+                return await provider.ExecuteAsync<T>(CreateTerminalExpression(query, nameof(Queryable.First)), cancellationToken).ConfigureAwait(false);
             }
 
             return query.First();
@@ -464,7 +464,7 @@ namespace Kuery
 
             if (TryGetKueryProvider(query, out var provider))
             {
-                return await provider.ExecuteAsync<T>(query.Expression, cancellationToken).ConfigureAwait(false);
+                return await provider.ExecuteAsync<T>(CreateTerminalExpression(query, nameof(Queryable.FirstOrDefault)), cancellationToken).ConfigureAwait(false);
             }
 
             return query.FirstOrDefault();
@@ -512,6 +512,11 @@ namespace Kuery
             }
 
             throw new NotSupportedException("ExecuteUpdateAsync is supported only for queries created by Kuery Query<T>().");
+        }
+
+        private static Expression CreateTerminalExpression<T>(IQueryable<T> query, string name)
+        {
+            return Expression.Call(typeof(Queryable), name, new[] { typeof(T) }, query.Expression);
         }
 
         private static bool TryGetKueryProvider<T>(IQueryable<T> query, out KueryQueryProvider provider)

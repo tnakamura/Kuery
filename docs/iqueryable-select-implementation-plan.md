@@ -1,5 +1,7 @@
 # IQueryable ベース SELECT 導入計画（Kuery）
 
+> この文書は初回導入時の設計記録です。現在の構造は [クエリパイプライン](query-pipeline.md)、対応範囲は [SQL サポート状況](iqueryable-sql-support-status.md) を参照してください。
+
 ## 目的
 `connection.Query<T>()`（引数なし）を入口にして、LINQ の式木を SQL `SELECT` に変換・実行できるようにする。
 

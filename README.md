@@ -144,6 +144,10 @@ Most async methods accept `CancellationToken`.
 
 You can also compose SQL `SELECT` queries through LINQ by using `Query<T>()`.
 
+The query pipeline translates LINQ to typed SQL expressions and constructs results directly
+from the selected columns. It supports SQLite, PostgreSQL, SQL Server, and MySQL without
+an EF Core dependency, change tracking, or migrations.
+
 ```cs
 var products = await connection.Query<Product>()
     .Where(p => p.Code == "0001")
@@ -177,6 +181,27 @@ SQL translation currently supports (including async equivalents where applicable
   - Other: null coalescing (`??`), ternary conditional (`?:`), bitwise operators (`&`, `|`, `^`, `~`), and `KueryFunctions.Like(...)`
 
 Unsupported LINQ operators throw `NotSupportedException`.
+
+Computed projections can be filtered, sorted, and aggregated on the server:
+
+```cs
+var summaries = await connection.Query<Product>()
+    .Select(p => new { p.Name, Score = p.Price * p.TotalSales })
+    .Where(p => p.Score > 100)
+    .OrderByDescending(p => p.Score)
+    .Take(10)
+    .ToListAsync();
+```
+
+Operator order is preserved: `Take(10).Where(predicate)` filters the first ten rows,
+and `Select(p => p.Name).Distinct().Count()` counts distinct names, including null.
+Nullable equality/inequality and collection `Contains` use C# null semantics.
+`Last`/`LastOrDefault` require an explicit `OrderBy`; out-of-range `ElementAt` throws
+`ArgumentOutOfRangeException`. Queries combined in joins, set operations, or subqueries
+must use the same connection. Use `AsEnumerable()` to switch explicitly to client processing.
+
+See [SQL support](docs/iqueryable-sql-support-status.md) and
+[query pipeline design](docs/query-pipeline.md) for capabilities and limitations.
 
 #### Manual SQL
 

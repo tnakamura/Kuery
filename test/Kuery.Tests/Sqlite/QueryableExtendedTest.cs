@@ -808,7 +808,7 @@ namespace Kuery.Tests.Sqlite
             using (var connection = fixture.OpenNewConnection())
             {
                 Assert.Throws<InvalidOperationException>(() =>
-                    connection.Query<Customer>().Last());
+                    connection.Query<Customer>().OrderBy(x => x.Id).Last());
             }
         }
 
@@ -834,6 +834,7 @@ namespace Kuery.Tests.Sqlite
             using (var connection = fixture.OpenNewConnection())
             {
                 var result = connection.Query<Customer>()
+                    .OrderBy(x => x.Id)
                     .LastOrDefault();
 
                 Assert.Null(result);
@@ -841,15 +842,13 @@ namespace Kuery.Tests.Sqlite
         }
 
         [Fact]
-        public void LastWithNoOrderByUsesDefaultPkTest()
+        public void LastWithNoOrderByThrowsTest()
         {
             SeedThreeCustomers();
 
             using (var connection = fixture.OpenNewConnection())
             {
-                var result = connection.Query<Customer>().Last();
-
-                Assert.Equal(3, result.Id);
+                Assert.Throws<NotSupportedException>(() => connection.Query<Customer>().Last());
             }
         }
 
@@ -1055,7 +1054,7 @@ namespace Kuery.Tests.Sqlite
 
             using (var connection = fixture.OpenNewConnection())
             {
-                Assert.Throws<InvalidOperationException>(() =>
+                Assert.Throws<ArgumentOutOfRangeException>(() =>
                     connection.Query<Customer>()
                         .OrderBy(x => x.Id)
                         .ElementAt(10));

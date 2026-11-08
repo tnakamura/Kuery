@@ -16,7 +16,7 @@ namespace KueryBenchmark
             base()
         {
             var baseConfig = Job.Default;
-            AddJob(baseConfig.WithRuntime(CoreRuntime.Core31).WithJit(Jit.RyuJit).WithPlatform(Platform.X64));
+            AddJob(baseConfig.WithRuntime(CoreRuntime.Core10_0).WithJit(Jit.RyuJit));
 
             AddLogger(ConsoleLogger.Default);
 

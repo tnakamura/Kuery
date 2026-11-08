@@ -24,7 +24,8 @@ namespace Kuery.Linq
                 return new MySqlDialect();
             }
 
-            return new SqliteDialect();
+            if (connection.IsSqlite()) return new SqliteDialect();
+            throw new NotSupportedException("Unsupported database connection: " + connection.GetType().FullName);
         }
     }
 }

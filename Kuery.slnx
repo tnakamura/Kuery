@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/benchmark/">
     <Project Path="benchmark/KueryBenchmark/KueryBenchmark.csproj" />
+    <Project Path="benchmark/QueryPipelineProbe/QueryPipelineProbe.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Kuery/Kuery.csproj" />
