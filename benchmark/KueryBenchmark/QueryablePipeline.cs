@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using BenchmarkDotNet.Attributes;
 using Kuery;
-using Kuery.Linq;
+using Kuery.Query;
+using Kuery.Query.Internal;
+using Kuery.Query.SqlExpressions;
 using Microsoft.Data.Sqlite;
 
 namespace KueryBenchmark
@@ -31,7 +33,7 @@ namespace KueryBenchmark
 
         // Iteration setup forces a single invocation, keeping cache reset outside the measured operation.
         [IterationSetup(Target = nameof(FirstExecution))]
-        public void ResetPlanCache() => QueryPlanCache.Clear();
+        public void ResetPlanCache() => CompiledQueryCache.Clear();
 
         [Benchmark]
         public List<PipelineItem> FirstExecution() => _rows.Where(x => x.Id > 990).ToList();

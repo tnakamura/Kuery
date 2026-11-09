@@ -2,7 +2,9 @@ using System;
 using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
-using Kuery.Linq;
+using Kuery.Query;
+using Kuery.Query.Internal;
+using Kuery.Query.SqlExpressions;
 using Xunit;
 
 namespace Kuery.Tests

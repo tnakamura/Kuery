@@ -5,7 +5,9 @@ using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Kuery.Linq;
+using Kuery.Query;
+using Kuery.Query.Internal;
+using Kuery.Query.SqlExpressions;
 using Microsoft.Data.Sqlite;
 using Xunit;
 
@@ -334,9 +336,9 @@ namespace Kuery.Tests.Sqlite
             int minimum = 1;
             var query = Query.Where(x => x.Id > minimum).Select(x => x.Name);
             var executor = new KueryLinqExecutor();
-            var first = executor.Prepare(new KueryQueryContext(_connection), query.Expression, typeof(IEnumerable<string>), false, out var firstPlan);
+            var first = executor.Prepare(new QueryContext(_connection), query.Expression, typeof(IEnumerable<string>), false, out var firstPlan);
             minimum = 4;
-            var second = executor.Prepare(new KueryQueryContext(_connection), query.Expression, typeof(IEnumerable<string>), false, out var secondPlan);
+            var second = executor.Prepare(new QueryContext(_connection), query.Expression, typeof(IEnumerable<string>), false, out var secondPlan);
             Assert.Same(firstPlan, secondPlan);
             Assert.Equal(first.CommandText, second.CommandText);
             Assert.Equal(1, first.Parameters.Single().Value);
@@ -351,11 +353,11 @@ namespace Kuery.Tests.Sqlite
             int minimum = 1;
             var query = Query.Where(x => x.Id > minimum).Select(x => x.Id);
             var executor = new KueryLinqExecutor();
-            var first = executor.Prepare(new KueryQueryContext(_connection), query.Expression, typeof(IEnumerable<int>), false, out var plan);
+            var first = executor.Prepare(new QueryContext(_connection), query.Expression, typeof(IEnumerable<int>), false, out var plan);
             Assert.NotNull(plan.CommandTemplate);
             Assert.All(plan.CommandTemplate.Parameters, p => Assert.Null(p.Value));
             minimum = 4;
-            var second = executor.Prepare(new KueryQueryContext(_connection), query.Expression, typeof(IEnumerable<int>), false, out var reused);
+            var second = executor.Prepare(new QueryContext(_connection), query.Expression, typeof(IEnumerable<int>), false, out var reused);
             Assert.Same(plan, reused);
             Assert.Equal(first.CommandText, second.CommandText);
             Assert.Equal(4, second.Parameters.Single().Value);
@@ -375,13 +377,13 @@ namespace Kuery.Tests.Sqlite
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        static (WeakReference Connection, WeakReference Payload, RelationalQueryPlan Plan) CompileWithoutRetainingInputs()
+        static (WeakReference Connection, WeakReference Payload, CompiledQuery Plan) CompileWithoutRetainingInputs()
         {
             using var connection = new SqliteConnection("Data Source=:memory:");
             var payload = new CapturePayload { Minimum = 2 };
             var query = connection.Query<PipelineRow>().Where(x => x.Id >= payload.Minimum)
                 .Select(x => new LeakProjection { Id = x.Id });
-            new KueryLinqExecutor().Prepare(new KueryQueryContext(connection), query.Expression,
+            new KueryLinqExecutor().Prepare(new QueryContext(connection), query.Expression,
                 typeof(IEnumerable<LeakProjection>), false, out var plan);
             return (new WeakReference(connection), new WeakReference(payload), plan);
         }
@@ -404,11 +406,11 @@ namespace Kuery.Tests.Sqlite
         public void PlanCacheEvictsLeastRecentlyUsedEntriesAtItsBound()
         {
             string prefix = Guid.NewGuid().ToString();
-            var original = new RelationalQueryPlan();
-            Assert.Same(original, QueryPlanCache.GetOrAdd(prefix, () => original));
-            for (int i = 0; i < 257; i++) QueryPlanCache.GetOrAdd(prefix + i, () => new RelationalQueryPlan());
-            Assert.True(QueryPlanCache.Count <= 256);
-            Assert.NotSame(original, QueryPlanCache.GetOrAdd(prefix, () => new RelationalQueryPlan()));
+            var original = new CompiledQuery();
+            Assert.Same(original, CompiledQueryCache.GetOrAdd(prefix, () => original));
+            for (int i = 0; i < 257; i++) CompiledQueryCache.GetOrAdd(prefix + i, () => new CompiledQuery());
+            Assert.True(CompiledQueryCache.Count <= 256);
+            Assert.NotSame(original, CompiledQueryCache.GetOrAdd(prefix, () => new CompiledQuery()));
         }
 
         static int UserFunction(int value) => value + 1;

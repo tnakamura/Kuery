@@ -2,7 +2,7 @@
 
 ## プロジェクト構成
 
-- `src/Kuery/` は .NET ORM ライブラリのソースです。`Linq/` にクエリの変換処理とデータベースごとの SQL 方言を配置します。
+- `src/Kuery/` は .NET ORM ライブラリのソースです。`Query/` にクエリの変換処理と SQL 方言、`Query/SqlExpressions/` に SQL 式、`Query/Internal/` にコンパイルとキャッシュの内部処理を配置します。
 - `test/Kuery.Tests/` は xUnit テストです。プロバイダーごとに `Sqlite`、`Npgsql`、`SqlClient`、`MySql` に分かれ、共通のフィクスチャやヘルパーはその上の階層にあります。
 - `benchmark/KueryBenchmark/` は性能測定用、`docs/` は実装計画と LINQ のサポート状況の文書です。`Kuery.slnx` に全プロジェクトが含まれます。
 

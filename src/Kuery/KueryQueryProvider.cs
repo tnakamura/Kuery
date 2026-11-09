@@ -5,24 +5,26 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Kuery.Linq;
+using Kuery.Query;
+using Kuery.Query.Internal;
+using Kuery.Query.SqlExpressions;
 
 namespace Kuery
 {
     public sealed class KueryQueryProvider : IQueryProvider
     {
-        readonly KueryQueryContext _context;
+        readonly QueryContext _context;
 
         readonly IKueryLinqExecutor _executor;
 
         internal IDbConnection Connection => _context.Connection;
 
         internal KueryQueryProvider(IDbConnection connection)
-            : this(new KueryQueryContext(connection), new KueryLinqExecutor())
+            : this(new QueryContext(connection), new KueryLinqExecutor())
         {
         }
 
-        internal KueryQueryProvider(KueryQueryContext context, IKueryLinqExecutor executor)
+        internal KueryQueryProvider(QueryContext context, IKueryLinqExecutor executor)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _executor = executor ?? throw new ArgumentNullException(nameof(executor));

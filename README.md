@@ -202,6 +202,8 @@ must use the same connection. Use `AsEnumerable()` to switch explicitly to clien
 
 See [SQL support](docs/iqueryable-sql-support-status.md) and
 [query pipeline design](docs/query-pipeline.md) for capabilities and limitations.
+The internal class names and compilation stages follow EF Core where practical;
+see the [EF Core alignment guide](docs/efcore-query-alignment.md) for corresponding source locations and intentional differences.
 
 #### Manual SQL
 

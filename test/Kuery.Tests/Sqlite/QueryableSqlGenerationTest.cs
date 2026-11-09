@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
 using System.Linq.Expressions;
-using Kuery.Linq;
+using Kuery.Query;
+using Kuery.Query.Internal;
+using Kuery.Query.SqlExpressions;
 using Microsoft.Data.Sqlite;
 using Xunit;
 
@@ -19,9 +21,9 @@ namespace Kuery.Tests.Sqlite
 
         static RelationalCommand Generate(Expression expression, SqliteConnection connection, ISqlDialect dialect)
         {
-            var normalized = new QueryNormalizer(connection);
-            var plan = new RelationalQueryCompiler().Compile(normalized.Visit(expression));
-            return new RelationalSqlGenerator(dialect, normalized.Values).Generate(plan);
+            var normalized = new ExpressionTreeFuncletizer(connection);
+            var plan = new QueryCompilationContext().CreateQueryExecutor(normalized.Visit(expression));
+            return new QuerySqlGenerator(dialect, normalized.Values).GetCommand(plan.Query);
         }
 
         [Theory]
@@ -102,9 +104,9 @@ namespace Kuery.Tests.Sqlite
             var query = connection.Query<QueryPipelineContract.ContractRow>().Where(x => names.Contains(x.Name));
             var executor = new KueryLinqExecutor();
             var resultType = typeof(System.Collections.Generic.IEnumerable<QueryPipelineContract.ContractRow>);
-            var first = executor.Prepare(new KueryQueryContext(connection), query.Expression, resultType, false, out var firstPlan);
+            var first = executor.Prepare(new QueryContext(connection), query.Expression, resultType, false, out var firstPlan);
             names = Array.Empty<string>();
-            var second = executor.Prepare(new KueryQueryContext(connection), query.Expression, resultType, false, out var secondPlan);
+            var second = executor.Prepare(new QueryContext(connection), query.Expression, resultType, false, out var secondPlan);
             Assert.Same(firstPlan, secondPlan);
             Assert.Contains(" is null", first.CommandText);
             Assert.Contains("(1 = 0)", second.CommandText);
