@@ -253,8 +253,8 @@ This script starts test databases via `test/docker-compose.test.yml`, runs SQL S
 GitHub Actions runs:
 
 - `fast` job: SQLite-only tests
-- `integration` job: SQL Server + PostgreSQL tests via Docker
-- `Release NuGet Package` workflow: runs when a GitHub Release is published and pushes package(s) to NuGet.org using `NUGET_API_KEY` secret
+- `integration` job: SQL Server + PostgreSQL + MySQL tests via Docker
+- `Release NuGet Package` workflow: validates the release tag, runs both test suites, and publishes to NuGet.org using Trusted Publishing when a GitHub Release is published. See [publishing packages](docs/publishing.md) for initial setup and release steps.
 
 ### All tests
 

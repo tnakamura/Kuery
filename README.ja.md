@@ -221,8 +221,8 @@ Docker が必要です。
 GitHub Actions では次のジョブとワークフローを実行します。
 
 - `fast` ジョブ：SQLite のテストのみ
-- `integration` ジョブ：Docker を使用した SQL Server と PostgreSQL のテスト
-- `Release NuGet Package` ワークフロー：GitHub Release の公開時に実行され、`NUGET_API_KEY` シークレットを使用してパッケージを NuGet.org にプッシュ
+- `integration` ジョブ：Docker を使用した SQL Server、PostgreSQL、MySQL のテスト
+- `Release NuGet Package` ワークフロー：GitHub Release の公開時にタグを検証し、両テストスイートの成功後に Trusted Publishing で NuGet.org に公開。初期設定とリリース手順は[パッケージの公開](docs/publishing.md)を参照してください。
 
 ### すべてのテスト
 
