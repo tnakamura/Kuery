@@ -38,6 +38,22 @@ namespace Kuery.Query.Internal
                 if (!source.Type.IsArray) throw RelationalQueryableMethodTranslatingExpressionVisitor.Unsupported(node);
                 return Visit(Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), contains.Method.GetGenericArguments(), source, contains.Arguments[1]));
             }
+            if (node is MethodCallExpression entityContains && entityContains.Method.DeclaringType == typeof(Queryable)
+                && entityContains.Method.Name == nameof(Queryable.Contains) && entityContains.Arguments.Count == 2
+                && !IsScalar(entityContains.Method.GetGenericArguments()[0]) && IsEvaluatable(entityContains.Arguments[1]))
+            {
+                var type = entityContains.Method.GetGenericArguments()[0];
+                var mapping = SqlMapper.GetMapping(type);
+                if (mapping.PK == null) throw new NotSupportedException("Entity Contains requires a mapped primary key: " + type);
+                var value = Evaluate(entityContains.Arguments[1]);
+                var keyType = mapping.PK.PropertyInfo.PropertyType;
+                if (keyType.IsValueType && Nullable.GetUnderlyingType(keyType) == null) keyType = typeof(Nullable<>).MakeGenericType(keyType);
+                var key = new QueryParameterExpression(Values.Count, keyType);
+                Values.Add(value == null ? null : mapping.PK.PropertyInfo.GetValue(value, null));
+                var present = new QueryParameterExpression(Values.Count, typeof(bool));
+                Values.Add(value != null);
+                return entityContains.Update(null, new[] { Visit(entityContains.Arguments[0]), new EntityReferenceExpression(type, key, present) });
+            }
             var construction = node is MemberInitExpression || (node is NewExpression && !IsScalar(node.Type)
                 && !typeof(System.Collections.IEnumerable).IsAssignableFrom(node.Type));
             if (!construction && !(node is LambdaExpression) && node.NodeType != ExpressionType.Quote && IsEvaluatable(node))
@@ -99,7 +115,7 @@ namespace Kuery.Query.Internal
                 if (node is ParameterExpression || node is SqlExpression || node is QueryParameterExpression || node is QueryRootExpression
                     || node is LambdaExpression || node.NodeType == ExpressionType.Quote)
                 { Dependent = true; return node; }
-                if (node is MethodCallExpression call && (call.Method.DeclaringType == typeof(Queryable) || call.Method.DeclaringType == typeof(KueryFunctions)))
+                if (node is MethodCallExpression call && (call.Method.DeclaringType == typeof(Queryable) || call.Method.DeclaringType == typeof(KueryFunctions) || call.Method.DeclaringType == typeof(KueryQueryableExtensions)))
                 { Dependent = true; return node; }
                 if (node is MemberExpression member && member.Member.DeclaringType == typeof(DateTime)
                     && (member.Member.Name == nameof(DateTime.Now) || member.Member.Name == nameof(DateTime.UtcNow) || member.Member.Name == nameof(DateTime.Today)))

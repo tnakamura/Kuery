@@ -40,6 +40,9 @@ namespace Kuery.Query
 
         protected override Expression VisitExtension(Expression node)
         {
+            if (node is OptionalShaperExpression optional)
+                return Expression.Condition(Expression.Equal(Visit(optional.Presence), Expression.Constant(null, optional.Presence.Type)),
+                    Expression.Default(optional.Type), Visit(optional.Value));
             if (node is SqlExpression sql)
             {
                 var ordinal = _query.AddToProjection(sql);

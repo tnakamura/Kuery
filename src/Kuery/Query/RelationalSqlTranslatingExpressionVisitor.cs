@@ -23,6 +23,10 @@ namespace Kuery.Query
 
         protected override Expression VisitExtension(Expression node)
         {
+            if (node is OptionalShaperExpression optional)
+                return _sqlExpressionFactory.Case(optional.Type,
+                    _sqlExpressionFactory.MakeUnary(ExpressionType.Equal, typeof(bool), optional.Presence),
+                    new SqlConstantExpression(optional.Type.IsValueType ? Activator.CreateInstance(optional.Type) : null, optional.Type), Translate(optional.Value));
             if (node is QueryParameterExpression parameter) return new SqlParameterExpression(parameter.Index, parameter.Type);
             if (node is SqlExpression) return node;
             throw RelationalQueryableMethodTranslatingExpressionVisitor.Unsupported(node);
@@ -123,16 +127,14 @@ namespace Kuery.Query
                     || (call.Object != null && declaringType.Namespace == "System.Collections.Generic")))
             {
                 if (call.Arguments.Count != (call.Object == null ? 2 : 1)) throw RelationalQueryableMethodTranslatingExpressionVisitor.Unsupported(call);
-                var operand = Translate(call.Arguments[call.Object == null ? 1 : 0]);
-                if (source is QueryRootExpression || (source is MethodCallExpression queryCall && queryCall.Method.DeclaringType == typeof(Queryable)))
+                var item = call.Arguments[call.Object == null ? 1 : 0];
+                if (typeof(IQueryable).IsAssignableFrom(source.Type))
                 {
-                    var subquery = _queryableMethodTranslatingExpressionVisitor.Translate(source);
-                    _queryableMethodTranslatingExpressionVisitor.PushdownIntoSubquery(subquery, false);
-                    subquery.QueryExpression.Predicate = RelationalQueryableMethodTranslatingExpressionVisitor.And(subquery.QueryExpression.Predicate, _sqlExpressionFactory.MakeBinary(ExpressionType.Equal, typeof(bool), Translate(subquery.ShaperExpression), operand));
-                    subquery.QueryExpression.AddToProjection(RelationalQueryableMethodTranslatingExpressionVisitor.Integer(1));
-                    return new ExistsExpression(subquery.QueryExpression);
+                    var subquery = _queryableMethodTranslatingExpressionVisitor.TranslateContains(
+                        _queryableMethodTranslatingExpressionVisitor.Translate(source), item);
+                    return subquery.ShaperExpression;
                 }
-                return new InExpression(operand, Translate(source));
+                return new InExpression(Translate(item), Translate(source));
             }
             if (declaringType == typeof(Queryable) && (name == "Any" || name == "All" || name == "Count" || name == "LongCount" || name == "Sum" || name == "Min" || name == "Max" || name == "Average"))
             {

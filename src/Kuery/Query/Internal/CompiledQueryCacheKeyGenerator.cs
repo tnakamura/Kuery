@@ -45,6 +45,7 @@ namespace Kuery.Query.Internal
             protected override Expression VisitExtension(Expression node)
             {
                 if (node is QueryParameterExpression parameter) Text.Append("slot:").Append(parameter.Index);
+                else if (node is EntityReferenceExpression entity) { Visit(entity.Key); Visit(entity.Present); }
                 else if (node is QueryRootExpression root)
                 {
                     Text.Append("table:"); Add(root.Mapping.TableName);

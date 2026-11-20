@@ -86,6 +86,14 @@ namespace Kuery.Query
             var source = Translate(method.Arguments[0]);
             switch (name)
             {
+                case nameof(Queryable.Reverse): return TranslateReverse(source);
+                case nameof(Queryable.Cast): return TranslateCast(source, method.Method.GetGenericArguments()[0]);
+                case nameof(Queryable.Contains):
+                    if (method.Arguments.Count != 2) throw Unsupported(method);
+                    return TranslateContains(source, method.Arguments[1]);
+                case nameof(Queryable.DefaultIfEmpty):
+                    if (method.Arguments.Count != 1) throw Unsupported(method);
+                    return TranslateDefaultIfEmpty(source);
                 case nameof(Queryable.Where):
                     TranslateWhere(source, Lambda(method.Arguments[1]));
                     break;
@@ -132,6 +140,82 @@ namespace Kuery.Query
                 default: throw Unsupported(method);
             }
             return source;
+        }
+
+        ShapedQueryExpression TranslateReverse(ShapedQueryExpression source)
+        {
+            if (source.QueryExpression.Orderings.Count == 0) throw new NotSupportedException("Reverse requires an explicit OrderBy.");
+            if (source.QueryExpression.Limit != null || source.QueryExpression.Offset != null) PushdownIntoSubquery(source);
+            foreach (var ordering in source.QueryExpression.Orderings) ordering.IsAscending = !ordering.IsAscending;
+            return source;
+        }
+
+        ShapedQueryExpression TranslateCast(ShapedQueryExpression source, Type resultType)
+        {
+            if (source.ShaperExpression.Type != resultType)
+            {
+                try { source.ShaperExpression = Expression.Convert(source.ShaperExpression, resultType); }
+                catch (InvalidOperationException ex) { throw new NotSupportedException("Cannot cast query result to " + resultType, ex); }
+            }
+            return source;
+        }
+
+        internal ShapedQueryExpression TranslateContains(ShapedQueryExpression source, Expression item)
+        {
+            PushdownIntoSubquery(source, false);
+            var shape = StripConvert(source.ShaperExpression);
+            SqlExpression predicate;
+            if (shape is EntityProjectionExpression entity)
+            {
+                if (entity.Mapping.PK == null) throw new NotSupportedException("Entity Contains requires a mapped primary key.");
+                var key = Scalar(entity.Members[entity.Mapping.PK.PropertyName]);
+                var other = StripConvert(item);
+                SqlExpression otherKey;
+                SqlExpression present;
+                if (other is EntityReferenceExpression reference)
+                { otherKey = Scalar(reference.Key); present = Scalar(reference.Present); }
+                else if (other is EntityProjectionExpression otherEntity && otherEntity.Mapping.PK != null)
+                { otherKey = Scalar(otherEntity.Members[otherEntity.Mapping.PK.PropertyName]); present = IsPresent(otherEntity.Presence); }
+                else throw Unsupported(item);
+                predicate = And(And(IsPresent(entity.Presence), present), _sqlExpressionFactory.MakeBinary(ExpressionType.Equal, typeof(bool), key, otherKey));
+                if (entity.Presence != null)
+                    predicate = _sqlExpressionFactory.MakeBinary(ExpressionType.OrElse, typeof(bool), predicate,
+                        And(_sqlExpressionFactory.MakeUnary(ExpressionType.Equal, typeof(bool), entity.Presence),
+                            _sqlExpressionFactory.MakeUnary(ExpressionType.Not, typeof(bool), present)));
+            }
+            else predicate = _sqlExpressionFactory.MakeBinary(ExpressionType.Equal, typeof(bool), Scalar(source.ShaperExpression), Scalar(item));
+            source.QueryExpression.Predicate = And(source.QueryExpression.Predicate, predicate);
+            return CreateExistsResult(source, false);
+        }
+
+        SqlExpression IsPresent(SqlExpression presence) => presence == null ? (SqlExpression)new SqlConstantExpression(true, typeof(bool))
+            : _sqlExpressionFactory.MakeUnary(ExpressionType.NotEqual, typeof(bool), presence);
+
+        ShapedQueryExpression TranslateDefaultIfEmpty(ShapedQueryExpression source)
+        {
+            var marker = MakeOptional(source);
+            var singleton = new SelectExpression(Alias());
+            singleton.AddToProjection(Integer(1));
+            var outer = new SelectExpression { From = singleton };
+            outer.Joins.Add(new LeftJoinExpression(source.QueryExpression.From, new SqlConstantExpression(true, typeof(bool))));
+            source.QueryExpression = outer;
+            return source;
+        }
+
+        SqlExpression MakeOptional(ShapedQueryExpression source)
+        {
+            var inner = source.QueryExpression;
+            var alias = Alias();
+            var lift = new ProjectionLifter(inner, alias);
+            var value = lift.Visit(source.ShaperExpression);
+            var marker = (SqlExpression)lift.Visit(new SqlConstantExpression(1, typeof(int?)));
+            inner.Alias = alias;
+            if (inner.Limit == null && inner.Offset == null) inner.Orderings.Clear();
+            source.QueryExpression = new SelectExpression { From = inner };
+            source.ShaperExpression = value is EntityProjectionExpression entity
+                ? (Expression)new EntityProjectionExpression(entity.Mapping, entity.Members, marker)
+                : new OptionalShaperExpression(value, marker);
+            return marker;
         }
 
         ShapedQueryExpression TranslateSelect(ShapedQueryExpression source, MethodCallExpression method)
@@ -456,7 +540,7 @@ namespace Kuery.Query
 
         internal Expression Projection(Expression expression)
         {
-            if (expression is EntityProjectionExpression || expression is GroupByShaperExpression) return expression;
+            if (expression is OptionalShaperExpression || expression is EntityProjectionExpression || expression is GroupByShaperExpression) return expression;
             if (expression is UnaryExpression conversion && (conversion.NodeType == ExpressionType.Convert || conversion.NodeType == ExpressionType.ConvertChecked)
                 && (conversion.Type == typeof(object) || conversion.Type.IsAssignableFrom(conversion.Operand.Type)))
                 return conversion.Update(Projection(conversion.Operand));
@@ -505,7 +589,9 @@ namespace Kuery.Query
             protected override Expression VisitExtension(Expression node) => node;
             protected override Expression VisitMember(MemberExpression node)
             {
-                var source = node.Expression == null ? null : Visit(node.Expression);
+                var source = node.Expression == null ? null : StripConvert(Visit(node.Expression));
+                if (source is OptionalShaperExpression optional)
+                    return new OptionalShaperExpression(Visit(node.Update(optional.Value)), optional.Presence);
                 if (source is EntityProjectionExpression entity && entity.Members.TryGetValue(node.Member.Name, out var member)) return member;
                 if (source is GroupByShaperExpression group && node.Member.Name == "Key") return group.Key;
                 if (source is NewExpression created && created.Members != null)
@@ -533,6 +619,8 @@ namespace Kuery.Query
             }
             protected override Expression VisitExtension(Expression node)
             {
+                if (node is OptionalShaperExpression optional)
+                    return new OptionalShaperExpression(Visit(optional.Value), (SqlExpression)Visit(optional.Presence));
                 if (node is SqlExpression sql)
                 {
                     var ordinal = _query.AddToProjection(sql);

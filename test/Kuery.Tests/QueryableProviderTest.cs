@@ -10,7 +10,7 @@ using Xunit;
 namespace Kuery.Tests
 {
     // Run the same behavioral contract against every provider through the existing test scripts.
-    public abstract class QueryPipelineContract
+    public abstract partial class QueryPipelineContract
     {
         readonly Func<IDbConnection> _open;
         protected QueryPipelineContract(Func<IDbConnection> open) { _open = open; }
