@@ -166,12 +166,14 @@ var updated = await connection.Query<Product>()
 
 SQL translation currently supports (including async equivalents where applicable):
 
-- Query shape: `Where`, `Select`, `OrderBy`/`ThenBy`, `Skip`, `Take`
+- Query shape: `Where`, `Select`, `OrderBy`/`ThenBy`, `Reverse`, `Skip`, `Take`, parameterless `DefaultIfEmpty`
 - Retrieval/aggregation: `Count`, `LongCount`, `Any`, `All`, `First`, `FirstOrDefault`, `Single`, `SingleOrDefault`, `Last`, `LastOrDefault`, `Sum`, `Min`, `Max`, `Average`
 - Grouping: `GroupBy` (single key and composite key), `HAVING`
-- Joins: `Join`, composite-key join, chained joins, left join (`GroupJoin + SelectMany + DefaultIfEmpty`)
+- Joins: `Join`, composite-key join, chained joins, `LeftJoin`/`RightJoin` (.NET 10), Kuery `FullJoin`, and the existing left join pattern
 - Set operations: `Distinct`, `Concat`, `Union`, `Intersect`, `Except`
-- Subqueries: `Contains` (`IN`), `Any` (`EXISTS`), `SelectMany` (cross join)
+- Membership: terminal and subquery `Contains` (null-aware `EXISTS`; entity primary-key comparison)
+- Types: `Cast`, `OfType`, and query-only TPH discriminator attributes
+- Subqueries: `Any` (`EXISTS`), `SelectMany` (cross join)
 - Data modification: `ExecuteDelete`/`ExecuteDeleteAsync` (requires `Where`), `ExecuteUpdate`/`ExecuteUpdateAsync`
 - Built-in expression translation:
   - String: `Contains`, `StartsWith`, `EndsWith`, `Replace`, `Substring`, `Trim`, `TrimStart`, `TrimEnd`, `Length`, `IndexOf`, `string.IsNullOrEmpty`, `string.IsNullOrWhiteSpace`
@@ -196,14 +198,15 @@ var summaries = await connection.Query<Product>()
 Operator order is preserved: `Take(10).Where(predicate)` filters the first ten rows,
 and `Select(p => p.Name).Distinct().Count()` counts distinct names, including null.
 Nullable equality/inequality and collection `Contains` use C# null semantics.
-`Last`/`LastOrDefault` require an explicit `OrderBy`; out-of-range `ElementAt` throws
+`Reverse`/`Last`/`LastOrDefault` require an explicit `OrderBy`; out-of-range `ElementAt` throws
 `ArgumentOutOfRangeException`. Queries combined in joins, set operations, or subqueries
 must use the same connection. Use `AsEnumerable()` to switch explicitly to client processing.
 
 See [SQL support](docs/iqueryable-sql-support-status.md) and
 [query pipeline design](docs/query-pipeline.md) for capabilities and limitations.
-The internal class names and compilation stages follow EF Core where practical;
-see the [EF Core alignment guide](docs/efcore-query-alignment.md) for corresponding source locations and intentional differences.
+The internal class names and compilation stages follow EF Core where practical.
+The [40-operator coverage matrix](docs/query-operator-coverage.md) defines the comparison scope and verification status.
+See the [EF Core alignment guide](docs/efcore-query-alignment.md) for corresponding source locations and intentional differences.
 
 #### Manual SQL
 

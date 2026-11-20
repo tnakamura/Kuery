@@ -25,9 +25,12 @@ EF Core のパッケージや DbContext、変更追跡、ナビゲーション�
 4. ShapedQueryExpression は QueryExpression と ShaperExpression、結果の件数種別を保持する。
    RelationalShapedQueryCompilingExpressionVisitor は、射影と SELECT の列位置から IDataRecord 用のデリゲートを一度コンパイルし、CompiledQuery を作る。
    スカラー・匿名型・コンストラクター・MemberInit・エンティティを直接作る。
-   LEFT JOIN の不在は派生テーブル内の存在マーカーで判定する。
+   外部結合と DefaultIfEmpty の不在は派生テーブル内の存在マーカーで判定する。
+   StructuralTypeProjectionExpression / StructuralTypeShaperExpression はエンティティの列と構築を分離し、
+   読み取り専用 TPH の型識別に対応する。OptionalShaperExpression は値全体の default(T) を保持する。
 5. RelationalCommandCache は SQL 雛形の再利用と値の束縛を担当する。
-   SQL を作る場合は SqlNullabilityProcessor がパラメータ値に応じて null 比較を補償し、QuerySqlGenerator が方言別 SQL とパラメータ情報を生成する。
+   SQL を作る場合は RelationalQueryTranslationPostprocessor が必要な FullJoin を UNION ALL へ変換する。
+   続いて SqlNullabilityProcessor がパラメータ値に応じて null 比較を補償し、QuerySqlGenerator が方言別 SQL とパラメータ情報を生成する。
    SQL Server の真偽値射影、COUNT_BIG、ページングの0件取得などを処理する。
 6. KueryLinqExecutor はコマンドとリーダーを破棄し、同じ結果構築処理を同期・非同期で使用する。
    First / Single 系は必要な行数で読み取りを終了する。
@@ -40,7 +43,7 @@ EF Core のパッケージや DbContext、変更追跡、ナビゲーション�
 
 - プロセス内で上限256件の LRU を共有する。追加・参照・追い出しは同じロックで保護する。
 - キーは正規化した式の構造、型・メンバーの同一性、テーブルと列のマッピング、
-  方言、結果型、実行種別、同期・非同期、更新対象と更新値の構造を含む。
+  TPH の型階層・識別値・列、方言、結果型、実行種別、同期・非同期、更新対象と更新値の構造を含む。
   キー作成のバッファはスレッド単位で再利用し、式への参照は使用後に消去する。
 - CompiledQueryCache は CompiledQuery を保持する。接続、元の式木のクロージャ、実際の値は保持しない。
 - SQL の形が固定の場合はコマンド雛形も共有する。雛形にはパラメータ名・型・スロット番号だけを保存する。
@@ -71,3 +74,5 @@ dotnet run -c Release --project benchmark/KueryBenchmark -- --filter '*Queryable
 対応範囲と互換性の変更は [SQL サポート状況](iqueryable-sql-support-status.md) を参照。
 変更前後の測定と検証上の制約は [性能検証](query-pipeline-performance.md) に記録する。
 EF Core の参照先、対応するクラス、意図的な相違は [EF Core への追従](efcore-query-alignment.md) を参照。
+
+演算子の集計と実行テストの一覧は [40種類の対応表](query-operator-coverage.md) を参照。

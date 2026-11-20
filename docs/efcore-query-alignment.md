@@ -20,6 +20,8 @@ Kuery でも `src/Kuery/Query/`、`Query/Internal/`、`Query/SqlExpressions/` �
 | コンパイルの段階管理 | EFCore/Query/QueryCompilationContext.cs | Query/QueryCompilationContext.cs |
 | LINQ 演算子の変換 | EFCore.Relational/Query/RelationalQueryableMethodTranslatingExpressionVisitor.cs | Query/RelationalQueryableMethodTranslatingExpressionVisitor.cs |
 | スカラー式の変換 | EFCore.Relational/Query/RelationalSqlTranslatingExpressionVisitor.cs | Query/RelationalSqlTranslatingExpressionVisitor.cs |
+| 型付きエンティティ射影と構築 | EFCore.Relational/Query/StructuralTypeProjectionExpression.cs / EFCore/Query/StructuralTypeShaperExpression.cs | Query/StructuralTypeProjectionExpression.cs / Query/StructuralTypeShaperExpression.cs |
+| 方言に応じた SQL 式の後処理 | EFCore.Relational/Query/RelationalQueryTranslationPostprocessor.cs | Query/RelationalQueryTranslationPostprocessor.cs |
 | SQL と結果形状の組 | EFCore/Query/ShapedQueryExpression.cs | Query/ShapedQueryExpression.cs |
 | 結果構築のコンパイル | EFCore.Relational/Query/RelationalShapedQueryCompilingExpressionVisitor.cs | Query/RelationalShapedQueryCompilingExpressionVisitor.cs |
 | SQL 式の生成 | EFCore.Relational/Query/SqlExpressionFactory.cs | Query/SqlExpressionFactory.cs |
@@ -37,7 +39,7 @@ Kuery の公開 KueryQueryProvider / KueryQueryable は、EF Core の EntityQuer
 ## 実装を確認する順序
 
 1. EF Core の変更が、パラメータ抽出、LINQ 変換、SQL 式変換、null 補償、SQL 生成、結果構築のどの段階に属するか確認する。
-2. LINQ 演算子の改善は対応する TranslateWhere / TranslateSelect / TranslateOrderBy / TranslateThenBy / TranslateAny / TranslateAll などを比較する。
+2. LINQ 演算子の改善は対応する TranslateWhere / TranslateSelect / TranslateOrderBy / TranslateThenBy / TranslateAny / TranslateAll / TranslateContains / TranslateCast / TranslateOfType / TranslateReverse / TranslateDefaultIfEmpty / TranslateLeftJoin / TranslateRightJoin / TranslateFullJoin などを比較する。
    集約は TranslateAggregateWithSelector、要素取得は TranslateSingleResult、集合演算は TranslateSetOperation に共通処理をまとめている。
 3. 文字列・数学・日時関数の改善は RelationalSqlTranslatingExpressionVisitor の VisitMethodCall / VisitMember と、対応する SqliteDialect / PostgreSqlDialect / SqlServerDialect / MySqlDialect の Function を確認する。
 4. SQL 式を書き換える場合は SqlExpressionVisitor と各型の Update を使う。キャッシュ済みの式を直接変更しない。
@@ -51,14 +53,19 @@ Kuery の公開 KueryQueryProvider / KueryQueryable は、EF Core の EntityQuer
   QueryCompilationContext などの段階は保持し、必要な実装を直接構築する。
 - EF Core が各 Visitor の VisitExtension で行う SQL 型ごとの振り分けは、Kuery の SqlExpressionVisitor に共通化する。
   VisitSqlBinary / VisitSqlUnary / VisitCase / VisitExists などの処理名は EF Core に合わせる。
-- LINQ は標準の Queryable メソッドを扱う。EF Core 専用の拡張メソッドやモデル情報を使う変換は、そのまま移植しない。
+- LINQ は標準の Queryable メソッドを扱う。.NET 10 に存在しない FullJoin は Kuery 拡張も受け付ける。EF Core 専用の拡張メソッドやモデル情報を使う変換は、そのまま移植しない。
 - CLR 関数の登録用 Provider / Plugin 群は導入していない。対応範囲が小さいため、共通のスカラー Visitor と方言で実装する。
   SqlFunctionExpression の一部は `String.Length` のような方言から独立した意味名を保持する。
 - SQL 型マッピングは CLR 型、null 許容性、既存 TableMapping と方言の範囲に限定する。
-  EntityProjectionExpression、NonQueryExpression、CompiledQuery は Kuery に必要な最小限の情報を持つ。
+  StructuralTypeProjectionExpression / StructuralTypeShaperExpression、NonQueryExpression、CompiledQuery は Kuery に必要な最小限の情報を持つ。
 - ResultCardinality は Enumerable / Single / SingleOrDefault に揃えるが、First / Single / ElementAt の検証には追加の QueryResultKind を保持する。
 - SqlBinaryExpression の UseRelationalNulls は、JOIN の生の SQL 比較や補償済みの比較を再び補償しないための印であり、EF Core のオプションサービスとは別物。
 - コンパイル済みクエリは上限256件の LRU。SQL 雛形は CompiledQuery のスロット情報だけを共有し、値や接続を保持しない。
 
 既存動作と公開 API を守るため、EF Core の変更は対応する責務へ個別に取り込む。
 同名の内部型であっても、EF Core と型・引数・内部契約が互換であることは意味しない。
+
+読み取り専用 TPH は InheritanceMapping に必要最小限の型識別情報を持つ。
+EF Core のモデル構築 API は導入しない。StructuralTypeProjectionExpression は SQL の列と候補型、
+StructuralTypeShaperExpression は型識別に基づく結果構築の入口を表す。
+FullJoinExpression は論理的な完全外部結合を保持し、後処理で SQLite / MySQL の UNION ALL へ変換する。
