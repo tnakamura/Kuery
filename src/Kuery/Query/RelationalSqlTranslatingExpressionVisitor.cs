@@ -41,11 +41,21 @@ namespace Kuery.Query
             if (binary.NodeType == ExpressionType.Coalesce)
                 return _sqlExpressionFactory.Function("Coalesce", binary.Type, Translate(binary.Left), Translate(binary.Right));
             if ((binary.NodeType == ExpressionType.Equal || binary.NodeType == ExpressionType.NotEqual)
-                && (binary.Left is EntityProjectionExpression || binary.Right is EntityProjectionExpression))
+                && (binary.Left is OptionalShaperExpression || binary.Right is OptionalShaperExpression))
             {
-                var entity = (binary.Left as EntityProjectionExpression) ?? (EntityProjectionExpression)binary.Right;
+                var optional = (binary.Left as OptionalShaperExpression) ?? (OptionalShaperExpression)binary.Right;
+                if (!(optional.Value is SqlExpression) && !optional.Type.IsValueType)
+                {
+                    var other = ReferenceEquals(optional, binary.Left) ? binary.Right : binary.Left;
+                    return _sqlExpressionFactory.Function(binary.NodeType == ExpressionType.Equal ? "EntityIsNull" : "EntityIsNotNull", typeof(bool), optional.Presence, Translate(other));
+                }
+            }
+            if ((binary.NodeType == ExpressionType.Equal || binary.NodeType == ExpressionType.NotEqual)
+                && (binary.Left is StructuralTypeProjectionExpression || binary.Right is StructuralTypeProjectionExpression))
+            {
+                var entity = (binary.Left as StructuralTypeProjectionExpression) ?? (StructuralTypeProjectionExpression)binary.Right;
                 var other = ReferenceEquals(entity, binary.Left) ? binary.Right : binary.Left;
-                if (other is EntityProjectionExpression) throw RelationalQueryableMethodTranslatingExpressionVisitor.Unsupported(binary);
+                if (other is StructuralTypeProjectionExpression) throw RelationalQueryableMethodTranslatingExpressionVisitor.Unsupported(binary);
                 return _sqlExpressionFactory.Function(binary.NodeType == ExpressionType.Equal ? "EntityIsNull" : "EntityIsNotNull", typeof(bool), entity.Presence ?? RelationalQueryableMethodTranslatingExpressionVisitor.Integer(1), Translate(other));
             }
             if (binary.Method != null && binary.Method.DeclaringType != typeof(string) && binary.Method.DeclaringType != typeof(decimal)

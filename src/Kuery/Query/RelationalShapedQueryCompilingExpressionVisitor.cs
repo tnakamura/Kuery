@@ -50,15 +50,24 @@ namespace Kuery.Query
                     Expression.Call(_record, typeof(IDataRecord).GetMethod(nameof(IDataRecord.GetValue)), Expression.Constant(ordinal)),
                     Expression.Constant(sql.Type, typeof(Type))), sql.Type);
             }
-            if (node is EntityProjectionExpression entity)
+            if (node is StructuralTypeProjectionExpression projection) return Visit(new StructuralTypeShaperExpression(projection));
+            if (node is StructuralTypeShaperExpression shaper)
             {
-                var bindings = entity.Members.Select(pair => Expression.Bind(entity.Type.GetProperty(pair.Key), Visit(pair.Value)));
-                Expression result = Expression.MemberInit(Expression.New(entity.Type), bindings);
-                if (entity.Presence != null)
+                var entity = shaper.Projection;
+                Expression Construct(TableMapping mapping) => Expression.Convert(Expression.MemberInit(Expression.New(mapping.MappedType),
+                    mapping.Columns.Select(column => Expression.Bind(column.PropertyInfo, Visit(entity.Members[column.PropertyName])))), entity.Type);
+                Expression result;
+                if (entity.Hierarchy == null) result = Construct(entity.Mapping);
+                else
                 {
-                    var presence = Visit(entity.Presence);
-                    result = Expression.Condition(Expression.Equal(presence, Expression.Constant(null, presence.Type)), Expression.Default(entity.Type), result);
+                    var discriminator = Visit(entity.Discriminator);
+                    result = Expression.Throw(Expression.New(typeof(InvalidOperationException).GetConstructor(new[] { typeof(string) }),
+                        Expression.Constant("Unknown discriminator value for TPH hierarchy " + entity.Hierarchy.Root.MappedType + ".")), entity.Type);
+                    foreach (var entry in entity.ConcreteTypes.Reverse())
+                        result = Expression.Condition(Expression.Equal(discriminator, Expression.Constant(entry.Value)), Construct(entry.Mapping), result);
                 }
+                if (entity.Presence != null)
+                    result = Expression.Condition(Expression.Equal(Visit(entity.Presence), Expression.Constant(null, entity.Presence.Type)), Expression.Default(entity.Type), result);
                 return result;
             }
             throw new NotSupportedException("An unprojected GroupBy is not supported. Select its key and aggregates.");

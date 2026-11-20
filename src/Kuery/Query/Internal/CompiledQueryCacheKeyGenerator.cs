@@ -49,6 +49,14 @@ namespace Kuery.Query.Internal
                 else if (node is QueryRootExpression root)
                 {
                     Text.Append("table:"); Add(root.Mapping.TableName);
+                    var hierarchy = InheritanceMapping.Find(root.Mapping.MappedType);
+                    if (hierarchy != null)
+                    {
+                        Add(hierarchy.Root.TableName); Add(hierarchy.DiscriminatorColumn);
+                        foreach (var entry in hierarchy.Entries) { Text.Append(entry.Mapping.MappedType.TypeHandle.Value.ToInt64()); Add(entry.Value); }
+                        foreach (var column in hierarchy.Columns)
+                        { Add(column.PropertyName); Add(column.Name); Text.Append(column.PropertyInfo.PropertyType.TypeHandle.Value.ToInt64()).Append(':').Append(column.IsNullable).Append(':').Append(column.StoreAsText); }
+                    }
                     foreach (var column in root.Mapping.Columns)
                     {
                         Add(column.PropertyName); Add(column.Name); Text.Append(column.ColumnType.TypeHandle.Value.ToInt64()).Append(':');

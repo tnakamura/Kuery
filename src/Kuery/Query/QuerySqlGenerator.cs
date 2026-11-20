@@ -43,7 +43,7 @@ namespace Kuery.Query
             var nonQuery = queryExpression as NonQueryExpression;
             var select = nonQuery?.QueryExpression ?? (SelectExpression)queryExpression;
             var nullabilityProcessor = new SqlNullabilityProcessor(_values);
-            var query = nullabilityProcessor.Process(select);
+            var query = nullabilityProcessor.Process(new RelationalQueryTranslationPostprocessor(_dialect.Kind).Process(select));
             if (nonQuery == null)
             {
                 Visit(query);
@@ -78,7 +78,7 @@ namespace Kuery.Query
             if (query.From != null) sql.Append(" from ").Append(Source(query.From));
             foreach (var join in query.Joins)
             {
-                sql.Append(join is InnerJoinExpression ? " inner join " : join is LeftJoinExpression ? " left join " : " cross join ").Append(Source(join.Table));
+                sql.Append(join is InnerJoinExpression ? " inner join " : join is LeftJoinExpression ? " left join " : join is FullJoinExpression ? " full outer join " : " cross join ").Append(Source(join.Table));
                 if (join is PredicateJoinExpressionBase predicateJoin) sql.Append(" on ").Append(Predicate(predicateJoin.JoinPredicate));
             }
             var predicate = query.Predicate == null ? null : Predicate(query.Predicate);
@@ -204,6 +204,11 @@ namespace Kuery.Query
             if (constant.Value == null) _sqlFragment = "null";
             else if (constant.Value is bool boolean) _sqlFragment = _dialect.Kind == SqlDialectKind.PostgreSql ? (boolean ? "true" : "false") : (boolean ? "1" : "0");
             else if (constant.Value is string text) _sqlFragment = "'" + text.Replace("'", "''") + "'";
+            else if (constant.Value is DateTime date) _sqlFragment = "'" + date.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture) + "'";
+            else if (constant.Value is DateTimeOffset offset) _sqlFragment = "'" + offset.ToString("o", CultureInfo.InvariantCulture) + "'";
+            else if (constant.Value is Guid guid) _sqlFragment = "'" + guid.ToString() + "'";
+            else if (constant.Value is TimeSpan span) _sqlFragment = "'" + span.ToString("c", CultureInfo.InvariantCulture) + "'";
+            else if (constant.Value is Enum) _sqlFragment = Value(new SqlConstantExpression(BoundParameter.ConvertValue(constant.Value, constant.Type), typeof(object)));
             else _sqlFragment = Convert.ToString(constant.Value, CultureInfo.InvariantCulture);
             return constant;
         }

@@ -1,0 +1,37 @@
+using System;
+using System.Linq.Expressions;
+using Kuery.Query.SqlExpressions;
+
+namespace Kuery.Query
+{
+    // Lower logical operators before null processing, without changing the cached SQL tree.
+    internal sealed class RelationalQueryTranslationPostprocessor : SqlExpressionVisitor
+    {
+        readonly SqlDialectKind _dialect;
+        internal RelationalQueryTranslationPostprocessor(SqlDialectKind dialect) { _dialect = dialect; }
+        internal SelectExpression Process(SelectExpression query) => (SelectExpression)Visit(query);
+
+        protected override Expression VisitSelect(SelectExpression node)
+        {
+            var query = (SelectExpression)base.VisitSelect(node);
+            if (_dialect != SqlDialectKind.MySql && _dialect != SqlDialectKind.Sqlite) return query;
+            var full = query.Joins.Count == 1 ? query.Joins[0] as FullJoinExpression : null;
+            if (full == null) return query;
+            if (query.Predicate != null || query.Having != null || query.GroupBy.Count != 0 || query.Orderings.Count != 0
+                || query.Limit != null || query.Offset != null || query.IsDistinct)
+                throw new NotSupportedException("A FULL JOIN must be isolated before provider lowering.");
+            // Translation isolates each FULL JOIN in its own SELECT, before subsequent composition.
+            var left = new SelectExpression { From = query.From };
+            left.Joins.Add(new LeftJoinExpression(full.Table, full.JoinPredicate));
+            left.Projection.AddRange(query.Projection);
+            var right = new SelectExpression { From = full.Table, Predicate = full.UnmatchedPredicate };
+            right.Joins.Add(new LeftJoinExpression(query.From, full.JoinPredicate));
+            right.Projection.AddRange(query.Projection);
+            var alias = query.Alias + "_full";
+            var result = new SelectExpression(query.Alias) { From = new UnionExpression(alias, left, right, false) };
+            foreach (var projection in query.Projection)
+                result.AddToProjection(new ColumnExpression(alias, projection.Alias, projection.Expression.Type, projection.Expression.IsNullable));
+            return result;
+        }
+    }
+}

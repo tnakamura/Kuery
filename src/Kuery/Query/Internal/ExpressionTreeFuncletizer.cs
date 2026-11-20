@@ -38,8 +38,17 @@ namespace Kuery.Query.Internal
                 if (!source.Type.IsArray) throw RelationalQueryableMethodTranslatingExpressionVisitor.Unsupported(node);
                 return Visit(Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), contains.Method.GetGenericArguments(), source, contains.Arguments[1]));
             }
+            if (node is MethodCallExpression fullJoin && fullJoin.Method.DeclaringType == typeof(Queryable)
+                && fullJoin.Method.Name == "FullJoin" && fullJoin.Arguments.Count == 6)
+            {
+                if (!IsEvaluatable(fullJoin.Arguments[5]) || Evaluate(fullJoin.Arguments[5]) != null)
+                    throw new NotSupportedException("FullJoin supports only the default comparer.");
+                return fullJoin.Update(null, fullJoin.Arguments.Take(5).Select(Visit)
+                    .Concat(new[] { Expression.Constant(null, fullJoin.Arguments[5].Type) }));
+            }
             if (node is MethodCallExpression entityContains && entityContains.Method.DeclaringType == typeof(Queryable)
                 && entityContains.Method.Name == nameof(Queryable.Contains) && entityContains.Arguments.Count == 2
+                && entityContains.Method.GetGenericArguments()[0] != typeof(object)
                 && !IsScalar(entityContains.Method.GetGenericArguments()[0]) && IsEvaluatable(entityContains.Arguments[1]))
             {
                 var type = entityContains.Method.GetGenericArguments()[0];
