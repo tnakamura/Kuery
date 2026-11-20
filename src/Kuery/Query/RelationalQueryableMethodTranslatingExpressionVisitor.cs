@@ -216,14 +216,14 @@ namespace Kuery.Query
             SqlExpression predicate;
             if (shape is StructuralTypeProjectionExpression entity)
             {
-                if (entity.Mapping.PK == null) throw new NotSupportedException("Entity Contains requires a mapped primary key.");
+                if (entity.Mapping.Columns.Count(c => c.IsPK) != 1) throw new NotSupportedException("Entity Contains requires a single mapped primary key.");
                 var key = Scalar(entity.Members[entity.Mapping.PK.PropertyName]);
                 var other = StripConvert(item);
                 SqlExpression otherKey;
                 SqlExpression present;
                 if (other is EntityReferenceExpression reference)
                 { otherKey = Scalar(reference.Key); present = Scalar(reference.Present); }
-                else if (other is StructuralTypeProjectionExpression otherEntity && otherEntity.Mapping.PK != null)
+                else if (other is StructuralTypeProjectionExpression otherEntity && otherEntity.Mapping.Columns.Count(c => c.IsPK) == 1)
                 { otherKey = Scalar(otherEntity.Members[otherEntity.Mapping.PK.PropertyName]); present = IsPresent(otherEntity.Presence); }
                 else throw Unsupported(item);
                 predicate = And(And(IsPresent(entity.Presence), present), _sqlExpressionFactory.MakeBinary(ExpressionType.Equal, typeof(bool), key, otherKey));

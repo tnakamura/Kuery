@@ -53,7 +53,7 @@ namespace Kuery.Query.Internal
             {
                 var type = entityContains.Method.GetGenericArguments()[0];
                 var mapping = SqlMapper.GetMapping(type);
-                if (mapping.PK == null) throw new NotSupportedException("Entity Contains requires a mapped primary key: " + type);
+                if (mapping.Columns.Count(c => c.IsPK) != 1) throw new NotSupportedException("Entity Contains requires a single mapped primary key: " + type);
                 var value = Evaluate(entityContains.Arguments[1]);
                 var keyType = mapping.PK.PropertyInfo.PropertyType;
                 if (keyType.IsValueType && Nullable.GetUnderlyingType(keyType) == null) keyType = typeof(Nullable<>).MakeGenericType(keyType);

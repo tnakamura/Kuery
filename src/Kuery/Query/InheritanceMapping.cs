@@ -45,11 +45,14 @@ namespace Kuery.Query
             foreach (var entry in entries)
             {
                 var type = entry.Mapping.MappedType;
+                if (type != root && type.IsDefined(typeof(DiscriminatorAttribute), false))
+                    throw new NotSupportedException("Nested discriminator roots are not supported: " + type);
                 var table = type.GetCustomAttribute<TableAttribute>(false);
                 if (type != root && table != null && table.Name != SqlMapper.GetMapping(root).TableName)
                     throw new NotSupportedException("TPH types must use the root table: " + type);
             }
-            if (!requested.IsAbstract && entries.All(e => e.Mapping.MappedType != requested))
+            if (!entries.Any(e => requested.IsAssignableFrom(e.Mapping.MappedType))
+                || (!requested.IsAbstract && entries.All(e => e.Mapping.MappedType != requested)))
                 throw new NotSupportedException("Register every concrete TPH type, including a concrete root: " + requested);
             var columns = new Dictionary<string, TableMapping.Column>(StringComparer.Ordinal);
             foreach (var column in new[] { SqlMapper.GetMapping(root) }.Concat(entries.Select(e => e.Mapping)).SelectMany(m => m.Columns))

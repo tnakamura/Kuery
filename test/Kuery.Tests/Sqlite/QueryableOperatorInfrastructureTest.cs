@@ -13,6 +13,11 @@ using static Kuery.Tests.QueryPipelineContract;
 
 namespace Kuery.Tests.Sqlite
 {
+    // Keep cache reuse / GC assertions separate from tests that deliberately evict shared plans.
+    [CollectionDefinition("Query operator infrastructure", DisableParallelization = true)]
+    public sealed class QueryOperatorInfrastructureCollection { }
+
+    [Collection("Query operator infrastructure")]
     public class QueryableOperatorInfrastructureTest
     {
         [Theory]
@@ -108,6 +113,7 @@ namespace Kuery.Tests.Sqlite
             Assert.Throws<NotSupportedException>(() => rows.RightJoin(second.Query<ContractRow>(), x => x.Id, x => x.Id, (a, b) => a).ToList());
             Assert.Throws<NotSupportedException>(() => rows.Select(x => x.Id).Contains(1, EqualityComparer<int>.Default));
             Assert.Throws<NotSupportedException>(() => first.Query<KeylessRow>().Contains(new KeylessRow()));
+            Assert.Throws<NotSupportedException>(() => first.Query<CompositeIdentityRow>().Contains(new CompositeIdentityRow()));
         }
 
         [Fact]
@@ -125,6 +131,7 @@ namespace Kuery.Tests.Sqlite
         [Table("kuery_pipeline_contract")]
         public class IdentityRow { [PrimaryKey] public int Id { get; set; } }
         public class KeylessRow { public int Id { get; set; } }
+        public class CompositeIdentityRow { [PrimaryKey] public int Id { get; set; } [PrimaryKey] public int TenantId { get; set; } }
         [Table("abstract_tph"), Discriminator("Kind"), DerivedType(typeof(AbstractLeaf), "leaf")]
         public abstract class AbstractRoot { public int Id { get; set; } }
         public class AbstractLeaf : AbstractRoot { public int Value { get; set; } }
