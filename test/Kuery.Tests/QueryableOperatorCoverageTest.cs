@@ -12,14 +12,14 @@ namespace Kuery.Tests
             var names = new[] { "Where", "Select", "OrderBy", "OrderByDescending", "ThenBy", "ThenByDescending", "Skip", "Take", "Distinct",
                 "Count", "LongCount", "Sum", "Min", "Max", "Average", "Any", "All", "Contains", "First", "FirstOrDefault", "Single", "SingleOrDefault",
                 "Last", "LastOrDefault", "ElementAt", "ElementAtOrDefault", "Join", "LeftJoin", "RightJoin", "FullJoin", "Union", "Concat", "Intersect", "Except",
-                "GroupBy", "SelectMany", "Cast", "OfType", "DefaultIfEmpty", "Reverse" };
-            var expected = new[] { 3, 20, 1, 4, 2, 4, 2, 2, 3, 4, 4, 10, 1, 4, 25, 1, 1, 1, 1, 0, 2, 0, 4, 0, 2, 0, 4, 4, 4, 4, 4, 5, 1, 1, 3, 16, 4, 4, 1, 4 };
+                "GroupBy", "SelectMany", "Cast", "OfType", "DefaultIfEmpty", "Reverse", "Order", "OrderDescending", "MinBy", "MaxBy" };
+            var expected = new[] { 3, 20, 1, 4, 2, 4, 2, 2, 3, 4, 4, 10, 1, 4, 25, 1, 1, 1, 1, 0, 2, 0, 4, 0, 2, 0, 4, 4, 4, 4, 4, 5, 1, 1, 3, 16, 4, 4, 1, 4, 1, 4, 1, 4 };
             for (int i = 0; i < names.Length; i++) yield return new object[] { names[i], expected[i] };
         }
 
         [Theory]
         [MemberData(nameof(OperatorCoverageCases))]
-        public void AllFortyOperatorFamiliesExecute(string name, int expected)
+        public void AllSelectedOperatorFamiliesExecute(string name, int expected)
         {
             using var connection = Open();
             var query = connection.Query<ContractRow>();
@@ -65,6 +65,10 @@ namespace Kuery.Tests
                 "OfType" => query.OfType<ContractRow>().Count(),
                 "DefaultIfEmpty" => query.Take(0).DefaultIfEmpty().Count(),
                 "Reverse" => query.OrderBy(x => x.Id).Reverse().First().Id,
+                "Order" => query.Select(x => x.Id).Order().First(),
+                "OrderDescending" => query.Select(x => x.Id).OrderDescending().First(),
+                "MinBy" => query.MinBy(x => x.Id).Id,
+                "MaxBy" => query.MaxBy(x => x.Id).Id,
                 _ => throw new ArgumentOutOfRangeException(nameof(name)),
             };
             Assert.Equal(expected, result);

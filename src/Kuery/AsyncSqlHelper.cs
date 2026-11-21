@@ -392,6 +392,15 @@ namespace Kuery
             }
         }
 
+        /// <summary>Reads the query results asynchronously into a list.</summary>
+        /// <typeparam name="T">The element type of the query.</typeparam>
+        /// <param name="query">The query to execute.</param>
+        /// <param name="cancellationToken">A token that can cancel Kuery command execution and reads.</param>
+        /// <returns>A task whose result is a list of rows in returned order.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="query"/> is null.</exception>
+        /// <exception cref="NotSupportedException">A Kuery expression cannot be translated.</exception>
+        /// <exception cref="OperationCanceledException">The Kuery operation was canceled.</exception>
+        /// <remarks>For other LINQ providers, the existing synchronous execution behavior is used.</remarks>
         public static async Task<List<T>> ToListAsync<T>(
             this IQueryable<T> query,
             CancellationToken cancellationToken = default)
@@ -406,6 +415,15 @@ namespace Kuery
             return query.ToList();
         }
 
+        /// <summary>Counts the query results asynchronously.</summary>
+        /// <typeparam name="T">The element type of the query.</typeparam>
+        /// <param name="query">The query to execute.</param>
+        /// <param name="cancellationToken">A token that can cancel Kuery command execution and reads.</param>
+        /// <returns>A task whose result is the number of matching rows.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="query"/> is null.</exception>
+        /// <exception cref="NotSupportedException">A Kuery expression cannot be translated.</exception>
+        /// <exception cref="OperationCanceledException">The Kuery operation was canceled.</exception>
+        /// <remarks>For other LINQ providers, the existing synchronous execution behavior is used.</remarks>
         public static async Task<int> CountAsync<T>(
             this IQueryable<T> query,
             CancellationToken cancellationToken = default)
@@ -420,6 +438,16 @@ namespace Kuery
             return query.Count();
         }
 
+        /// <summary>Counts rows satisfying a condition asynchronously.</summary>
+        /// <typeparam name="T">The element type of the query.</typeparam>
+        /// <param name="query">The query to execute.</param>
+        /// <param name="predicate">The condition evaluated for each row.</param>
+        /// <param name="cancellationToken">A token that can cancel Kuery command execution and reads.</param>
+        /// <returns>A task whose result is the number of matching rows.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="query"/> or <paramref name="predicate"/> is null.</exception>
+        /// <exception cref="NotSupportedException">A Kuery expression cannot be translated.</exception>
+        /// <exception cref="OperationCanceledException">The Kuery operation was canceled.</exception>
+        /// <remarks>For other LINQ providers, the existing synchronous execution behavior is used.</remarks>
         public static async Task<int> CountAsync<T>(
             this IQueryable<T> query,
             Expression<Func<T, bool>> predicate,
@@ -431,6 +459,16 @@ namespace Kuery
             return await query.Where(predicate).CountAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        /// <summary>Returns the first row asynchronously.</summary>
+        /// <typeparam name="T">The element type of the query.</typeparam>
+        /// <param name="query">The query to execute.</param>
+        /// <param name="cancellationToken">A token that can cancel Kuery command execution and reads.</param>
+        /// <returns>A task whose result is the first row.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="query"/> is null.</exception>
+        /// <exception cref="NotSupportedException">A Kuery expression cannot be translated.</exception>
+        /// <exception cref="OperationCanceledException">The Kuery operation was canceled.</exception>
+        /// <exception cref="InvalidOperationException">The result is empty.</exception>
+        /// <remarks>For other LINQ providers, the existing synchronous execution behavior is used.</remarks>
         public static async Task<T> FirstAsync<T>(
             this IQueryable<T> query,
             CancellationToken cancellationToken = default)
@@ -445,6 +483,17 @@ namespace Kuery
             return query.First();
         }
 
+        /// <summary>Filters the query and returns its first row asynchronously.</summary>
+        /// <typeparam name="T">The element type of the query.</typeparam>
+        /// <param name="query">The query to execute.</param>
+        /// <param name="predicate">The condition evaluated for each row.</param>
+        /// <param name="cancellationToken">A token that can cancel Kuery command execution and reads.</param>
+        /// <returns>A task whose result is the first matching row.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="query"/> or <paramref name="predicate"/> is null.</exception>
+        /// <exception cref="NotSupportedException">A Kuery expression cannot be translated.</exception>
+        /// <exception cref="OperationCanceledException">The Kuery operation was canceled.</exception>
+        /// <exception cref="InvalidOperationException">No row matches the condition.</exception>
+        /// <remarks>For other LINQ providers, the existing synchronous execution behavior is used.</remarks>
         public static async Task<T> FirstAsync<T>(
             this IQueryable<T> query,
             Expression<Func<T, bool>> predicate,
@@ -456,6 +505,15 @@ namespace Kuery
             return await query.Where(predicate).FirstAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        /// <summary>Returns the first row or a default value asynchronously.</summary>
+        /// <typeparam name="T">The element type of the query.</typeparam>
+        /// <param name="query">The query to execute.</param>
+        /// <param name="cancellationToken">A token that can cancel Kuery command execution and reads.</param>
+        /// <returns>A task whose result is the first row, or the default value when the query is empty.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="query"/> is null.</exception>
+        /// <exception cref="NotSupportedException">A Kuery expression cannot be translated.</exception>
+        /// <exception cref="OperationCanceledException">The Kuery operation was canceled.</exception>
+        /// <remarks>For other LINQ providers, the existing synchronous execution behavior is used.</remarks>
         public static async Task<T> FirstOrDefaultAsync<T>(
             this IQueryable<T> query,
             CancellationToken cancellationToken = default)
@@ -470,6 +528,16 @@ namespace Kuery
             return query.FirstOrDefault();
         }
 
+        /// <summary>Returns the first matching row or a default value asynchronously.</summary>
+        /// <typeparam name="T">The element type of the query.</typeparam>
+        /// <param name="query">The query to execute.</param>
+        /// <param name="predicate">The condition evaluated for each row.</param>
+        /// <param name="cancellationToken">A token that can cancel Kuery command execution and reads.</param>
+        /// <returns>A task whose result is the first matching row, or the default value if no row matches.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="query"/> or <paramref name="predicate"/> is null.</exception>
+        /// <exception cref="NotSupportedException">A Kuery expression cannot be translated.</exception>
+        /// <exception cref="OperationCanceledException">The Kuery operation was canceled.</exception>
+        /// <remarks>For other LINQ providers, the existing synchronous execution behavior is used.</remarks>
         public static async Task<T> FirstOrDefaultAsync<T>(
             this IQueryable<T> query,
             Expression<Func<T, bool>> predicate,

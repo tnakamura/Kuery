@@ -307,11 +307,10 @@ namespace Kuery.Tests.Sqlite
             using var other = new SqliteConnection("Data Source=:memory:");
             Assert.Throws<NotSupportedException>(() => Query.Join(other.Query<PipelineRow>(), x => x.Id, x => x.Id, (x, y) => x).ToList());
             Assert.Throws<NotSupportedException>(() => Query.Union(_rows.AsQueryable()).ToList());
-            Assert.Throws<NotSupportedException>(() => Query.Select(x => x.Value).GroupBy(x => x).ToList());
             Assert.Throws<NotSupportedException>(() => Query.Select(x => new PipelineDto(x.Id, x.Name)).Where(x => x.Number > 1).ToList());
             var entity = _rows[0];
             Assert.Throws<NotSupportedException>(() => Query.Where(x => x == entity).ToList());
-            Assert.Throws<NotSupportedException>(() => Query.SelectMany(parent => Query.Where(child => child.ParentId == parent.Id)).ToList());
+            Assert.Throws<NotSupportedException>(() => Query.SelectMany(parent => Query.Where(child => child.ParentId == parent.Id).Take(1)).ToList());
             Assert.Throws<NotSupportedException>(() => Query.Select(x => x.Id).Distinct(EqualityComparer<int>.Default).ToList());
             Assert.Throws<NotSupportedException>(() => Query.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToList());
         }

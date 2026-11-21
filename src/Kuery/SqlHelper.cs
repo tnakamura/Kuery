@@ -19,6 +19,13 @@ namespace Kuery
             return new TableQuery<T>(connection, map);
         }
 
+        /// <summary>Creates a deferred Kuery LINQ query for a mapped table.</summary>
+        /// <typeparam name="T">The mapped element type.</typeparam>
+        /// <param name="connection">The connection used when the query executes.</param>
+        /// <returns>A query that translates supported LINQ operations to SQL.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="connection"/> is null.</exception>
+        /// <remarks>Open the connection before executing or enumerating the query.
+        /// Joined query sources must use the same connection. Unsupported expressions throw when the query is translated.</remarks>
         public static IQueryable<T> Query<T>(this IDbConnection connection)
         {
             Requires.NotNull(connection, nameof(connection));

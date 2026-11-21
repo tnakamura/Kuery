@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
@@ -20,6 +21,49 @@ namespace Kuery.Tests.Sqlite
     [Collection("Query operator infrastructure")]
     public class QueryableOperatorInfrastructureTest
     {
+        [Fact]
+        public void SqlDiagnosticsDoNotOpenAConnectionAndTagsDoNotChangeThePlan()
+        {
+            using var connection = new SqliteConnection("Data Source=:memory:");
+            var compiler = new QueryCompiler();
+            var a = connection.FromSql<IdentityRow>($"select Id from kuery_pipeline_contract where Id >= {3}").TagWith("one\r\ntwo");
+            var b = connection.FromSql<IdentityRow>($"select Id from kuery_pipeline_contract where Id >= {8}").TagWith("another");
+
+            Assert.StartsWith("-- one\n-- two\nselect ", a.ToQueryString());
+            Assert.StartsWith("-- file.cs:42\n", b.TagWithCallSite("file.cs", 42).ToQueryString().Substring("-- another\n".Length));
+            Assert.Equal(ConnectionState.Closed, connection.State);
+            var first = compiler.CompileQuery(new QueryContext(connection), a.Expression, typeof(IEnumerable<IdentityRow>), false, out var plan);
+            var second = compiler.CompileQuery(new QueryContext(connection), b.Expression, typeof(IEnumerable<IdentityRow>), false, out var reused);
+            Assert.Same(plan, reused);
+            Assert.DoesNotContain("-- ", plan.CommandTemplate.CommandText);
+            Assert.StartsWith("-- another\n", second.CommandText);
+            Assert.Equal(3, Assert.Single(first.Parameters).Value);
+            Assert.Equal(8, Assert.Single(second.Parameters).Value);
+            Assert.Throws<ArgumentException>(() => connection.FromSql<IdentityRow>($"select Id from kuery_pipeline_contract;"));
+            Assert.Throws<ArgumentException>(() => connection.FromSql<IdentityRow>($"delete from kuery_pipeline_contract"));
+            using var other = new SqliteConnection("Data Source=:memory:");
+            Assert.Throws<NotSupportedException>(() => other.Query<IdentityRow>().Concat(a).ToQueryString());
+        }
+
+        [Fact]
+        public void LateralSqlUsesTheProviderSyntax()
+        {
+            static IQueryable<int> MakeQuery(IDbConnection connection)
+            {
+                var rows = connection.Query<ContractRow>();
+                return rows.SelectMany(parent => rows.Where(child => child.ParentId == parent.Id)
+                    .OrderBy(child => child.Id).Take(1).DefaultIfEmpty(), (parent, child) => child == null ? 0 : child.Id);
+            }
+            using var sqlServer = new Microsoft.Data.SqlClient.SqlConnection();
+            using var postgres = new global::Npgsql.NpgsqlConnection();
+            using var mysql = new MySqlConnector.MySqlConnection();
+            using var sqlite = new SqliteConnection();
+            Assert.Contains(" outer apply ", MakeQuery(sqlServer).ToQueryString());
+            Assert.Contains(" left join lateral ", MakeQuery(postgres).ToQueryString());
+            Assert.Contains(" left join lateral ", MakeQuery(mysql).ToQueryString());
+            Assert.Throws<NotSupportedException>(() => MakeQuery(sqlite).ToQueryString());
+        }
+
         [Theory]
         [InlineData((int)SqlDialectKind.Sqlite, false)]
         [InlineData((int)SqlDialectKind.PostgreSql, true)]
