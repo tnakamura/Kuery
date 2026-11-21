@@ -12,7 +12,7 @@ namespace Kuery.Query
         internal CompiledQuery CreateQueryExecutor(Expression query)
         {
             var preprocessed = _preprocessor.Process(query);
-            var translated = new RelationalQueryableMethodTranslatingExpressionVisitor().Translate(preprocessed);
+            var translated = new RelationalQueryableMethodTranslatingExpressionVisitor().TranslateRoot(preprocessed);
             return new RelationalShapedQueryCompilingExpressionVisitor().Compile(translated);
         }
 

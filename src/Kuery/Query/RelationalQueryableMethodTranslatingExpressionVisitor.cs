@@ -7,7 +7,7 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query
 {
-    internal sealed class RelationalQueryableMethodTranslatingExpressionVisitor : ExpressionVisitor
+    internal sealed partial class RelationalQueryableMethodTranslatingExpressionVisitor : ExpressionVisitor
     {
         int _alias;
         internal string Alias() => "t" + _alias++;
@@ -57,10 +57,29 @@ namespace Kuery.Query
             return nonQuery;
         }
 
-        internal ShapedQueryExpression Translate(Expression expression) => (ShapedQueryExpression)Visit(expression);
+        internal ShapedQueryExpression Translate(Expression expression)
+        {
+            var result = (ShapedQueryExpression)Visit(expression);
+            if (result.Collection != null) throw new NotSupportedException("Compose the query before projecting a grouped collection.");
+            return result;
+        }
+
+        internal ShapedQueryExpression TranslateRoot(Expression expression)
+        {
+            var source = (ShapedQueryExpression)Visit(expression);
+            if (source.ShaperExpression is GroupByShaperExpression grouping) CompleteGrouping(source, grouping);
+            return source;
+        }
 
         protected override Expression VisitExtension(Expression expression)
         {
+            if (expression is FromSqlQueryRootExpression fromSql)
+            {
+                var source = Translate(fromSql.Source);
+                var fromSqlAlias = source.QueryExpression.From.Alias;
+                source.QueryExpression.From = new FromSqlExpression(fromSqlAlias, fromSql.Sql, fromSql.Arguments.Select(Scalar).ToArray());
+                return source;
+            }
             if (!(expression is QueryRootExpression root)) throw Unsupported(expression);
             var alias = Alias();
             var hierarchy = InheritanceMapping.Find(root.Mapping.MappedType);
@@ -88,6 +107,7 @@ namespace Kuery.Query
             if (name == nameof(Queryable.SelectMany) && method.Arguments[0] is MethodCallExpression groupJoin
                 && groupJoin.Method.DeclaringType == typeof(Queryable) && groupJoin.Method.Name == nameof(Queryable.GroupJoin))
                 return TranslateLeftJoin(groupJoin, method);
+            if (name == nameof(Queryable.GroupJoin)) return TranslateGroupJoin(method);
             if (name == nameof(Queryable.Join)) return TranslateJoin(method);
             if (name == "LeftJoin") return TranslateLeftJoin(method);
             if (name == "RightJoin") return TranslateRightJoin(method);
@@ -140,6 +160,9 @@ namespace Kuery.Query
                     return TranslateAny(source, method.Arguments.Count == 2 ? Lambda(method.Arguments[1]) : null);
                 case nameof(Queryable.All):
                     return TranslateAll(source, Lambda(method.Arguments[1]));
+                case "MinBy":
+                case "MaxBy":
+                    return TranslateMinMaxBy(source, method);
                 case nameof(Queryable.First):
                 case nameof(Queryable.FirstOrDefault):
                 case nameof(Queryable.Single):
@@ -275,7 +298,10 @@ namespace Kuery.Query
         {
             var query = source.QueryExpression;
             if (query.IsDistinct) PushdownIntoSubquery(source);
-            source.ShaperExpression = Projection(Bind(Lambda(method.Arguments[1]), source.ShaperExpression));
+            var projection = Bind(Lambda(method.Arguments[1]), source.ShaperExpression);
+            if (source.ShaperExpression is GroupByShaperExpression grouping && TryTranslateGroupedElement(source, grouping, projection))
+                return source;
+            source.ShaperExpression = Projection(projection);
             return source;
         }
 
@@ -328,30 +354,80 @@ namespace Kuery.Query
 
         ShapedQueryExpression TranslateGroupBy(ShapedQueryExpression source, MethodCallExpression method)
         {
+            if (method.Arguments.Count < 2 || method.Arguments.Count > 3) throw Unsupported(method);
+            if (source.QueryExpression.Limit != null || source.QueryExpression.Offset != null
+                || source.QueryExpression.IsDistinct || source.QueryExpression.GroupBy.Count > 0) PushdownIntoSubquery(source);
+
             var query = source.QueryExpression;
-            if (method.Arguments.Count != 2) throw Unsupported(method);
-            if (query.Limit != null || query.Offset != null || query.IsDistinct || query.GroupBy.Count > 0) PushdownIntoSubquery(source);
             var key = Projection(Bind(Lambda(method.Arguments[1]), source.ShaperExpression));
-            source.QueryExpression.GroupBy.AddRange(Leaves(key));
-            source.QueryExpression.Orderings.Clear();
-            source.ShaperExpression = new GroupByShaperExpression(method.Type.GetGenericArguments()[0], key, source.ShaperExpression);
+            var element = source.ShaperExpression;
+            if (method.Arguments.Count == 3)
+            {
+                var selector = Lambda(method.Arguments[2]);
+                if (selector.Parameters.Count != 1) throw Unsupported(method);
+                element = Projection(Bind(selector, element));
+            }
+
+            query.GroupBy.AddRange(Leaves(key));
+            var orderings = query.Orderings.ToArray();
+            query.Orderings.Clear();
+            source.ShaperExpression = new GroupByShaperExpression(method.Type.GetGenericArguments()[0], key, element, orderings);
             return source;
         }
 
         ShapedQueryExpression TranslateSelectMany(ShapedQueryExpression source, MethodCallExpression method)
         {
-            var query = source.QueryExpression;
-            var collection = Bind(Lambda(method.Arguments[1]), source.ShaperExpression);
-            var correlation = new CorrelationDetector();
-            correlation.Visit(collection);
-            if (correlation.Found) throw new NotSupportedException("Correlated SelectMany requires lateral joins. Use a correlated Any/Contains subquery or an explicit Join.");
-            var inner = Translate(collection);
             PushdownIntoSubquery(source);
-            PushdownIntoSubquery(inner, false);
-            source.QueryExpression.Joins.Add(new CrossJoinExpression(inner.QueryExpression.From));
+            var collection = Bind(Lambda(method.Arguments[1]), source.ShaperExpression);
+            var optional = collection is MethodCallExpression defaultIfEmpty
+                && IsQueryableMethod(defaultIfEmpty, nameof(Queryable.DefaultIfEmpty)) && defaultIfEmpty.Arguments.Count == 1;
+            if (optional) collection = ((MethodCallExpression)collection).Arguments[0];
+
+            var input = collection;
+            var predicates = new List<LambdaExpression>();
+            while (input is MethodCallExpression where && IsQueryableMethod(where, nameof(Queryable.Where)))
+            {
+                predicates.Add(Lambda(where.Arguments[1]));
+                input = where.Arguments[0];
+            }
+
+            var correlated = IsCorrelated(collection);
+            bool requiresLateral = correlated && (predicates.Count == 0 || IsCorrelated(input));
+            var inner = Translate(correlated && !requiresLateral ? input : collection);
+            if (optional) MakeOptional(inner, true);
+            else PushdownIntoSubquery(inner);
+
+            JoinExpressionBase join;
+            if (requiresLateral)
+                join = new ApplyExpression(inner.QueryExpression.From, optional);
+            else if (correlated || optional)
+            {
+                SqlExpression predicate = null;
+                if (correlated)
+                    foreach (var filter in predicates)
+                        predicate = And(predicate, Scalar(Bind(filter, inner.ShaperExpression)));
+                predicate = predicate ?? new SqlConstantExpression(true, typeof(bool));
+                join = optional
+                    ? (JoinExpressionBase)new LeftJoinExpression(inner.QueryExpression.From, predicate)
+                    : new InnerJoinExpression(inner.QueryExpression.From, predicate);
+            }
+            else join = new CrossJoinExpression(inner.QueryExpression.From);
+
+            source.QueryExpression.Joins.Add(join);
+            source.QueryExpression.Orderings.AddRange(inner.QueryExpression.Orderings);
             source.ShaperExpression = method.Arguments.Count == 3
                 ? Projection(Bind(Lambda(method.Arguments[2]), source.ShaperExpression, inner.ShaperExpression)) : inner.ShaperExpression;
             return source;
+        }
+
+        static bool IsQueryableMethod(MethodCallExpression call, string name)
+            => call.Method.DeclaringType == typeof(Queryable) && call.Method.Name == name;
+
+        static bool IsCorrelated(Expression expression)
+        {
+            var detector = new CorrelationDetector();
+            detector.Visit(expression);
+            return detector.Found;
         }
 
         ShapedQueryExpression TranslateAggregateWithSelector(ShapedQueryExpression source, MethodCallExpression method)
@@ -405,6 +481,28 @@ namespace Kuery.Query
             source.ShaperExpression = negated ? (SqlExpression)_sqlExpressionFactory.MakeUnary(ExpressionType.Not, typeof(bool), exists) : exists;
             source.QueryExpression = new SelectExpression();
             source.ResultKind = QueryResultKind.Scalar;
+            return source;
+        }
+
+        ShapedQueryExpression TranslateMinMaxBy(ShapedQueryExpression source, MethodCallExpression method)
+        {
+            if (method.Arguments.Count != 2) throw Unsupported(method);
+            var query = source.QueryExpression;
+            if (query.Limit != null || query.Offset != null || query.IsDistinct || query.GroupBy.Count != 0)
+                PushdownIntoSubquery(source);
+
+            query = source.QueryExpression;
+            var key = Scalar(Bind(Lambda(method.Arguments[1]), source.ShaperExpression));
+            query.Orderings.Insert(0, new OrderingExpression(key, method.Method.Name == "MinBy"));
+            if (key.IsNullable)
+            {
+                var isNull = _sqlExpressionFactory.MakeUnary(ExpressionType.Equal, typeof(bool), key);
+                query.Orderings.Insert(0, new OrderingExpression(_sqlExpressionFactory.Case(typeof(int), isNull, Integer(1), Integer(0)), true));
+            }
+
+            query.Limit = Integer(1);
+            source.ResultKind = !method.Type.IsValueType || Nullable.GetUnderlyingType(method.Type) != null
+                ? QueryResultKind.FirstOrDefault : QueryResultKind.First;
             return source;
         }
 
@@ -643,7 +741,12 @@ namespace Kuery.Query
         {
             if (expression is OptionalShaperExpression optional)
                 return optional.Value is SqlExpression ? (Expression)Scalar(optional) : new OptionalShaperExpression(Projection(optional.Value), optional.Presence);
-            if (expression is StructuralTypeProjectionExpression || expression is GroupByShaperExpression) return expression;
+            if (expression is StructuralTypeProjectionExpression || expression is GroupByShaperExpression || expression is CollectionShaperExpression)
+                return expression;
+            if (expression is MethodCallExpression materialize && materialize.Method.DeclaringType == typeof(Enumerable)
+                && (materialize.Method.Name == nameof(Enumerable.ToList) || materialize.Method.Name == nameof(Enumerable.ToArray))
+                && materialize.Arguments.Count == 1 && materialize.Arguments[0] is CollectionShaperExpression)
+                return expression;
             if (expression is UnaryExpression conversion && (conversion.NodeType == ExpressionType.Convert || conversion.NodeType == ExpressionType.ConvertChecked)
                 && (conversion.Type == typeof(object) || conversion.Type.IsAssignableFrom(conversion.Operand.Type)))
                 return conversion.Update(Projection(conversion.Operand));
@@ -715,10 +818,12 @@ namespace Kuery.Query
         {
             readonly SelectExpression _query;
             readonly string _alias;
-            internal ProjectionLifter(SelectExpression query, string alias)
+            readonly IDictionary<Expression, Expression> _replacements;
+            internal ProjectionLifter(SelectExpression query, string alias, IDictionary<Expression, Expression> replacements = null)
             {
                 _query = query;
                 _alias = alias;
+                _replacements = replacements;
             }
             protected override Expression VisitExtension(Expression node)
             {
@@ -727,7 +832,9 @@ namespace Kuery.Query
                 if (node is SqlExpression sql)
                 {
                     var ordinal = _query.AddToProjection(sql);
-                    return new ColumnExpression(_alias, "c" + ordinal, sql.Type, sql.IsNullable);
+                    var column = new ColumnExpression(_alias, "c" + ordinal, sql.Type, sql.IsNullable);
+                    if (_replacements != null) _replacements[sql] = column;
+                    return column;
                 }
                 if (node is StructuralTypeProjectionExpression entity)
                     return entity.Update(entity.Members.ToDictionary(p => p.Key, p => Visit(p.Value)), (SqlExpression)Visit(entity.Presence), (SqlExpression)Visit(entity.Discriminator));
@@ -751,8 +858,8 @@ namespace Kuery.Query
             internal bool Found;
             protected override Expression VisitExtension(Expression node)
             {
-                if (node is ColumnExpression) Found = true;
-                return node;
+                if (node is ColumnExpression || node is StructuralTypeProjectionExpression) Found = true;
+                return Found ? node : base.VisitExtension(node);
             }
         }
     }

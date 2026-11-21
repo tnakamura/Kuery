@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Kuery.Query;
@@ -39,13 +40,48 @@ namespace Kuery.Query.Internal
                 using (var reader = await dbCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 {
                     var rows = CreateList(plan);
-                    while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                    {
-                        rows.Add(plan.Materialize(reader));
-                        if (Finished(plan, rows.Count)) break;
-                    }
+                    await foreach (var value in ReadAsync(reader, plan, cancellationToken).ConfigureAwait(false))
+                        rows.Add(value);
                     return Result(plan, rows);
                 }
+            }
+        }
+
+        public async IAsyncEnumerable<T> StreamAsync<T>(QueryContext context, Expression expression,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var generated = Prepare(context, expression, typeof(IEnumerable<T>), true, out var plan);
+            using (var command = CreateCommand(context.Connection, generated))
+            {
+                if (!(command is DbCommand dbCommand))
+                    throw new NotSupportedException("Asynchronous streaming requires an ADO.NET DbCommand.");
+
+                using (var reader = await dbCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    await foreach (var value in ReadAsync(reader, plan, cancellationToken).ConfigureAwait(false))
+                        yield return (T)value;
+                }
+            }
+        }
+
+        static async IAsyncEnumerable<object> ReadAsync(DbDataReader reader, CompiledQuery plan,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            if (plan.Collection != null)
+            {
+                var coordinator = new CollectionResultCoordinator(plan.Collection);
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    if (coordinator.Read(reader, out var result)) yield return result;
+                if (coordinator.HasGroup) yield return coordinator.Finish();
+                yield break;
+            }
+
+            int count = 0;
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                yield return plan.Materialize(reader);
+                if (Finished(plan, ++count)) yield break;
             }
         }
 
@@ -56,6 +92,18 @@ namespace Kuery.Query.Internal
         static object Read(IDataReader reader, CompiledQuery plan, CancellationToken cancellationToken = default)
         {
             var rows = CreateList(plan);
+            if (plan.Collection != null)
+            {
+                var coordinator = new CollectionResultCoordinator(plan.Collection);
+                while (reader.Read())
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (coordinator.Read(reader, out var group)) rows.Add(group);
+                }
+                if (coordinator.HasGroup) rows.Add(coordinator.Finish());
+                return rows;
+            }
+
             while (reader.Read())
             {
                 cancellationToken.ThrowIfCancellationRequested();

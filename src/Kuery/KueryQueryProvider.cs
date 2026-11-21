@@ -93,6 +93,12 @@ namespace Kuery
             return (TResult)result;
         }
 
+        internal string GetQueryString(Expression expression, Type resultType)
+            => new QueryCompiler().CompileQuery(_context, expression, resultType, false, out _).CommandText;
+
+        internal IAsyncEnumerable<T> StreamAsync<T>(Expression expression, CancellationToken cancellationToken)
+            => _executor.StreamAsync<T>(_context, expression, cancellationToken);
+
         static Type GetElementType(Type sequenceType)
         {
             if (sequenceType.IsGenericType && sequenceType.GetGenericTypeDefinition() == typeof(IQueryable<>))

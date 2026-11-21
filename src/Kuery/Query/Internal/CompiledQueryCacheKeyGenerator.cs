@@ -46,6 +46,13 @@ namespace Kuery.Query.Internal
             {
                 if (node is QueryParameterExpression parameter) Text.Append("slot:").Append(parameter.Index);
                 else if (node is EntityReferenceExpression entity) { Visit(entity.Key); Visit(entity.Present); }
+                else if (node is FromSqlQueryRootExpression fromSql)
+                {
+                    Text.Append("from-sql:");
+                    Add(fromSql.Sql);
+                    Visit(fromSql.Source);
+                    foreach (var argument in fromSql.Arguments) Visit(argument);
+                }
                 else if (node is QueryRootExpression root)
                 {
                     Text.Append("table:"); Add(root.Mapping.TableName);

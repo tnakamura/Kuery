@@ -2,6 +2,10 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>8.0</LangVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Legacy APIs predate the XML documentation requirement. -->
+    <NoWarn>$(NoWarn);1591</NoWarn>
     <Copyright>tnakamura</Copyright>
     <Authors>tnakamura</Authors>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -71,6 +75,7 @@ Tests
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.0" />
     <None Include="..\..\README.md">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>

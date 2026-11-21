@@ -7,12 +7,27 @@ namespace Kuery.Query
     {
         internal Expression Process(Expression query)
         {
-            return new InvocationExpressionRemovingExpressionVisitor().Visit(query);
+            return new QueryableMethodNormalizingExpressionVisitor().Visit(query);
         }
 
-        private sealed class InvocationExpressionRemovingExpressionVisitor : ExpressionVisitor
+        private sealed class QueryableMethodNormalizingExpressionVisitor : ExpressionVisitor
         {
             protected override Expression VisitExtension(Expression node) => node;
+
+            protected override Expression VisitMethodCall(MethodCallExpression node)
+            {
+                var visited = (MethodCallExpression)base.VisitMethodCall(node);
+                if (visited.Method.DeclaringType != typeof(Queryable)
+                    || (visited.Method.Name != "Order" && visited.Method.Name != "OrderDescending"))
+                    return visited;
+
+                if (visited.Arguments.Count != 1) throw RelationalQueryableMethodTranslatingExpressionVisitor.Unsupported(visited);
+                var elementType = visited.Method.GetGenericArguments()[0];
+                var element = Expression.Parameter(elementType, "element");
+                return Expression.Call(typeof(Queryable),
+                    visited.Method.Name == "Order" ? nameof(Queryable.OrderBy) : nameof(Queryable.OrderByDescending),
+                    new[] { elementType, elementType }, visited.Arguments[0], Expression.Quote(Expression.Lambda(element, element)));
+            }
 
             protected override Expression VisitInvocation(InvocationExpression node)
             {

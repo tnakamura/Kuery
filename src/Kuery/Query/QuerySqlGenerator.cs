@@ -78,6 +78,12 @@ namespace Kuery.Query
             if (query.From != null) sql.Append(" from ").Append(Source(query.From));
             foreach (var join in query.Joins)
             {
+                if (join is ApplyExpression apply)
+                {
+                    AppendApply(sql, apply);
+                    continue;
+                }
+
                 sql.Append(join is InnerJoinExpression ? " inner join " : join is LeftJoinExpression ? " left join " : join is FullJoinExpression ? " full outer join " : " cross join ").Append(Source(join.Table));
                 if (join is PredicateJoinExpressionBase predicateJoin) sql.Append(" on ").Append(Predicate(predicateJoin.JoinPredicate));
             }
@@ -112,6 +118,23 @@ namespace Kuery.Query
             return sql.ToString();
         }
 
+        void AppendApply(StringBuilder sql, ApplyExpression apply)
+        {
+            switch (_dialect.Kind)
+            {
+                case SqlDialectKind.SqlServer:
+                    sql.Append(apply.IsOuter ? " outer apply " : " cross apply ").Append(Source(apply.Table));
+                    break;
+                case SqlDialectKind.PostgreSql:
+                case SqlDialectKind.MySql:
+                    sql.Append(apply.IsOuter ? " left join lateral " : " cross join lateral ").Append(Source(apply.Table));
+                    if (apply.IsOuter) sql.Append(" on true");
+                    break;
+                default:
+                    throw new NotSupportedException("This correlated SelectMany requires APPLY or LATERAL, which is unsupported by " + _dialect.Kind + ".");
+            }
+        }
+
         string PagingValue(SqlExpression expression)
         {
             if (_dialect.Kind != SqlDialectKind.MySql) return Value(expression);
@@ -136,6 +159,11 @@ namespace Kuery.Query
         {
             string body;
             if (source is SelectExpression select) body = "(" + Select(select) + ")";
+            else if (source is FromSqlExpression fromSql)
+            {
+                var arguments = fromSql.Arguments.Select(a => (object)Value(a)).ToArray();
+                body = "( " + string.Format(CultureInfo.InvariantCulture, fromSql.Sql, arguments) + "\n)";
+            }
             else if (source is SetOperationBase set)
             {
                 var leftAlias = _dialect.EscapeIdentifier("s" + _derived++);
@@ -146,6 +174,18 @@ namespace Kuery.Query
             }
             else body = _dialect.EscapeIdentifier(((TableExpression)source).Name);
             return body + " " + _dialect.EscapeIdentifier(source.Alias);
+        }
+
+        protected override Expression VisitExtension(Expression node)
+        {
+            if (!(node is WindowFunctionExpression window)) return base.VisitExtension(node);
+
+            var name = window.Function == WindowFunction.RowNumber ? "row_number()" : "dense_rank()";
+            var partitions = window.Partitions.Count == 0 ? "" : "partition by " + string.Join(", ", window.Partitions.Select(Value)) + " ";
+            var orderings = window.Orderings.Count == 0 ? "(select 1)"
+                : string.Join(", ", window.Orderings.Select(o => Value(o.Expression) + (o.IsAscending ? " asc" : " desc")));
+            _sqlFragment = name + " over (" + partitions + "order by " + orderings + ")";
+            return node;
         }
 
         internal string Value(SqlExpression expression)

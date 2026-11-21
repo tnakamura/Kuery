@@ -9,6 +9,7 @@ namespace Kuery.Query
     {
         internal SelectExpression QueryExpression { get; set; }
         internal Expression ShaperExpression { get; set; }
+        internal CollectionShaperExpression Collection { get; set; }
         internal QueryResultKind ResultKind { get; set; }
         internal ResultCardinality ResultCardinality => ResultKind == QueryResultKind.Sequence
             ? ResultCardinality.Enumerable

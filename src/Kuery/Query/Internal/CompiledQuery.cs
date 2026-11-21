@@ -12,6 +12,7 @@ namespace Kuery.Query.Internal
         internal QueryResultKind ResultKind => ShapedQuery.ResultKind;
         internal Type ElementType => ShapedQuery.ShaperExpression.Type;
         internal Func<IDataRecord, object> Materialize { get; set; }
+        internal CollectionQueryPlan Collection { get; set; }
         internal RelationalCommand CommandTemplate;
     }
 }

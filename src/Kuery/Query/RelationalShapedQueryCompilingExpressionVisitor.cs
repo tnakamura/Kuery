@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.Linq;
@@ -16,9 +18,76 @@ namespace Kuery.Query
         internal CompiledQuery Compile(ShapedQueryExpression shapedQuery)
         {
             _query = shapedQuery.QueryExpression;
-            var record = _record;
-            var body = Visit(shapedQuery.ShaperExpression);
-            return new CompiledQuery { ShapedQuery = shapedQuery, Materialize = Expression.Lambda<Func<IDataRecord, object>>(Expression.Convert(body, typeof(object)), record).Compile() };
+            if (shapedQuery.Collection != null)
+                return new CompiledQuery { ShapedQuery = shapedQuery, Collection = CompileCollection(shapedQuery) };
+
+            return new CompiledQuery
+            {
+                ShapedQuery = shapedQuery,
+                Materialize = ReadValue<object>(shapedQuery.ShaperExpression)
+            };
+        }
+
+        Func<IDataRecord, T> ReadValue<T>(Expression expression)
+            => Expression.Lambda<Func<IDataRecord, T>>(Expression.Convert(Visit(expression), typeof(T)), _record).Compile();
+
+        CollectionQueryPlan CompileCollection(ShapedQueryExpression query)
+        {
+            var collection = query.Collection;
+            var binding = new CollectionProjectionBindingVisitor(collection);
+            var result = binding.Visit(query.ShaperExpression);
+            var values = Expression.NewArrayInit(typeof(object), binding.OuterValues.Select(e => Expression.Convert(Visit(e), typeof(object))));
+            var hasElement = collection.Presence == null ? (Expression)Expression.Constant(true)
+                : Expression.NotEqual(Visit(collection.Presence), Expression.Constant(null, collection.Presence.Type));
+
+            return new CollectionQueryPlan
+            {
+                ReadIdentifier = ReadValue<long>(collection.Identifier),
+                ReadElement = ReadValue<object>(collection.Element),
+                HasElement = Expression.Lambda<Func<IDataRecord, bool>>(hasElement, _record).Compile(),
+                ReadOuterValues = Expression.Lambda<Func<IDataRecord, object[]>>(values, _record).Compile(),
+                CreateResult = Expression.Lambda<Func<object[], IList, object>>(Expression.Convert(result, typeof(object)), binding.Values, binding.Elements).Compile(),
+                ListType = typeof(List<>).MakeGenericType(collection.Element.Type)
+            };
+        }
+
+        sealed class CollectionProjectionBindingVisitor : ExpressionVisitor
+        {
+            readonly CollectionShaperExpression _collection;
+            internal readonly List<Expression> OuterValues = new List<Expression>();
+            internal readonly ParameterExpression Values = Expression.Parameter(typeof(object[]), "values");
+            internal readonly ParameterExpression Elements = Expression.Parameter(typeof(IList), "elements");
+
+            internal CollectionProjectionBindingVisitor(CollectionShaperExpression collection)
+            {
+                _collection = collection;
+            }
+
+            public override Expression Visit(Expression node)
+            {
+                if (node == null) return null;
+                if (ReferenceEquals(node, _collection)) return Expression.Convert(Elements, node.Type);
+                var finder = new CollectionFindingVisitor();
+                finder.Visit(node);
+                if (finder.Found) return base.Visit(node);
+
+                var index = OuterValues.Count;
+                OuterValues.Add(node);
+                return Expression.Convert(Expression.ArrayIndex(Values, Expression.Constant(index)), node.Type);
+            }
+
+            protected override Expression VisitMemberInit(MemberInitExpression node)
+                => node.Update(node.NewExpression.Update(node.NewExpression.Arguments.Select(Visit)), Visit(node.Bindings, VisitMemberBinding));
+        }
+
+        sealed class CollectionFindingVisitor : ExpressionVisitor
+        {
+            internal bool Found;
+            protected override Expression VisitExtension(Expression node)
+            {
+                if (node is CollectionShaperExpression) Found = true;
+                return node;
+            }
         }
 
         internal static object ConvertValue(object value, Type type)

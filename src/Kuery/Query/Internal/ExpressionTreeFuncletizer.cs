@@ -13,20 +13,34 @@ namespace Kuery.Query.Internal
     {
         readonly IDbConnection _connection;
         internal readonly List<object> Values = new List<object>();
-        internal ExpressionTreeFuncletizer(IDbConnection connection)
+        readonly bool _allowTags;
+        List<string> _tags;
+        internal IReadOnlyList<string> Tags => _tags;
+
+        internal ExpressionTreeFuncletizer(IDbConnection connection, bool allowTags = true)
         {
             _connection = connection;
+            _allowTags = allowTags;
         }
 
         internal Expression ExtractParameters(Expression expression)
         {
             Values.Clear();
+            _tags?.Clear();
             return Visit(expression);
         }
 
         public override Expression Visit(Expression node)
         {
             if (node == null || node is SqlExpression || node is QueryParameterExpression || node is QueryRootExpression) return node;
+            if (node is QueryTagExpression tag)
+            {
+                if (!_allowTags) throw new NotSupportedException("Query tags are supported only for read queries.");
+                if (_tags == null) _tags = new List<string>();
+                var source = Visit(tag.Source);
+                _tags.Add(tag.Tag);
+                return source;
+            }
             // .NET 10 may bind array.Contains to MemoryExtensions and insert a ref-struct conversion.
             // Normalize it before trying to parameterize a ReadOnlySpan<T>.
             if (node is MethodCallExpression contains && contains.Method.DeclaringType?.FullName == "System.MemoryExtensions"
@@ -85,7 +99,7 @@ namespace Kuery.Query.Internal
             return base.Visit(node);
         }
 
-        static bool IsScalar(Type type)
+        internal static bool IsScalar(Type type)
         {
             type = Nullable.GetUnderlyingType(type) ?? type;
             return type.IsPrimitive || type.IsEnum || type == typeof(string) || type == typeof(decimal)
@@ -121,7 +135,7 @@ namespace Kuery.Query.Internal
             public override Expression Visit(Expression node)
             {
                 if (node == null || Dependent) return node;
-                if (node is ParameterExpression || node is SqlExpression || node is QueryParameterExpression || node is QueryRootExpression
+                if (node is FromSqlQueryRootExpression || node is QueryTagExpression || node is ParameterExpression || node is SqlExpression || node is QueryParameterExpression || node is QueryRootExpression
                     || node is LambdaExpression || node.NodeType == ExpressionType.Quote)
                 { Dependent = true; return node; }
                 if (node is MethodCallExpression call && (call.Method.DeclaringType == typeof(Queryable) || call.Method.DeclaringType == typeof(KueryFunctions) || call.Method.DeclaringType == typeof(KueryQueryableExtensions)))

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Text;
 using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query.Internal
@@ -10,7 +11,7 @@ namespace Kuery.Query.Internal
         internal RelationalCommand CompileQuery(QueryContext context, Expression expression, Type resultType, bool async,
             out CompiledQuery plan, string operation = "select", IReadOnlyList<SetPropertyCall> setters = null)
         {
-            var normalizer = new ExpressionTreeFuncletizer(context.Connection);
+            var normalizer = new ExpressionTreeFuncletizer(context.Connection, allowTags: operation == "select");
             var normalized = normalizer.ExtractParameters(expression);
             var dialect = SqlDialectFactory.Create(context.Connection);
             var key = CompiledQueryCacheKeyGenerator.GenerateCacheKey(normalized, dialect.Kind, resultType, operation, async);
@@ -30,7 +31,27 @@ namespace Kuery.Query.Internal
             plan = CompiledQueryCache.GetOrAdd(key, () => operation == "select"
                 ? new QueryCompilationContext().CreateQueryExecutor(normalized)
                 : new QueryCompilationContext().CreateNonQueryExecutor(normalized, operation, normalizedSetters));
-            return RelationalCommandCache.GetRelationalCommand(plan, dialect, normalizer.Values);
+            var command = RelationalCommandCache.GetRelationalCommand(plan, dialect, normalizer.Values);
+            command.CommandText = ApplyTags(command.CommandText, normalizer.Tags);
+            return command;
+        }
+
+        static string ApplyTags(string sql, IReadOnlyList<string> tags)
+        {
+            if (tags == null || tags.Count == 0) return sql;
+
+            var text = new StringBuilder();
+            foreach (var tag in tags)
+            {
+                foreach (var line in tag.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+                {
+                    text.Append("-- ");
+                    foreach (var c in line)
+                        text.Append(char.IsControl(c) || c == '\u2028' || c == '\u2029' ? ' ' : c);
+                    text.Append('\n');
+                }
+            }
+            return text.Append(sql).ToString();
         }
 
     }

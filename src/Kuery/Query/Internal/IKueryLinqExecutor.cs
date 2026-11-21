@@ -14,6 +14,8 @@ namespace Kuery.Query.Internal
 
         Task<object> ExecuteAsync(QueryContext context, Expression expression, Type resultType, CancellationToken cancellationToken);
 
+        IAsyncEnumerable<T> StreamAsync<T>(QueryContext context, Expression expression, CancellationToken cancellationToken);
+
         int ExecuteDelete(QueryContext context, Expression expression);
 
         Task<int> ExecuteDeleteAsync(QueryContext context, Expression expression, CancellationToken cancellationToken);
