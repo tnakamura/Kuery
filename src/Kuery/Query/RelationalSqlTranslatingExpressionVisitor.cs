@@ -21,6 +21,9 @@ namespace Kuery.Query
             throw RelationalQueryableMethodTranslatingExpressionVisitor.Unsupported(expression);
         }
 
+        /// <summary>Translates normalized parameters and optional values, and passes through SQL expressions.</summary>
+        /// <param name="node">The expression to visit.</param>
+        /// <returns>The translated SQL expression.</returns>
         protected override Expression VisitExtension(Expression node)
         {
             if (node is OptionalShaperExpression optional)
@@ -32,10 +35,19 @@ namespace Kuery.Query
             throw RelationalQueryableMethodTranslatingExpressionVisitor.Unsupported(node);
         }
 
+        /// <summary>Converts a CLR constant to a typed SQL constant.</summary>
+        /// <param name="node">The constant to visit.</param>
+        /// <returns>The translated SQL expression.</returns>
         protected override Expression VisitConstant(ConstantExpression node) => new SqlConstantExpression(node.Value, node.Type);
+        /// <summary>Translates a conditional expression to a SQL CASE expression.</summary>
+        /// <param name="node">The conditional expression to visit.</param>
+        /// <returns>The translated SQL expression.</returns>
         protected override Expression VisitConditional(ConditionalExpression node)
             => _sqlExpressionFactory.Case(node.Type, Translate(node.Test), Translate(node.IfTrue), Translate(node.IfFalse));
 
+        /// <summary>Translates comparison, arithmetic and logical operations to SQL.</summary>
+        /// <param name="binary">The binary expression to visit.</param>
+        /// <returns>The translated SQL expression.</returns>
         protected override Expression VisitBinary(BinaryExpression binary)
         {
             if (binary.NodeType == ExpressionType.Coalesce)
@@ -66,6 +78,9 @@ namespace Kuery.Query
 
         }
 
+        /// <summary>Translates conversions, negation and other supported unary operations to SQL.</summary>
+        /// <param name="unary">The unary expression to visit.</param>
+        /// <returns>The translated SQL expression.</returns>
         protected override Expression VisitUnary(UnaryExpression unary)
         {
             if (unary.NodeType == ExpressionType.Convert || unary.NodeType == ExpressionType.ConvertChecked)
@@ -86,6 +101,9 @@ namespace Kuery.Query
             throw RelationalQueryableMethodTranslatingExpressionVisitor.Unsupported(unary);
         }
 
+        /// <summary>Translates supported CLR member accesses to SQL.</summary>
+        /// <param name="member">The member access to visit.</param>
+        /// <returns>The translated SQL expression.</returns>
         protected override Expression VisitMember(MemberExpression member)
         {
             if (member.Member.DeclaringType == typeof(DateTime) && member.Expression == null
@@ -107,6 +125,9 @@ namespace Kuery.Query
             throw RelationalQueryableMethodTranslatingExpressionVisitor.Unsupported(member);
         }
 
+        /// <summary>Translates supported scalar functions, aggregates and subqueries to SQL.</summary>
+        /// <param name="call">The method call to visit.</param>
+        /// <returns>The translated SQL expression.</returns>
         protected override Expression VisitMethodCall(MethodCallExpression call)
         {
             var name = call.Method.Name;

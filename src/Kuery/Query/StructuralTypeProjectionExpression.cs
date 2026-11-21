@@ -26,8 +26,13 @@ namespace Kuery.Query
         internal StructuralTypeProjectionExpression WithType(Type type)
             => new StructuralTypeProjectionExpression(SqlMapper.GetMapping(type), Members, Presence, Hierarchy, Discriminator,
                 ConcreteTypes.Where(e => type.IsAssignableFrom(e.Mapping.MappedType)).ToArray());
+        /// <summary>Gets the CLR type of the mapped entity projection.</summary>
         public override Type Type => Mapping.MappedType;
+        /// <summary>Gets the extension node kind used to identify this expression.</summary>
         public override ExpressionType NodeType => ExpressionType.Extension;
+        /// <summary>Returns this node because it exposes no visitable child expressions.</summary>
+        /// <param name="visitor">The visitor to apply to the child expressions.</param>
+        /// <returns>This expression.</returns>
         protected override Expression VisitChildren(ExpressionVisitor visitor) => this;
     }
 }

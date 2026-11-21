@@ -63,6 +63,9 @@ namespace Kuery.Query
                 _collection = collection;
             }
 
+            /// <summary>Binds the collection and outer values used to construct a grouped result.</summary>
+            /// <param name="node">The expression to visit.</param>
+            /// <returns>The visited expression.</returns>
             public override Expression Visit(Expression node)
             {
                 if (node == null) return null;
@@ -76,6 +79,9 @@ namespace Kuery.Query
                 return Expression.Convert(Expression.ArrayIndex(Values, Expression.Constant(index)), node.Type);
             }
 
+            /// <summary>Rebinds the constructor arguments and assignments of a grouped result initializer.</summary>
+            /// <param name="node">The object initializer to visit.</param>
+            /// <returns>The visited expression.</returns>
             protected override Expression VisitMemberInit(MemberInitExpression node)
                 => node.Update(node.NewExpression.Update(node.NewExpression.Arguments.Select(Visit)), Visit(node.Bindings, VisitMemberBinding));
         }
@@ -83,6 +89,9 @@ namespace Kuery.Query
         sealed class CollectionFindingVisitor : ExpressionVisitor
         {
             internal bool Found;
+            /// <summary>Detects a collection shaper in a projected result.</summary>
+            /// <param name="node">The expression to visit.</param>
+            /// <returns>The visited expression.</returns>
             protected override Expression VisitExtension(Expression node)
             {
                 if (node is CollectionShaperExpression) Found = true;
@@ -107,6 +116,9 @@ namespace Kuery.Query
             return Convert.ChangeType(value, target, CultureInfo.InvariantCulture);
         }
 
+        /// <summary>Builds expressions that read SQL columns and construct the corresponding CLR values.</summary>
+        /// <param name="node">The expression to visit.</param>
+        /// <returns>The expression used to materialize the value.</returns>
         protected override Expression VisitExtension(Expression node)
         {
             if (node is OptionalShaperExpression optional)

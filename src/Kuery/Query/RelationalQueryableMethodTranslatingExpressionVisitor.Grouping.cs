@@ -159,6 +159,9 @@ namespace Kuery.Query
 
             internal MethodCallExpression Candidate { get; private set; }
 
+            /// <summary>Locates the supported terminal operation selecting elements from a group.</summary>
+            /// <param name="node">The method call to visit.</param>
+            /// <returns>The visited expression.</returns>
             protected override Expression VisitMethodCall(MethodCallExpression node)
             {
                 if (node.Arguments.Count == 1 && (IsSequenceMethod(node, nameof(Enumerable.First))
@@ -194,6 +197,9 @@ namespace Kuery.Query
                 _keys = keys;
             }
 
+            /// <summary>Replaces group keys and the ordered element selection with their translated projections.</summary>
+            /// <param name="node">The expression to visit.</param>
+            /// <returns>The visited expression.</returns>
             public override Expression Visit(Expression node)
             {
                 if (ReferenceEquals(node, _candidate)) return _replacement;
@@ -202,6 +208,9 @@ namespace Kuery.Query
                 return node != null && _keys.TryGetValue(node, out var key) ? key : base.Visit(node);
             }
 
+            /// <summary>Rebinds members after replacing the ordered element selection.</summary>
+            /// <param name="node">The member access to visit.</param>
+            /// <returns>The visited expression.</returns>
             protected override Expression VisitMember(MemberExpression node)
             {
                 // Resolve members such as g.OrderBy(...).First().Id after replacing the terminal.

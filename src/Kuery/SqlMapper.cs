@@ -102,6 +102,9 @@ namespace Kuery
 
             private readonly Action<object, IDataRecord, int>[] _fastSetters;
 
+            /// <summary>Builds an ordinal-to-property map for the reader's result columns.</summary>
+            /// <param name="map">The mapping used to match result columns to CLR properties.</param>
+            /// <param name="reader">The reader that supplies the result column names and ordinals.</param>
             public Deserializer(TableMapping map, IDataReader reader)
             {
                 _map = map;
@@ -142,6 +145,9 @@ namespace Kuery
                 }
             }
 
+            /// <summary>Creates and populates a mapped object from the current record.</summary>
+            /// <param name="record">The positioned record containing the values to deserialize.</param>
+            /// <returns>The populated entity cast to the requested result type.</returns>
             public T Deserialize(IDataRecord record)
             {
                 var obj = Activator.CreateInstance(_map.MappedType);

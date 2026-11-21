@@ -14,6 +14,9 @@ namespace Kuery.Query.SqlExpressions
         internal SqlExpression Pattern { get; }
         internal LikeExpression Update(SqlExpression match, SqlExpression pattern)
             => ReferenceEquals(match, Match) && ReferenceEquals(pattern, Pattern) ? this : new LikeExpression(match, pattern);
+        /// <summary>Visits the match expression and pattern.</summary>
+        /// <param name="visitor">The visitor to apply to the child expressions.</param>
+        /// <returns>This expression, or an expression updated with the visited children.</returns>
         protected override Expression VisitChildren(ExpressionVisitor visitor)
             => Update((SqlExpression)visitor.Visit(Match), (SqlExpression)visitor.Visit(Pattern));
     }

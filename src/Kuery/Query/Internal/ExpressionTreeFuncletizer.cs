@@ -30,6 +30,9 @@ namespace Kuery.Query.Internal
             return Visit(expression);
         }
 
+        /// <summary>Replaces evaluatable values and query roots with normalized expressions.</summary>
+        /// <param name="node">The expression to visit.</param>
+        /// <returns>The visited expression.</returns>
         public override Expression Visit(Expression node)
         {
             if (node == null || node is SqlExpression || node is QueryParameterExpression || node is QueryRootExpression) return node;
@@ -132,6 +135,9 @@ namespace Kuery.Query.Internal
         private sealed class DependencyDetector : ExpressionVisitor
         {
             internal bool Dependent;
+            /// <summary>Detects expressions that depend on a query or must remain in SQL.</summary>
+            /// <param name="node">The expression to visit.</param>
+            /// <returns>The visited expression.</returns>
             public override Expression Visit(Expression node)
             {
                 if (node == null || Dependent) return node;

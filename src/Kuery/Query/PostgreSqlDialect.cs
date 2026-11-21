@@ -6,20 +6,30 @@ namespace Kuery.Query
 {
     internal sealed class PostgreSqlDialect : SqlDialect
     {
+        /// <summary>Gets the database dialect that these SQL rules target.</summary>
         public override SqlDialectKind Kind => SqlDialectKind.PostgreSql;
 
+        /// <summary>Quotes a database identifier and escapes embedded identifier delimiters.</summary>
+        /// <param name="identifier">The unquoted identifier.</param>
+        /// <returns>The identifier quoted for the current dialect.</returns>
         public override string EscapeIdentifier(string identifier)
         {
             if (identifier == null) throw new ArgumentNullException(nameof(identifier));
             return "\"" + identifier.Replace("\"", "\"\"") + "\"";
         }
 
+        /// <summary>Prefixes a parameter name as required by the database provider.</summary>
+        /// <param name="parameterName">The parameter name without its provider prefix.</param>
+        /// <returns>The provider-specific parameter name.</returns>
         public override string FormatParameterName(string parameterName)
         {
             if (parameterName == null) throw new ArgumentNullException(nameof(parameterName));
             return "@" + parameterName;
         }
 
+        /// <summary>Gets the SQL type name used to cast a value to the specified CLR type.</summary>
+        /// <param name="type">The target CLR type of the cast.</param>
+        /// <returns>The SQL type name for the cast.</returns>
         public override string CastType(Type type)
         {
             type = Nullable.GetUnderlyingType(type) ?? type;
@@ -28,6 +38,10 @@ namespace Kuery.Query
             return base.CastType(type);
         }
 
+        /// <summary>Renders a supported database function or equivalent SQL expression.</summary>
+        /// <param name="operation">The logical SQL operation name.</param>
+        /// <param name="a">The rendered SQL arguments in call order.</param>
+        /// <returns>The SQL fragment that implements the operation.</returns>
         public override string Function(string operation, string[] a)
         {
             switch (operation)

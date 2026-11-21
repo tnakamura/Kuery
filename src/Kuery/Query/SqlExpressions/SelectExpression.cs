@@ -29,6 +29,9 @@ namespace Kuery.Query.SqlExpressions
         internal SqlExpression Limit;
         internal bool IsDistinct;
 
+        /// <summary>Visits the query sources, projections, and SQL clauses.</summary>
+        /// <param name="visitor">The visitor to apply to the child expressions.</param>
+        /// <returns>This expression, or an expression updated with the visited children.</returns>
         protected override Expression VisitChildren(ExpressionVisitor visitor)
         {
             var from = (TableExpressionBase)visitor.Visit(From);

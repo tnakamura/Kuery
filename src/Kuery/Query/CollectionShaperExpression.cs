@@ -20,8 +20,13 @@ namespace Kuery.Query
         internal SqlExpression Identifier { get; }
         internal Expression Element { get; }
         internal SqlExpression Presence { get; }
+        /// <summary>Gets the enumerable CLR type of the materialized collection.</summary>
         public override Type Type => typeof(IEnumerable<>).MakeGenericType(Element.Type);
+        /// <summary>Gets the extension node kind used to identify this expression.</summary>
         public override ExpressionType NodeType => ExpressionType.Extension;
+        /// <summary>Returns this node because it exposes no visitable child expressions.</summary>
+        /// <param name="visitor">The visitor to apply to the child expressions.</param>
+        /// <returns>This expression.</returns>
         protected override Expression VisitChildren(ExpressionVisitor visitor) => this;
     }
 
@@ -29,13 +34,19 @@ namespace Kuery.Query
     {
         readonly IEnumerable<TElement> _elements;
 
+        /// <summary>Initializes a materialized grouping with its key and elements.</summary>
+        /// <param name="key">The shared key for the grouped values.</param>
+        /// <param name="elements">The materialized values in the group.</param>
         public ResultGrouping(TKey key, IEnumerable<TElement> elements)
         {
             Key = key;
             _elements = elements;
         }
 
+        /// <summary>Gets the key shared by the grouped elements.</summary>
         public TKey Key { get; }
+        /// <summary>Returns an enumerator over the materialized group elements.</summary>
+        /// <returns>An enumerator over the elements with this key.</returns>
         public IEnumerator<TElement> GetEnumerator() => _elements.GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }

@@ -7,6 +7,9 @@ namespace Kuery.Query.SqlExpressions
         internal FullJoinExpression(TableExpressionBase table, SqlExpression predicate, SqlExpression unmatchedPredicate)
             : base(table, predicate) { UnmatchedPredicate = unmatchedPredicate; }
         internal SqlExpression UnmatchedPredicate { get; }
+        /// <summary>Visits the table, join predicate, and unmatched-row predicate.</summary>
+        /// <param name="visitor">The visitor to apply to the child expressions.</param>
+        /// <returns>This expression, or an expression updated with the visited children.</returns>
         protected override Expression VisitChildren(ExpressionVisitor visitor)
         {
             var table = (TableExpressionBase)visitor.Visit(Table);

@@ -11,6 +11,9 @@ namespace Kuery.Query
         internal RelationalQueryTranslationPostprocessor(SqlDialectKind dialect) { _dialect = dialect; }
         internal SelectExpression Process(SelectExpression query) => (SelectExpression)Visit(query);
 
+        /// <summary>Rewrites full joins into equivalent set operations for dialects that require it.</summary>
+        /// <param name="node">The SELECT statement to visit.</param>
+        /// <returns>The visited expression.</returns>
         protected override Expression VisitSelect(SelectExpression node)
         {
             var query = (SelectExpression)base.VisitSelect(node);

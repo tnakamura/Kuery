@@ -17,6 +17,9 @@ namespace Kuery.Query.SqlExpressions
         internal bool IsClrConversion { get; }
         internal SqlUnaryExpression Update(SqlExpression operand) => ReferenceEquals(operand, Operand) ? this
             : new SqlUnaryExpression(OperatorType, operand, Type, IsNullable, IsClrConversion);
+        /// <summary>Visits the operand of the unary operation.</summary>
+        /// <param name="visitor">The visitor to apply to the child expressions.</param>
+        /// <returns>This expression, or an expression updated with the visited children.</returns>
         protected override Expression VisitChildren(ExpressionVisitor visitor) => Update((SqlExpression)visitor.Visit(Operand));
     }
 }

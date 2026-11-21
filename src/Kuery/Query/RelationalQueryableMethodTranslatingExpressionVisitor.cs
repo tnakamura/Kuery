@@ -71,6 +71,9 @@ namespace Kuery.Query
             return source;
         }
 
+        /// <summary>Translates a normalized table or raw SQL root to a shaped query.</summary>
+        /// <param name="expression">The expression to visit.</param>
+        /// <returns>The translated query shape.</returns>
         protected override Expression VisitExtension(Expression expression)
         {
             if (expression is FromSqlQueryRootExpression fromSql)
@@ -100,6 +103,9 @@ namespace Kuery.Query
             return query;
         }
 
+        /// <summary>Dispatches supported LINQ operators to their relational translations.</summary>
+        /// <param name="method">The method call to visit.</param>
+        /// <returns>The translated query shape.</returns>
         protected override Expression VisitMethodCall(MethodCallExpression method)
         {
             if (method.Method.DeclaringType != typeof(Queryable) && method.Method.DeclaringType != typeof(KueryQueryableExtensions)) throw Unsupported(method);
@@ -791,8 +797,17 @@ namespace Kuery.Query
             {
                 _bindings = bindings;
             }
+            /// <summary>Substitutes the bound projection for a lambda parameter.</summary>
+            /// <param name="node">The lambda parameter to visit.</param>
+            /// <returns>The visited expression.</returns>
             protected override Expression VisitParameter(ParameterExpression node) => _bindings.TryGetValue(node, out var value) ? value : node;
+            /// <summary>Preserves the already translated projection node during binding.</summary>
+            /// <param name="node">The expression to visit.</param>
+            /// <returns>The visited expression.</returns>
             protected override Expression VisitExtension(Expression node) => node;
+            /// <summary>Resolves a projected member to the corresponding bound expression.</summary>
+            /// <param name="node">The member access to visit.</param>
+            /// <returns>The visited expression.</returns>
             protected override Expression VisitMember(MemberExpression node)
             {
                 var source = node.Expression == null ? null : StripConvert(Visit(node.Expression));
@@ -825,6 +840,9 @@ namespace Kuery.Query
                 _alias = alias;
                 _replacements = replacements;
             }
+            /// <summary>Adds SQL projections to the inner SELECT and replaces them with outer column references.</summary>
+            /// <param name="node">The expression to visit.</param>
+            /// <returns>The visited expression.</returns>
             protected override Expression VisitExtension(Expression node)
             {
                 if (node is OptionalShaperExpression optional)
@@ -844,6 +862,9 @@ namespace Kuery.Query
 
         private sealed class NullableProjectionVisitor : ExpressionVisitor
         {
+            /// <summary>Marks projected columns as nullable after an outer join.</summary>
+            /// <param name="node">The expression to visit.</param>
+            /// <returns>The visited expression.</returns>
             protected override Expression VisitExtension(Expression node)
             {
                 if (node is ColumnExpression column) return new ColumnExpression(column.TableAlias, column.Name, column.Type, true);
@@ -856,6 +877,9 @@ namespace Kuery.Query
         private sealed class CorrelationDetector : ExpressionVisitor
         {
             internal bool Found;
+            /// <summary>Detects a reference to an outer projection in a collection selector.</summary>
+            /// <param name="node">The expression to visit.</param>
+            /// <returns>The visited expression.</returns>
             protected override Expression VisitExtension(Expression node)
             {
                 if (node is ColumnExpression || node is StructuralTypeProjectionExpression) Found = true;

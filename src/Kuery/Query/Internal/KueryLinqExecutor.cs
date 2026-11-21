@@ -20,6 +20,11 @@ namespace Kuery.Query.Internal
             out CompiledQuery plan, string operation = "select", IReadOnlyList<SetPropertyCall> setters = null)
             => _queryCompiler.CompileQuery(context, expression, resultType, async, out plan, operation, setters);
 
+        /// <summary>Compiles and executes the query and materializes its result.</summary>
+        /// <param name="context">The execution context containing the database connection.</param>
+        /// <param name="expression">The expression to process.</param>
+        /// <param name="resultType">The expected CLR result type of the query.</param>
+        /// <returns>The materialized result.</returns>
         public object Execute(QueryContext context, Expression expression, Type resultType)
         {
             var generated = Prepare(context, expression, resultType, false, out var plan);
@@ -27,6 +32,12 @@ namespace Kuery.Query.Internal
             using (var reader = command.ExecuteReader()) return Read(reader, plan);
         }
 
+        /// <summary>Compiles and executes the query and materializes its result asynchronously.</summary>
+        /// <param name="context">The execution context containing the database connection.</param>
+        /// <param name="expression">The expression to process.</param>
+        /// <param name="resultType">The expected CLR result type of the query.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the materialized result.</returns>
         public async Task<object> ExecuteAsync(QueryContext context, Expression expression, Type resultType, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -47,6 +58,12 @@ namespace Kuery.Query.Internal
             }
         }
 
+        /// <summary>Streams the materialized query results asynchronously.</summary>
+        /// <typeparam name="T">The element type of the query result.</typeparam>
+        /// <param name="context">The execution context containing the database connection.</param>
+        /// <param name="expression">The expression to process.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>The asynchronously enumerated query results.</returns>
         public async IAsyncEnumerable<T> StreamAsync<T>(QueryContext context, Expression expression,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
@@ -155,10 +172,30 @@ namespace Kuery.Query.Internal
             catch { command.Dispose(); throw; }
         }
 
+        /// <summary>Compiles and executes a set-based delete and returns the affected row count.</summary>
+        /// <param name="context">The execution context containing the database connection.</param>
+        /// <param name="expression">The expression to process.</param>
+        /// <returns>The affected row count.</returns>
         public int ExecuteDelete(QueryContext context, Expression expression) => Mutate(context, expression, "delete", null);
+        /// <summary>Executes a set-based delete asynchronously and returns the affected row count.</summary>
+        /// <param name="context">The execution context containing the database connection.</param>
+        /// <param name="expression">The expression to process.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the affected row count.</returns>
         public Task<int> ExecuteDeleteAsync(QueryContext context, Expression expression, CancellationToken cancellationToken)
             => MutateAsync(context, expression, "delete", null, cancellationToken);
+        /// <summary>Compiles and executes a set-based update using the supplied assignments.</summary>
+        /// <param name="context">The execution context containing the database connection.</param>
+        /// <param name="expression">The expression to process.</param>
+        /// <param name="setters">The property assignments to apply to the selected rows.</param>
+        /// <returns>The affected row count.</returns>
         public int ExecuteUpdate(QueryContext context, Expression expression, IReadOnlyList<SetPropertyCall> setters) => Mutate(context, expression, "update", setters);
+        /// <summary>Executes a set-based update asynchronously using the supplied assignments.</summary>
+        /// <param name="context">The execution context containing the database connection.</param>
+        /// <param name="expression">The expression to process.</param>
+        /// <param name="setters">The property assignments to apply to the selected rows.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the affected row count.</returns>
         public Task<int> ExecuteUpdateAsync(QueryContext context, Expression expression, IReadOnlyList<SetPropertyCall> setters, CancellationToken cancellationToken)
             => MutateAsync(context, expression, "update", setters, cancellationToken);
 

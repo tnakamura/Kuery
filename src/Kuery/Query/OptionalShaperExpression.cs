@@ -11,8 +11,13 @@ namespace Kuery.Query
         { Value = value; Presence = presence; }
         internal Expression Value { get; }
         internal SqlExpression Presence { get; }
+        /// <summary>Gets the CLR type of the value being shaped.</summary>
         public override Type Type => Value.Type;
+        /// <summary>Gets the extension node kind used to identify this expression.</summary>
         public override ExpressionType NodeType => ExpressionType.Extension;
+        /// <summary>Visits the value and its presence test.</summary>
+        /// <param name="visitor">The visitor to apply to the child expressions.</param>
+        /// <returns>This expression, or an expression updated with the visited children.</returns>
         protected override Expression VisitChildren(ExpressionVisitor visitor)
         {
             var value = visitor.Visit(Value);

@@ -176,6 +176,9 @@ namespace Kuery.Query
             return body + " " + _dialect.EscapeIdentifier(source.Alias);
         }
 
+        /// <summary>Renders window functions and delegates other extension nodes to the SQL visitor.</summary>
+        /// <param name="node">The expression to visit.</param>
+        /// <returns>The original expression.</returns>
         protected override Expression VisitExtension(Expression node)
         {
             if (!(node is WindowFunctionExpression window)) return base.VisitExtension(node);
@@ -222,12 +225,18 @@ namespace Kuery.Query
             return _sqlFragment;
         }
 
+        /// <summary>Renders the SQL column reference for the current dialect.</summary>
+        /// <param name="column">The SQL expression to visit.</param>
+        /// <returns>The original expression.</returns>
         protected override Expression VisitColumn(ColumnExpression column)
         {
             _sqlFragment = _dialect.EscapeIdentifier(column.TableAlias) + "." + _dialect.EscapeIdentifier(column.Name);
             return column;
         }
 
+        /// <summary>Renders the SQL parameter reference for the current dialect.</summary>
+        /// <param name="parameter">The SQL expression to visit.</param>
+        /// <returns>The original expression.</returns>
         protected override Expression VisitSqlParameter(SqlParameterExpression parameter)
         {
             if (!_parameters.TryGetValue(parameter.Index, out var name))
@@ -239,6 +248,9 @@ namespace Kuery.Query
             return parameter;
         }
 
+        /// <summary>Renders the SQL constant value for the current dialect.</summary>
+        /// <param name="constant">The SQL expression to visit.</param>
+        /// <returns>The original expression.</returns>
         protected override Expression VisitSqlConstant(SqlConstantExpression constant)
         {
             if (constant.Value == null) _sqlFragment = "null";
@@ -253,6 +265,9 @@ namespace Kuery.Query
             return constant;
         }
 
+        /// <summary>Renders the SQL binary operation for the current dialect.</summary>
+        /// <param name="binary">The SQL binary expression to visit.</param>
+        /// <returns>The original expression.</returns>
         protected override Expression VisitSqlBinary(SqlBinaryExpression binary)
         {
             _sqlFragment = GenerateBinary(binary);
@@ -276,6 +291,9 @@ namespace Kuery.Query
             return result;
         }
 
+        /// <summary>Renders the SQL unary operation for the current dialect.</summary>
+        /// <param name="unary">The SQL unary expression to visit.</param>
+        /// <returns>The original expression.</returns>
         protected override Expression VisitSqlUnary(SqlUnaryExpression unary)
         {
             _sqlFragment = GenerateUnary(unary);
@@ -298,6 +316,9 @@ namespace Kuery.Query
             }
         }
 
+        /// <summary>Renders the SQL CASE expression for the current dialect.</summary>
+        /// <param name="expression">The SQL expression to visit.</param>
+        /// <returns>The original expression.</returns>
         protected override Expression VisitCase(CaseExpression expression)
         {
             _sqlFragment = "(case " + string.Join(" ", expression.WhenClauses.Select(c => "when " + Predicate(c.Test) + " then " + Value(c.Result)))
@@ -305,36 +326,54 @@ namespace Kuery.Query
             return expression;
         }
 
+        /// <summary>Renders the SQL membership predicate for the current dialect.</summary>
+        /// <param name="expression">The SQL expression to visit.</param>
+        /// <returns>The original expression.</returns>
         protected override Expression VisitIn(InExpression expression)
         {
             _sqlFragment = Contains(expression.Values, expression.Item);
             return expression;
         }
 
+        /// <summary>Renders the SQL LIKE predicate for the current dialect.</summary>
+        /// <param name="expression">The SQL expression to visit.</param>
+        /// <returns>The original expression.</returns>
         protected override Expression VisitLike(LikeExpression expression)
         {
             _sqlFragment = "(" + Value(expression.Match) + " like " + Value(expression.Pattern) + ")";
             return expression;
         }
 
+        /// <summary>Renders the SQL EXISTS predicate for the current dialect.</summary>
+        /// <param name="expression">The SQL expression to visit.</param>
+        /// <returns>The original expression.</returns>
         protected override Expression VisitExists(ExistsExpression expression)
         {
             _sqlFragment = "exists (" + Select(expression.Subquery) + ")";
             return expression;
         }
 
+        /// <summary>Renders the SQL scalar subquery for the current dialect.</summary>
+        /// <param name="expression">The SQL expression to visit.</param>
+        /// <returns>The original expression.</returns>
         protected override Expression VisitScalarSubquery(ScalarSubqueryExpression expression)
         {
             _sqlFragment = "(" + Select(expression.Subquery) + ")";
             return expression;
         }
 
+        /// <summary>Renders the SQL function call for the current dialect.</summary>
+        /// <param name="expression">The SQL expression to visit.</param>
+        /// <returns>The original expression.</returns>
         protected override Expression VisitSqlFunction(SqlFunctionExpression expression)
         {
             _sqlFragment = GenerateFunction(expression);
             return expression;
         }
 
+        /// <summary>Renders the SQL SELECT statement for the current dialect.</summary>
+        /// <param name="expression">The SELECT statement to visit.</param>
+        /// <returns>The original expression.</returns>
         protected override Expression VisitSelect(SelectExpression expression)
         {
             _sqlFragment = Select(expression);

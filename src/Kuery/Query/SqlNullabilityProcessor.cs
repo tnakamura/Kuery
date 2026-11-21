@@ -19,6 +19,9 @@ namespace Kuery.Query
         internal SelectExpression Process(SelectExpression query) => (SelectExpression)Visit(query);
         internal SqlExpression Process(SqlExpression expression) => (SqlExpression)Visit(expression);
 
+        /// <summary>Rewrites nullable comparisons to preserve CLR semantics in SQL.</summary>
+        /// <param name="expression">The SQL binary expression to visit.</param>
+        /// <returns>The visited expression.</returns>
         protected override Expression VisitSqlBinary(SqlBinaryExpression expression)
         {
             var visited = (SqlBinaryExpression)base.VisitSqlBinary(expression);
@@ -48,6 +51,9 @@ namespace Kuery.Query
             return visited;
         }
 
+        /// <summary>Rewrites entity presence tests to SQL null checks.</summary>
+        /// <param name="expression">The SQL expression to visit.</param>
+        /// <returns>The visited expression.</returns>
         protected override Expression VisitSqlFunction(SqlFunctionExpression expression)
         {
             var visited = (SqlFunctionExpression)base.VisitSqlFunction(expression);

@@ -7,10 +7,20 @@ namespace Kuery.Query
 {
     internal abstract class SqlDialect : ISqlDialect
     {
+        /// <summary>Gets the database dialect that these SQL rules target.</summary>
         public abstract SqlDialectKind Kind { get; }
+        /// <summary>Quotes a database identifier and escapes embedded identifier delimiters.</summary>
+        /// <param name="identifier">The unquoted identifier.</param>
+        /// <returns>The identifier quoted for the current dialect.</returns>
         public abstract string EscapeIdentifier(string identifier);
+        /// <summary>Prefixes a parameter name as required by the database provider.</summary>
+        /// <param name="parameterName">The parameter name without its provider prefix.</param>
+        /// <returns>The provider-specific parameter name.</returns>
         public virtual string FormatParameterName(string parameterName) => "@" + parameterName;
 
+        /// <summary>Gets the SQL type name used to cast a value to the specified CLR type.</summary>
+        /// <param name="type">The target CLR type of the cast.</param>
+        /// <returns>The SQL type name for the cast.</returns>
         public virtual string CastType(Type type)
         {
             type = Nullable.GetUnderlyingType(type) ?? type;
@@ -25,6 +35,10 @@ namespace Kuery.Query
             throw new NotSupportedException("Unsupported SQL cast type: " + type);
         }
 
+        /// <summary>Renders a supported database function or equivalent SQL expression.</summary>
+        /// <param name="operation">The logical SQL operation name.</param>
+        /// <param name="a">The rendered SQL arguments in call order.</param>
+        /// <returns>The SQL fragment that implements the operation.</returns>
         public virtual string Function(string operation, string[] a)
         {
             switch (operation)

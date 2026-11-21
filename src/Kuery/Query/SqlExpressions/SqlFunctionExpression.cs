@@ -17,6 +17,9 @@ namespace Kuery.Query.SqlExpressions
         internal IReadOnlyList<SqlExpression> Arguments { get; }
         internal SqlFunctionExpression Update(IReadOnlyList<SqlExpression> arguments) => Arguments.SequenceEqual(arguments) ? this
             : new SqlFunctionExpression(Name, Type, IsNullable, arguments.ToArray());
+        /// <summary>Visits the SQL function arguments.</summary>
+        /// <param name="visitor">The visitor to apply to the child expressions.</param>
+        /// <returns>This expression, or an expression updated with the visited children.</returns>
         protected override Expression VisitChildren(ExpressionVisitor visitor) => Update(Arguments.Select(a => (SqlExpression)visitor.Visit(a)).ToArray());
     }
 }

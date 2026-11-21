@@ -11,8 +11,19 @@ using System.Threading.Tasks;
 
 namespace Kuery
 {
+    /// <remarks>Async connection extensions accept a cancellation token for database operations.</remarks>
     public static partial class SqlHelper
     {
+        /// <summary>Inserts an entity using its mapped column values asynchronously.</summary>
+        /// <typeparam name="T">The mapped CLR type of the affected entity.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="item">The entity whose mapped values are used by the operation.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of rows affected by the insert.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="item"/> is null.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
+        /// <remarks>A generated primary key is assigned back to the entity when configured by the mapping.</remarks>
         public static async Task<int> InsertAsync<T>(
             this DbConnection connection,
             T item,
@@ -22,6 +33,16 @@ namespace Kuery
             return await connection.InsertAsync(typeof(T), item, transaction, cancellationToken).ConfigureAwait(false);
         }
 
+        /// <summary>Inserts an entity using its mapped column values asynchronously.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="item">The entity whose mapped values are used by the operation.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of rows affected by the insert.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="item"/> or <paramref name="type"/> is null.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
+        /// <remarks>A generated primary key is assigned back to the entity when configured by the mapping.</remarks>
         public static async Task<int> InsertAsync(
             this DbConnection connection,
             Type type,
@@ -101,6 +122,15 @@ namespace Kuery
             }
         }
 
+        /// <summary>Inserts each entity in the supplied sequence asynchronously.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="items">The entities to process, in enumeration order.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the total number of rows affected by the inserts.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="items"/> is null.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
+        /// <remarks>The runtime type of each entity determines its mapping. Supply a transaction to group the individual commands into one transaction.</remarks>
         public static async Task<int> InsertAllAsync(
             this DbConnection connection,
             IEnumerable items,
@@ -117,6 +147,16 @@ namespace Kuery
             return result;
         }
 
+        /// <summary>Inserts each entity in the supplied sequence asynchronously.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="items">The entities to process, in enumeration order.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the total number of rows affected by the inserts.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="items"/> or <paramref name="type"/> is null.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
+        /// <remarks>Supply a transaction to group the individual commands into one transaction.</remarks>
         public static async Task<int> InsertAllAsync(
             this DbConnection connection,
             Type type,
@@ -134,6 +174,15 @@ namespace Kuery
             return result;
         }
 
+        /// <summary>Updates the row identified by the entity’s primary key asynchronously.</summary>
+        /// <typeparam name="T">The mapped CLR type of the affected entity.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="item">The entity whose mapped values are used by the operation.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of rows affected by the update.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="item"/> is null.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<int> UpdateAsync<T>(
             this DbConnection connection,
             T item,
@@ -145,6 +194,15 @@ namespace Kuery
             return await connection.UpdateAsync(typeof(T), item, transaction, cancellationToken).ConfigureAwait(false);
         }
 
+        /// <summary>Updates the row identified by the entity’s primary key asynchronously.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="item">The entity whose mapped values are used by the operation.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of rows affected by the update.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="item"/> or <paramref name="type"/> is null.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<int> UpdateAsync(
             this DbConnection connection, Type type,
             object item,
@@ -161,6 +219,15 @@ namespace Kuery
             }
         }
 
+        /// <summary>Updates each supplied entity by its mapped primary key asynchronously.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="items">The entities to process, in enumeration order.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the total number of rows affected by the updates.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="items"/> is null.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
+        /// <remarks>The runtime type of each entity determines its mapping. Supply a transaction to group the individual commands into one transaction.</remarks>
         public static async Task<int> UpdateAllAsync(
             this DbConnection connection,
             IEnumerable items,
@@ -185,6 +252,13 @@ namespace Kuery
         }
 
 
+        /// <summary>Inserts or replaces a row using the database provider’s conflict handling asynchronously.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="item">The entity to insert or replace. A null entity leaves the table unchanged.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of rows affected, or zero if the entity is null.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<int> InsertOrReplaceAsync(
             this DbConnection connection,
             object item,
@@ -198,6 +272,15 @@ namespace Kuery
             return await connection.InsertOrReplaceAsync(Orm.GetType(item), item, transaction, cancellationToken).ConfigureAwait(false);
         }
 
+        /// <summary>Inserts or replaces a row using the database provider’s conflict handling asynchronously.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="item">The entity to insert or replace. A null entity leaves the table unchanged.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of rows affected, or zero if the entity is null.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="type"/> is null.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<int> InsertOrReplaceAsync(
             this DbConnection connection,
             Type type,
@@ -217,6 +300,15 @@ namespace Kuery
             }
         }
 
+        /// <summary>Deletes the row identified by the entity’s primary key asynchronously.</summary>
+        /// <typeparam name="T">The mapped CLR type of the affected entity.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="item">The entity whose mapped values are used by the operation.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of rows deleted.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="item"/> is null.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<int> DeleteAsync<T>(
             this DbConnection connection,
             T item,
@@ -232,6 +324,14 @@ namespace Kuery
             }
         }
 
+        /// <summary>Deletes a row by its primary key asynchronously.</summary>
+        /// <typeparam name="T">The mapped CLR type of the affected entity.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="primaryKey">The primary key value of the row to delete.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of rows deleted.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<int> DeleteAsync<T>(
             this DbConnection connection,
             object primaryKey,
@@ -242,6 +342,14 @@ namespace Kuery
             return await connection.DeleteAsync(map, primaryKey, transaction, cancellationToken).ConfigureAwait(false);
         }
 
+        /// <summary>Deletes a row by its primary key asynchronously.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="primaryKey">The primary key value of the row to delete.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of rows deleted.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<int> DeleteAsync(
             this DbConnection connection,
             Type type,
@@ -269,6 +377,14 @@ namespace Kuery
             }
         }
 
+        /// <summary>Finds a row by primary key asynchronously.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="pk">The primary key value to look up.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the matching entity, or the default value if no row matches.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="pk"/> is null.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<T> FindAsync<T>(
             this DbConnection connection,
             object pk,
@@ -296,6 +412,13 @@ namespace Kuery
             }
         }
 
+        /// <summary>Finds the first row matching a predicate asynchronously.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="predicate">The filter expression to evaluate against the mapped rows.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the matching entity, or the default value if no row matches.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<T> FindAsync<T>(
             this DbConnection connection,
             Expression<Func<T, bool>> predicate,
@@ -306,6 +429,14 @@ namespace Kuery
                 .ConfigureAwait(false);
         }
 
+        /// <summary>Gets the first row matching a predicate asynchronously.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="predicate">The filter expression to evaluate against the mapped rows.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the matching entity.</returns>
+        /// <exception cref="InvalidOperationException">No row matches the supplied key or predicate.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<T> GetAsync<T>(
             this DbConnection connection,
             Expression<Func<T, bool>> predicate,
@@ -316,6 +447,15 @@ namespace Kuery
                 .ConfigureAwait(false);
         }
 
+        /// <summary>Gets the row with the specified primary key asynchronously.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="pk">The primary key value to look up.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the matching entity.</returns>
+        /// <exception cref="InvalidOperationException">No row matches the supplied key or predicate.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="pk"/> is null.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<T> GetAsync<T>(
             this DbConnection connection,
             object pk,
@@ -379,6 +519,14 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a parameterized SQL query and maps its result columns asynchronously.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="sql">The SQL command text to execute.</param>
+        /// <param name="param">Optional parameter values supplied as a dictionary or an object with public fields or properties.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the materialized rows, in the order returned by the database.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<IEnumerable<T>> QueryAsync<T>(
             this DbConnection connection,
             string sql,
@@ -549,6 +697,16 @@ namespace Kuery
             return await query.Where(predicate).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        /// <summary>Deletes rows selected by a filtered Kuery query asynchronously.</summary>
+        /// <typeparam name="T">The mapped CLR type of the affected entity.</typeparam>
+        /// <param name="query">The Kuery query that selects the rows to modify.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of rows deleted.</returns>
+        /// <exception cref="NotSupportedException">The provider or query shape does not support this operation.</exception>
+        /// <exception cref="InvalidOperationException">No filter is specified.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="query"/> is null.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
+        /// <remarks>The query must target a single mapped table with a filter.</remarks>
         public static async Task<int> ExecuteDeleteAsync<T>(
             this IQueryable<T> query,
             CancellationToken cancellationToken = default)
@@ -563,6 +721,17 @@ namespace Kuery
             throw new NotSupportedException("ExecuteDeleteAsync is supported only for queries created by Kuery Query<T>().");
         }
 
+        /// <summary>Updates the specified properties of rows selected by a filtered Kuery query asynchronously.</summary>
+        /// <typeparam name="T">The mapped CLR type of the affected entity.</typeparam>
+        /// <param name="query">The Kuery query that selects the rows to modify.</param>
+        /// <param name="setPropertyCalls">A function that builds the property assignments for the update.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of rows updated.</returns>
+        /// <exception cref="NotSupportedException">The provider or query shape does not support this operation.</exception>
+        /// <exception cref="InvalidOperationException">No filter or property assignments are specified.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="query"/> or <paramref name="setPropertyCalls"/> is null.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
+        /// <remarks>The query must target a single mapped table with a filter.</remarks>
         public static async Task<int> ExecuteUpdateAsync<T>(
             this IQueryable<T> query,
             Func<SetPropertyCalls<T>, SetPropertyCalls<T>> setPropertyCalls,
@@ -598,6 +767,14 @@ namespace Kuery
             return true;
         }
 
+        /// <summary>Executes a parameterized SQL query and maps its result columns asynchronously.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="sql">The SQL command text to execute.</param>
+        /// <param name="param">Optional parameter values supplied as a dictionary or an object with public fields or properties.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the materialized rows, in the order returned by the database.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<IEnumerable<object>> QueryAsync(
             this DbConnection connection,
             Type type,
@@ -624,6 +801,14 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a parameterized SQL query and maps its first row asynchronously.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="sql">The SQL command text to execute.</param>
+        /// <param name="param">Optional parameter values supplied as a dictionary or an object with public fields or properties.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the first mapped result, or the default value if the query is empty.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<T> FindWithQueryAsync<T>(
             this DbConnection connection,
             string sql,
@@ -637,6 +822,14 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a parameterized SQL query and maps its first row asynchronously.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="sql">The SQL command text to execute.</param>
+        /// <param name="param">Optional parameter values supplied as a dictionary or an object with public fields or properties.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the first mapped result, or the default value if the query is empty.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<object> FindWithQueryAsync(
             this DbConnection connection,
             Type type,
@@ -661,6 +854,13 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a parameterized SQL command without reading a result set asynchronously.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="sql">The SQL command text to execute.</param>
+        /// <param name="param">Optional parameter values supplied as a dictionary or an object with public fields or properties.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the affected row count reported by the provider.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<int> ExecuteAsync(
             this DbConnection connection,
             string sql,
@@ -673,6 +873,14 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a parameterized SQL command and reads its first column from the first row asynchronously.</summary>
+        /// <typeparam name="T">The CLR type to which the scalar result is converted.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="sql">The SQL command text to execute.</param>
+        /// <param name="param">Optional parameter values supplied as a dictionary or an object with public fields or properties.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the scalar converted to the requested type, or the default value if the command returns no value or NULL.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public static async Task<T> ExecuteScalarAsync<T>(
             this DbConnection connection,
             string sql,
@@ -694,10 +902,22 @@ namespace Kuery
         }
     }
 
+    /// <remarks>Async execution methods return materialized results.</remarks>
     public sealed partial class TableQuery<T>
     {
+        /// <summary>Deletes rows matching the combined query conditions asynchronously.</summary>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of rows deleted.</returns>
+        /// <exception cref="InvalidOperationException">The query has a row limit or offset, or no filter is specified.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public Task<int> DeleteAsync(CancellationToken cancellationToken = default) => DeleteAsync(null, cancellationToken);
 
+        /// <summary>Deletes rows matching the combined query conditions asynchronously.</summary>
+        /// <param name="predExpr">An optional filter to combine with the existing query conditions.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of rows deleted.</returns>
+        /// <exception cref="InvalidOperationException">The query has a row limit or offset, or no filter is specified.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public async Task<int> DeleteAsync(Expression<Func<T, bool>> predExpr, CancellationToken cancellationToken = default)
         {
             if (_limit.HasValue || _offset.HasValue)
@@ -741,11 +961,21 @@ namespace Kuery
             }
         }
 
+        /// <summary>Returns the row at the specified zero-based offset asynchronously.</summary>
+        /// <param name="index">The zero-based row offset.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the row at the requested offset.</returns>
+        /// <exception cref="InvalidOperationException">The query contains no row at the requested position.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public Task<T> ElementAtAsync(int index, CancellationToken cancellationToken = default)
         {
             return Skip(index).Take(1).FirstAsync(cancellationToken);
         }
 
+        /// <summary>Executes the query and materializes the results in a list asynchronously.</summary>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is a list containing the materialized rows.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public async Task<List<T>> ToListAsync(CancellationToken cancellationToken = default)
         {
             return await GenerateCommand("*")
@@ -753,11 +983,19 @@ namespace Kuery
                 .ConfigureAwait(false);
         }
 
+        /// <summary>Executes the query and materializes the results in an array asynchronously.</summary>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>An array containing the materialized rows.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public async Task<T[]> ToArrayAsync(CancellationToken cancellationToken = default)
         {
             return (await ToListAsync(cancellationToken).ConfigureAwait(false)).ToArray();
         }
 
+        /// <summary>Counts rows matching the query conditions asynchronously.</summary>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of matching rows.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public async Task<int> CountAsync(CancellationToken cancellationToken = default)
         {
             using (var command = GenerateCommand("count(*)"))
@@ -771,28 +1009,53 @@ namespace Kuery
             }
         }
 
+        /// <summary>Counts rows matching the query and the additional predicate asynchronously.</summary>
+        /// <param name="predExpr">The additional filter to combine with the existing query conditions.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the number of matching rows.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public Task<int> CountAsync(Expression<Func<T, bool>> predExpr, CancellationToken cancellationToken = default)
         {
             return Where(predExpr).CountAsync(cancellationToken);
         }
 
+        /// <summary>Returns the first row in the query result asynchronously.</summary>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the first matching row.</returns>
+        /// <exception cref="InvalidOperationException">The query contains no row at the requested position.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public async Task<T> FirstAsync(CancellationToken cancellationToken = default)
         {
             var list = await Take(1).ToListAsync(cancellationToken);
             return list.First();
         }
 
+        /// <summary>Returns the first matching row or its default value asynchronously.</summary>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the first matching row, or the default value if no row matches.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public async Task<T> FirstOrDefaultAsync(CancellationToken cancellationToken = default)
         {
             var list = await Take(1).ToListAsync(cancellationToken);
             return list.FirstOrDefault();
         }
 
+        /// <summary>Returns the first row matching the additional predicate asynchronously.</summary>
+        /// <param name="predExpr">The additional filter to combine with the existing query conditions.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the first matching row.</returns>
+        /// <exception cref="InvalidOperationException">The query contains no row at the requested position.</exception>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public Task<T> FirstAsync(Expression<Func<T, bool>> predExpr, CancellationToken cancellationToken = default)
         {
             return Where(predExpr).FirstAsync(cancellationToken);
         }
 
+        /// <summary>Returns the first matching row or its default value asynchronously.</summary>
+        /// <param name="predExpr">The additional filter to combine with the existing query conditions.</param>
+        /// <param name="cancellationToken">A token that the database provider can observe to cancel the operation.</param>
+        /// <returns>A task whose result is the first matching row, or the default value if no row matches.</returns>
+        /// <exception cref="OperationCanceledException">The database operation was canceled.</exception>
         public Task<T> FirstOrDefaultAsync(Expression<Func<T, bool>> predExpr, CancellationToken cancellationToken = default)
         {
             return Where(predExpr).FirstOrDefaultAsync(cancellationToken);

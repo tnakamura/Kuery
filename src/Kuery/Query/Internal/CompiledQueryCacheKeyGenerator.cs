@@ -34,6 +34,9 @@ namespace Kuery.Query.Internal
             internal readonly StringBuilder Text = new StringBuilder(512);
             readonly Dictionary<ParameterExpression, int> _parameters = new Dictionary<ParameterExpression, int>();
             internal void Reset() { Text.Clear(); _parameters.Clear(); }
+            /// <summary>Appends the node kind, CLR type and contents to the structural cache key.</summary>
+            /// <param name="node">The expression to visit.</param>
+            /// <returns>The visited expression or binding.</returns>
             public override Expression Visit(Expression node)
             {
                 if (node == null) { Text.Append("<null>"); return null; }
@@ -42,6 +45,9 @@ namespace Kuery.Query.Internal
                 Text.Append(')');
                 return node;
             }
+            /// <summary>Writes parameter slots and query root metadata to the cache key.</summary>
+            /// <param name="node">The expression to visit.</param>
+            /// <returns>The visited expression or binding.</returns>
             protected override Expression VisitExtension(Expression node)
             {
                 if (node is QueryParameterExpression parameter) Text.Append("slot:").Append(parameter.Index);
@@ -75,26 +81,47 @@ namespace Kuery.Query.Internal
             }
             void Add(string value) { Text.Append(value.Length).Append(':').Append(value); }
             void Member(MemberInfo member) { Text.Append(member.DeclaringType.TypeHandle.Value.ToInt64()).Append(':').Append(member.MetadataToken).Append(':'); }
+            /// <summary>Writes a stable identifier for a lambda parameter.</summary>
+            /// <param name="node">The lambda parameter to visit.</param>
+            /// <returns>The visited expression or binding.</returns>
             protected override Expression VisitParameter(ParameterExpression node)
             {
                 if (!_parameters.TryGetValue(node, out var index)) { index = _parameters.Count; _parameters.Add(node, index); }
                 Text.Append(index); return node;
             }
+            /// <summary>Writes the called method and its generic arguments to the cache key.</summary>
+            /// <param name="node">The method call to visit.</param>
+            /// <returns>The visited expression or binding.</returns>
             protected override Expression VisitMethodCall(MethodCallExpression node)
             {
                 Member(node.Method);
                 foreach (var type in node.Method.GetGenericArguments()) Text.Append(type.TypeHandle.Value.ToInt64()).Append(':');
                 return base.VisitMethodCall(node);
             }
+            /// <summary>Writes the identity of the referenced CLR member.</summary>
+            /// <param name="node">The member access to visit.</param>
+            /// <returns>The visited expression or binding.</returns>
             protected override Expression VisitMember(MemberExpression node) { Member(node.Member); return base.VisitMember(node); }
+            /// <summary>Writes the constructor and projected member identities to the cache key.</summary>
+            /// <param name="node">The constructor call to visit.</param>
+            /// <returns>The visited expression or binding.</returns>
             protected override Expression VisitNew(NewExpression node)
             {
                 if (node.Constructor != null) Member(node.Constructor);
                 if (node.Members != null) foreach (var member in node.Members) Member(member);
                 return base.VisitNew(node);
             }
+            /// <summary>Writes the identity of the member being initialized.</summary>
+            /// <param name="node">The member assignment to visit.</param>
+            /// <returns>The visited expression or binding.</returns>
             protected override MemberAssignment VisitMemberAssignment(MemberAssignment node) { Member(node.Member); return base.VisitMemberAssignment(node); }
+            /// <summary>Writes the operator method identity before visiting its operands.</summary>
+            /// <param name="node">The binary expression to visit.</param>
+            /// <returns>The visited expression or binding.</returns>
             protected override Expression VisitBinary(BinaryExpression node) { if (node.Method != null) Member(node.Method); return base.VisitBinary(node); }
+            /// <summary>Writes the operator method identity before visiting its operand.</summary>
+            /// <param name="node">The unary expression to visit.</param>
+            /// <returns>The visited expression or binding.</returns>
             protected override Expression VisitUnary(UnaryExpression node) { if (node.Method != null) Member(node.Method); return base.VisitUnary(node); }
         }
     }

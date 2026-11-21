@@ -11,8 +11,13 @@ using System.Text;
 
 namespace Kuery
 {
+    /// <summary>Provides connection extensions for mapped tables, LINQ queries, and SQL commands.</summary>
     public static partial class SqlHelper
     {
+        /// <summary>Creates a composable table query for the mapped type.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <returns>A table query that executes against the supplied connection.</returns>
         public static TableQuery<T> Table<T>(this IDbConnection connection)
         {
             var map = SqlMapper.GetMapping<T>();
@@ -33,6 +38,14 @@ namespace Kuery
             return new KueryQueryable<T>(provider);
         }
 
+        /// <summary>Deletes rows selected by a filtered Kuery query.</summary>
+        /// <typeparam name="T">The mapped CLR type of the affected entity.</typeparam>
+        /// <param name="query">The Kuery query that selects the rows to modify.</param>
+        /// <returns>The number of rows deleted.</returns>
+        /// <exception cref="NotSupportedException">The provider or query shape does not support this operation.</exception>
+        /// <exception cref="InvalidOperationException">No filter is specified.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="query"/> is null.</exception>
+        /// <remarks>The query must target a single mapped table with a filter.</remarks>
         public static int ExecuteDelete<T>(this IQueryable<T> query)
         {
             Requires.NotNull(query, nameof(query));
@@ -45,6 +58,15 @@ namespace Kuery
             throw new NotSupportedException("ExecuteDelete is supported only for queries created by Kuery Query<T>().");
         }
 
+        /// <summary>Updates the specified properties of rows selected by a filtered Kuery query.</summary>
+        /// <typeparam name="T">The mapped CLR type of the affected entity.</typeparam>
+        /// <param name="query">The Kuery query that selects the rows to modify.</param>
+        /// <param name="setPropertyCalls">A function that builds the property assignments for the update.</param>
+        /// <returns>The number of rows updated.</returns>
+        /// <exception cref="NotSupportedException">The provider or query shape does not support this operation.</exception>
+        /// <exception cref="InvalidOperationException">No filter or property assignments are specified.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="query"/> or <paramref name="setPropertyCalls"/> is null.</exception>
+        /// <remarks>The query must target a single mapped table with a filter.</remarks>
         public static int ExecuteUpdate<T>(
             this IQueryable<T> query,
             Func<SetPropertyCalls<T>, SetPropertyCalls<T>> setPropertyCalls)
@@ -63,11 +85,27 @@ namespace Kuery
             throw new NotSupportedException("ExecuteUpdate is supported only for queries created by Kuery Query<T>().");
         }
 
+        /// <summary>Inserts an entity using its mapped column values.</summary>
+        /// <typeparam name="T">The mapped CLR type of the affected entity.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="item">The entity whose mapped values are used by the operation.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <returns>The number of rows affected by the insert.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="item"/> is null.</exception>
+        /// <remarks>A generated primary key is assigned back to the entity when configured by the mapping.</remarks>
         public static int Insert<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
         {
             return connection.Insert(typeof(T), item, transaction);
         }
 
+        /// <summary>Inserts an entity using its mapped column values.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="item">The entity whose mapped values are used by the operation.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <returns>The number of rows affected by the insert.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="item"/> or <paramref name="type"/> is null.</exception>
+        /// <remarks>A generated primary key is assigned back to the entity when configured by the mapping.</remarks>
         public static int Insert(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
         {
             Requires.NotNull(item, nameof(item));
@@ -112,6 +150,13 @@ namespace Kuery
             }
         }
 
+        /// <summary>Inserts each entity in the supplied sequence.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="items">The entities to process, in enumeration order.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <returns>The total number of rows affected by the inserts.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="items"/> is null.</exception>
+        /// <remarks>The runtime type of each entity determines its mapping. Supply a transaction to group the individual commands into one transaction.</remarks>
         public static int InsertAll(this IDbConnection connection, IEnumerable items, IDbTransaction transaction = null)
         {
             Requires.NotNull(items, nameof(items));
@@ -124,6 +169,14 @@ namespace Kuery
             return result;
         }
 
+        /// <summary>Inserts each entity in the supplied sequence.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="items">The entities to process, in enumeration order.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <returns>The total number of rows affected by the inserts.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="items"/> or <paramref name="type"/> is null.</exception>
+        /// <remarks>Supply a transaction to group the individual commands into one transaction.</remarks>
         public static int InsertAll(this IDbConnection connection, Type type, IEnumerable items, IDbTransaction transaction = null)
         {
             Requires.NotNull(items, nameof(items));
@@ -138,6 +191,13 @@ namespace Kuery
         }
 
 
+        /// <summary>Updates the row identified by the entity’s primary key.</summary>
+        /// <typeparam name="T">The mapped CLR type of the affected entity.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="item">The entity whose mapped values are used by the operation.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <returns>The number of rows affected by the update.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="item"/> is null.</exception>
         public static int Update<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
         {
             Requires.NotNull(item, nameof(item));
@@ -145,6 +205,13 @@ namespace Kuery
             return connection.Update(typeof(T), item, transaction);
         }
 
+        /// <summary>Updates the row identified by the entity’s primary key.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="item">The entity whose mapped values are used by the operation.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <returns>The number of rows affected by the update.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="item"/> or <paramref name="type"/> is null.</exception>
         public static int Update(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
         {
             Requires.NotNull(item, nameof(item));
@@ -157,6 +224,13 @@ namespace Kuery
             }
         }
 
+        /// <summary>Updates each supplied entity by its mapped primary key.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="items">The entities to process, in enumeration order.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <returns>The total number of rows affected by the updates.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="items"/> is null.</exception>
+        /// <remarks>The runtime type of each entity determines its mapping. Supply a transaction to group the individual commands into one transaction.</remarks>
         public static int UpdateAll(this IDbConnection connection, IEnumerable items, IDbTransaction transaction = null)
         {
             Requires.NotNull(items, nameof(items));
@@ -176,6 +250,11 @@ namespace Kuery
             return result;
         }
 
+        /// <summary>Inserts or replaces a row using the database provider’s conflict handling.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="item">The entity to insert or replace. A null entity leaves the table unchanged.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <returns>The number of rows affected, or zero if the entity is null.</returns>
         public static int InsertOrReplace(this IDbConnection connection, object item, IDbTransaction transaction = null)
         {
             if (item == null)
@@ -185,6 +264,12 @@ namespace Kuery
             return connection.InsertOrReplace(Orm.GetType(item), item, transaction);
         }
 
+        /// <summary>Inserts or replaces a row using the database provider’s conflict handling.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="item">The entity to insert or replace. A null entity leaves the table unchanged.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <returns>The number of rows affected, or zero if the entity is null.</returns>
         public static int InsertOrReplace(this IDbConnection connection, Type type, object item, IDbTransaction transaction = null)
         {
             if (item == null)
@@ -198,6 +283,13 @@ namespace Kuery
             }
         }
 
+        /// <summary>Deletes the row identified by the entity’s primary key.</summary>
+        /// <typeparam name="T">The mapped CLR type of the affected entity.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="item">The entity whose mapped values are used by the operation.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <returns>The number of rows deleted.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="item"/> is null.</exception>
         public static int Delete<T>(this IDbConnection connection, T item, IDbTransaction transaction = null)
         {
             Requires.NotNull(item, nameof(item));
@@ -209,12 +301,24 @@ namespace Kuery
             }
         }
 
+        /// <summary>Deletes a row by its primary key.</summary>
+        /// <typeparam name="T">The mapped CLR type of the affected entity.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="primaryKey">The primary key value of the row to delete.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <returns>The number of rows deleted.</returns>
         public static int Delete<T>(this IDbConnection connection, object primaryKey, IDbTransaction transaction = null)
         {
             var map = SqlMapper.GetMapping<T>();
             return connection.Delete(map, primaryKey, transaction);
         }
 
+        /// <summary>Deletes a row by its primary key.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="primaryKey">The primary key value of the row to delete.</param>
+        /// <param name="transaction">The transaction to associate with each command, if any.</param>
+        /// <returns>The number of rows deleted.</returns>
         public static int Delete(this IDbConnection connection, Type type, object primaryKey, IDbTransaction transaction = null)
         {
             var map = SqlMapper.GetMapping(type);
@@ -233,6 +337,12 @@ namespace Kuery
         }
 
 
+        /// <summary>Finds a row by primary key.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="pk">The primary key value to look up.</param>
+        /// <returns>The matching entity, or the default value if no row matches.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="pk"/> is null.</exception>
         public static T Find<T>(this IDbConnection connection, object pk)
         {
             Requires.NotNull(pk, nameof(pk));
@@ -252,16 +362,34 @@ namespace Kuery
             }
         }
 
+        /// <summary>Finds the first row matching a predicate.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="predicate">The filter expression to evaluate against the mapped rows.</param>
+        /// <returns>The matching entity, or the default value if no row matches.</returns>
         public static T Find<T>(this IDbConnection connection, Expression<Func<T, bool>> predicate)
         {
             return connection.Table<T>().FirstOrDefault(predicate);
         }
 
+        /// <summary>Gets the first row matching a predicate.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="predicate">The filter expression to evaluate against the mapped rows.</param>
+        /// <returns>The matching entity.</returns>
+        /// <exception cref="InvalidOperationException">No row matches the supplied key or predicate.</exception>
         public static T Get<T>(this IDbConnection connection, Expression<Func<T, bool>> predicate)
         {
             return connection.Table<T>().First(predicate);
         }
 
+        /// <summary>Gets the row with the specified primary key.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="pk">The primary key value to look up.</param>
+        /// <returns>The matching entity.</returns>
+        /// <exception cref="InvalidOperationException">No row matches the supplied key or predicate.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="pk"/> is null.</exception>
         public static T Get<T>(this IDbConnection connection, object pk)
         {
             Requires.NotNull(pk, nameof(pk));
@@ -270,6 +398,14 @@ namespace Kuery
             return connection.Get<T>(map, pk);
         }
 
+        /// <summary>Gets the row with the specified primary key.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="pk">The primary key value to look up.</param>
+        /// <returns>The matching entity.</returns>
+        /// <exception cref="InvalidOperationException">No row matches the supplied key or predicate.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="pk"/> is null.</exception>
         public static T Get<T>(this IDbConnection connection, Type type, object pk)
         {
             var map = SqlMapper.GetMapping(type);
@@ -304,6 +440,12 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a parameterized SQL query and maps its result columns.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="sql">The SQL command text to execute.</param>
+        /// <param name="param">Optional parameter values supplied as a dictionary or an object with public fields or properties.</param>
+        /// <returns>The materialized rows, in the order returned by the database.</returns>
         public static IEnumerable<T> Query<T>(this IDbConnection connection, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
@@ -313,6 +455,12 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a parameterized SQL query and maps its result columns.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="sql">The SQL command text to execute.</param>
+        /// <param name="param">Optional parameter values supplied as a dictionary or an object with public fields or properties.</param>
+        /// <returns>The materialized rows, in the order returned by the database.</returns>
         public static IEnumerable<object> Query(this IDbConnection connection, Type type, string sql, object param = null)
         {
             var map = SqlMapper.GetMapping(type);
@@ -329,6 +477,12 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a parameterized SQL query and maps its first row.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="sql">The SQL command text to execute.</param>
+        /// <param name="param">Optional parameter values supplied as a dictionary or an object with public fields or properties.</param>
+        /// <returns>The first mapped result, or the default value if the query is empty.</returns>
         public static T FindWithQuery<T>(this IDbConnection connection, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
@@ -338,6 +492,12 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a parameterized SQL query and maps its first row.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="type">The CLR type whose mapping is used for the operation.</param>
+        /// <param name="sql">The SQL command text to execute.</param>
+        /// <param name="param">Optional parameter values supplied as a dictionary or an object with public fields or properties.</param>
+        /// <returns>The first mapped result, or the default value if the query is empty.</returns>
         public static object FindWithQuery(this IDbConnection connection, Type type, string sql, object param = null)
         {
             var map = SqlMapper.GetMapping(type);
@@ -352,6 +512,11 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a parameterized SQL command without reading a result set.</summary>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="sql">The SQL command text to execute.</param>
+        /// <param name="param">Optional parameter values supplied as a dictionary or an object with public fields or properties.</param>
+        /// <returns>The affected row count reported by the provider.</returns>
         public static int Execute(this IDbConnection connection, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
@@ -360,6 +525,12 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a parameterized SQL command and reads its first column from the first row.</summary>
+        /// <typeparam name="T">The CLR type to which the scalar result is converted.</typeparam>
+        /// <param name="connection">The database connection used by the operation.</param>
+        /// <param name="sql">The SQL command text to execute.</param>
+        /// <param name="param">Optional parameter values supplied as a dictionary or an object with public fields or properties.</param>
+        /// <returns>The scalar converted to the requested type, or the default value if the command returns no value or NULL.</returns>
         public static T ExecuteScalar<T>(this IDbConnection connection, string sql, object param = null)
         {
             using (var command = connection.CreateParameterizedCommand(sql, param))
@@ -379,53 +550,72 @@ namespace Kuery
         }
     }
 
+    /// <summary>Specifies the database table name for a mapped type.</summary>
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class TableAttribute : Attribute
     {
+        /// <summary>Gets the database table name.</summary>
         public string Name { get; }
 
+        /// <summary>Gets or sets whether the table mapping requests SQLite's WITHOUT ROWID option.</summary>
         public bool WithoutRowId { get; set; }
 
+        /// <summary>Initializes a table mapping attribute with the specified name.</summary>
+        /// <param name="name">The database table name.</param>
         public TableAttribute(string name)
         {
             Name = name;
         }
     }
 
+    /// <summary>Specifies the database column name for a mapped property.</summary>
     [AttributeUsage(AttributeTargets.Property)]
     public sealed class ColumnAttribute : Attribute
     {
+        /// <summary>Gets the database column name.</summary>
         public string Name { get; }
 
+        /// <summary>Initializes a column mapping attribute with the specified name.</summary>
+        /// <param name="name">The database column name.</param>
         public ColumnAttribute(string name)
         {
             Name = name;
         }
     }
 
+    /// <summary>Marks a mapped property as the primary key.</summary>
     [AttributeUsage(AttributeTargets.Property)]
     public sealed class PrimaryKeyAttribute : Attribute
     {
     }
 
+    /// <summary>Marks a mapped primary key for database-generated numeric values or generated GUIDs.</summary>
     [AttributeUsage(AttributeTargets.Property)]
     public sealed class AutoIncrementAttribute : Attribute
     {
     }
 
+    /// <summary>Marks a mapped property as part of an index.</summary>
     [AttributeUsage(AttributeTargets.Property)]
     public class IndexedAttribute : Attribute
     {
+        /// <summary>Gets or sets the index name. Use the same name on multiple properties to describe a composite index.</summary>
         public string Name { get; set; }
 
+        /// <summary>Gets or sets the position of the property within the index.</summary>
         public int Order { get; set; }
 
+        /// <summary>Gets or sets whether the index requires unique values.</summary>
         public virtual bool Unique { get; set; }
 
+        /// <summary>Initializes an index attribute.</summary>
         public IndexedAttribute()
         {
         }
 
+        /// <summary>Initializes an index attribute for a named index with a specified column order.</summary>
+        /// <param name="name">The name of the index to which the property belongs.</param>
+        /// <param name="order">The position of the column within the index.</param>
         public IndexedAttribute(string name, int order)
         {
             Name = name;
@@ -433,14 +623,17 @@ namespace Kuery
         }
     }
 
+    /// <summary>Excludes a property from Kuery mapping.</summary>
     [AttributeUsage(AttributeTargets.Property)]
     public sealed class IgnoreAttribute : Attribute
     {
     }
 
+    /// <summary>Marks a mapped property as part of a unique index.</summary>
     [AttributeUsage(AttributeTargets.Property)]
     public sealed class UniqueAttribute : IndexedAttribute
     {
+        /// <summary>Gets a value that is always true. Setting this property has no effect.</summary>
         public override bool Unique
         {
             get => true;
@@ -448,40 +641,53 @@ namespace Kuery
         }
     }
 
+    /// <summary>Specifies the maximum length used when declaring a mapped string column.</summary>
     [AttributeUsage(AttributeTargets.Property)]
     public sealed class MaxLengthAttribute : Attribute
     {
+        /// <summary>Gets the declared maximum length of the mapped string column.</summary>
         public int Value { get; }
 
+        /// <summary>Initializes a maximum length attribute.</summary>
+        /// <param name="length">The maximum length to declare for the column.</param>
         public MaxLengthAttribute(int length)
         {
             Value = length;
         }
     }
 
+    /// <summary>Describes which attributed code should be retained by a linker that recognizes this attribute.</summary>
     public sealed class PreserveAttribute : Attribute
     {
+        /// <summary>Gets or sets whether all members of the attributed type should be retained.</summary>
         public bool AllMembers { get; set; }
 
+        /// <summary>Gets or sets whether retention depends on the attributed code already being referenced.</summary>
         public bool Conditional { get; set; }
     }
 
+    /// <summary>Specifies the collation used in the declaration of a mapped column.</summary>
     [AttributeUsage(AttributeTargets.Property)]
     public sealed class CollationAttribute : Attribute
     {
+        /// <summary>Gets the database collation name.</summary>
         public string Value { get; }
 
+        /// <summary>Initializes a collation attribute with a database collation name.</summary>
+        /// <param name="collation">The collation name understood by the database.</param>
         public CollationAttribute(string collation)
         {
             Value = collation;
         }
     }
 
+    /// <summary>Marks a mapped column as non-nullable.</summary>
     [AttributeUsage(AttributeTargets.Property)]
     public sealed class NotNullAttribute : Attribute
     {
     }
 
+    /// <summary>Maps values of the attributed enum by name instead of as their underlying numbers.</summary>
     [AttributeUsage(AttributeTargets.Enum)]
     public sealed class StoreAsTextAttribute : Attribute
     {
@@ -489,16 +695,22 @@ namespace Kuery
 
     internal sealed class TableMapping
     {
+        /// <summary>Gets the CLR type represented by this mapping.</summary>
         public Type MappedType { get; }
 
+        /// <summary>Gets the mapped database table name.</summary>
         public string TableName { get; }
 
+        /// <summary>Gets whether the mapping requests a SQLite table without a row ID.</summary>
         public bool WithoutRowId { get; }
 
+        /// <summary>Gets the columns mapped for the CLR type.</summary>
         public IReadOnlyList<Column> Columns { get; }
 
+        /// <summary>Gets the mapped primary key column, or null when no primary key is mapped.</summary>
         public Column PK { get; }
 
+        /// <summary>Gets the flags used to infer mapping conventions.</summary>
         public CreateFlags CreateFlags { get; }
 
         private readonly Column _autoPk;
@@ -581,8 +793,12 @@ namespace Kuery
             InsertOrReplaceColumns = Columns.ToArray();
         }
 
+        /// <summary>Gets whether the mapping has an auto-incrementing numeric primary key.</summary>
         public bool HasAutoIncPK { get; }
 
+        /// <summary>Copies a generated numeric primary key to an entity when the mapping has one.</summary>
+        /// <param name="obj">The entity that received the generated key.</param>
+        /// <param name="id">The generated numeric primary key.</param>
         public void SetAutoIncPk(object obj, long id)
         {
             if (_autoPk != null)
@@ -591,13 +807,21 @@ namespace Kuery
             }
         }
 
+        /// <summary>Gets the columns included in a normal insert.</summary>
         public IReadOnlyList<Column> InsertColumns { get; }
 
+        /// <summary>Gets the columns included in an insert-or-replace operation.</summary>
         public IReadOnlyList<Column> InsertOrReplaceColumns { get; }
 
+        /// <summary>Finds the column mapped from the specified CLR property name.</summary>
+        /// <param name="propertyName">The name of the mapped CLR property.</param>
+        /// <returns>The column mapping, or null if the property is not mapped.</returns>
         public Column FindColumnWithPropertyName(string propertyName) =>
             _lookupByPropertyName.TryGetValue(propertyName, out var column) ? column : null;
 
+        /// <summary>Finds the mapping for a database column name without regard to case.</summary>
+        /// <param name="columnName">The database column name.</param>
+        /// <returns>The column mapping, or null if the name is not mapped.</returns>
         public Column FindColumn(string columnName) =>
             _lookupByColumnName.TryGetValue(columnName.ToLower(), out var column) ? column : null;
 
@@ -605,34 +829,50 @@ namespace Kuery
         {
             private readonly PropertyInfo _prop;
 
+            /// <summary>Gets the mapped database column name.</summary>
             public string Name { get; }
 
+            /// <summary>Gets the reflection metadata for the mapped property.</summary>
             public PropertyInfo PropertyInfo => _prop;
 
+            /// <summary>Gets the name of the mapped CLR property.</summary>
             public string PropertyName => _prop.Name;
 
+            /// <summary>Gets the CLR type of the column value after removing any nullable wrapper.</summary>
             public Type ColumnType { get; }
 
+            /// <summary>Gets the configured database collation, if any.</summary>
             public string Collation { get; }
 
+            /// <summary>Gets whether the column uses an auto-incrementing numeric value.</summary>
             public bool IsAutoInc { get; }
 
+            /// <summary>Gets whether a GUID value should be generated for the column.</summary>
             public bool IsAutoGuid { get; }
 
+            /// <summary>Gets whether the column is the primary key.</summary>
             public bool IsPK { get; }
 
+            /// <summary>Gets the configured index entries for the column.</summary>
             public IEnumerable<IndexedAttribute> Indices { get; }
 
+            /// <summary>Gets whether the mapping permits a database NULL for this column.</summary>
             public bool IsNullable { get; }
 
+            /// <summary>Gets the configured maximum string length, or null if none is declared.</summary>
             public int? MaxStringLength { get; }
 
+            /// <summary>Gets whether the property value is represented as text in the database.</summary>
             public bool StoreAsText { get; }
 
             internal readonly Type MappedType;
 
             internal readonly Action<object, IDataRecord, int> FastSetter;
 
+            /// <summary>Builds column metadata from a mapped property and the mapping flags.</summary>
+            /// <param name="mappedType">The CLR type that owns the mapped property.</param>
+            /// <param name="prop">The mapped CLR property.</param>
+            /// <param name="createFlags">The flags that control implicit mapping conventions.</param>
             public Column(Type mappedType, PropertyInfo prop, CreateFlags createFlags = CreateFlags.None)
             {
                 var colAttr = prop.CustomAttributes.FirstOrDefault(x => Orm.IsColumnAttribute(x.AttributeType));
@@ -675,6 +915,9 @@ namespace Kuery
                 FastSetter = Kuery.FastSetter.Typeless.GetFastSetter(this);
             }
 
+            /// <summary>Converts and assigns a database value to the mapped property.</summary>
+            /// <param name="obj">The entity instance containing the mapped property.</param>
+            /// <param name="val">The database value to assign to the property.</param>
             public void SetValue(object obj, object val)
             {
                 if (val == null || val == DBNull.Value)
@@ -754,6 +997,9 @@ namespace Kuery
                 }
             }
 
+            /// <summary>Reads the mapped property value from an entity.</summary>
+            /// <param name="obj">The entity instance containing the mapped property.</param>
+            /// <returns>The CLR value stored in the mapped property.</returns>
             public object GetValue(object obj)
             {
                 return _prop.GetValue(obj, null);
@@ -763,6 +1009,8 @@ namespace Kuery
 
     sealed class EnumCacheInfo
     {
+        /// <summary>Builds cached metadata about a CLR type's enum representation.</summary>
+        /// <param name="type">The CLR type to inspect.</param>
         public EnumCacheInfo(Type type)
         {
             var typeInfo = type.GetTypeInfo();
@@ -784,10 +1032,13 @@ namespace Kuery
             }
         }
 
+        /// <summary>Gets whether the CLR type is an enum.</summary>
         public bool IsEnum { get; }
 
+        /// <summary>Gets whether the enum is stored using member names.</summary>
         public bool StoreAsText { get; }
 
+        /// <summary>Gets the cached enum names by numeric value, when available.</summary>
         public Dictionary<int, string> EnumValues { get; }
     }
 
@@ -795,11 +1046,17 @@ namespace Kuery
     {
         private static readonly Dictionary<Type, EnumCacheInfo> _cache = new Dictionary<Type, EnumCacheInfo>();
 
+        /// <summary>Gets or creates the cached enum metadata for the requested CLR type.</summary>
+        /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+        /// <returns>The cached enum metadata for the type.</returns>
         public static EnumCacheInfo GetInfo<T>()
         {
             return GetInfo(typeof(T));
         }
 
+        /// <summary>Gets or creates the cached enum metadata for the requested CLR type.</summary>
+        /// <param name="type">The CLR type to inspect.</param>
+        /// <returns>The cached enum metadata for the type.</returns>
         public static EnumCacheInfo GetInfo(Type type)
         {
             lock (_cache)
@@ -816,8 +1073,11 @@ namespace Kuery
 
     static class Orm
     {
+        /// <summary>The conventional default length for string columns.</summary>
         public const int DefaultMaxStringLength = 140;
+        /// <summary>The property name used by the implicit primary key convention.</summary>
         public const string ImplicitPkName = "Id";
+        /// <summary>The column name suffix used by the implicit index convention.</summary>
         public const string ImplicitIndexSuffix = "Id";
         private const string DataAnnotationsSchemaTableAttributeFullName = "System.ComponentModel.DataAnnotations.Schema.TableAttribute";
         private const string DataAnnotationsSchemaColumnAttributeFullName = "System.ComponentModel.DataAnnotations.Schema.ColumnAttribute";
@@ -825,6 +1085,9 @@ namespace Kuery
         private const string DataAnnotationsMaxLengthAttributeFullName = "System.ComponentModel.DataAnnotations.MaxLengthAttribute";
         private const string DataAnnotationsStringLengthAttributeFullName = "System.ComponentModel.DataAnnotations.StringLengthAttribute";
 
+        /// <summary>Gets the runtime CLR type of an object, or System.Object for a null value.</summary>
+        /// <param name="obj">The instance whose runtime type is requested.</param>
+        /// <returns>The runtime CLR type, or System.Object if the instance is null.</returns>
         public static Type GetType(object obj)
         {
             if (obj == null)
@@ -839,6 +1102,11 @@ namespace Kuery
             return obj.GetType();
         }
 
+        /// <summary>Builds the SQL column declaration, including the applicable constraints.</summary>
+        /// <param name="p">The mapped column to describe.</param>
+        /// <param name="storeDateTimeAsTicks">Whether to store date and time values as ticks.</param>
+        /// <param name="storeTimeSpanAsTicks">Whether to store duration values as ticks.</param>
+        /// <returns>The SQL declaration for the column.</returns>
         public static string SqlDecl(TableMapping.Column p, bool storeDateTimeAsTicks, bool storeTimeSpanAsTicks)
         {
             var decl = "\"" +
@@ -865,6 +1133,11 @@ namespace Kuery
             return decl;
         }
 
+        /// <summary>Maps a column's CLR type and storage options to a SQL type name.</summary>
+        /// <param name="p">The mapped column to describe.</param>
+        /// <param name="storeDateTimeAsTicks">Whether to store date and time values as ticks.</param>
+        /// <param name="storeTimeSpanAsTicks">Whether to store duration values as ticks.</param>
+        /// <returns>The database type name.</returns>
         public static string SqlType(TableMapping.Column p, bool storeDateTimeAsTicks, bool storeTimeSpanAsTicks)
         {
             var clrType = p.ColumnType;
@@ -938,11 +1211,17 @@ namespace Kuery
             }
         }
 
+        /// <summary>Checks whether the property is marked as a primary key.</summary>
+        /// <param name="p">The mapped CLR member to inspect.</param>
+        /// <returns>True if the member has the primary key attribute.</returns>
         public static bool IsPK(MemberInfo p)
         {
             return p.CustomAttributes.Any(x => x.AttributeType == typeof(PrimaryKeyAttribute));
         }
 
+        /// <summary>Gets the collation declared on a member, if any.</summary>
+        /// <param name="p">The mapped CLR member to inspect.</param>
+        /// <returns>The declared collation name, or null when the member has none.</returns>
         public static string Collation(MemberInfo p)
         {
             return p.CustomAttributes
@@ -955,11 +1234,18 @@ namespace Kuery
                 .FirstOrDefault() ?? "";
         }
 
+        /// <summary>Checks whether a member is marked for auto-incrementing values.</summary>
+        /// <param name="p">The mapped CLR member to inspect.</param>
+        /// <returns>True if the member has the auto-increment attribute.</returns>
         public static bool IsAutoInc(MemberInfo p)
         {
             return p.CustomAttributes.Any(x => x.AttributeType == typeof(AutoIncrementAttribute));
         }
 
+        /// <summary>Finds a named field declared on a type or one of its base types.</summary>
+        /// <param name="t">The reflection metadata for the type where the search begins.</param>
+        /// <param name="name">The name of the member to find.</param>
+        /// <returns>The matching field.</returns>
         public static FieldInfo GetField(TypeInfo t, string name)
         {
             var f = t.GetDeclaredField(name);
@@ -970,6 +1256,10 @@ namespace Kuery
             return GetField(t.BaseType.GetTypeInfo(), name);
         }
 
+        /// <summary>Finds a named property declared on a type or one of its base types.</summary>
+        /// <param name="t">The reflection metadata for the type where the search begins.</param>
+        /// <param name="name">The name of the member to find.</param>
+        /// <returns>The matching property.</returns>
         public static PropertyInfo GetProperty(TypeInfo t, string name)
         {
             var f = t.GetDeclaredProperty(name);
@@ -980,6 +1270,9 @@ namespace Kuery
             return GetProperty(t.BaseType.GetTypeInfo(), name);
         }
 
+        /// <summary>Constructs an attribute instance and sets the values from its metadata.</summary>
+        /// <param name="x">The metadata used to construct the attribute instance.</param>
+        /// <returns>The constructed attribute instance.</returns>
         public static object InflateAttribute(CustomAttributeData x)
         {
             var atype = x.AttributeType;
@@ -1000,10 +1293,16 @@ namespace Kuery
             return r;
         }
 
+        /// <summary>Checks whether a type is a recognized table mapping attribute.</summary>
+        /// <param name="attributeType">The attribute type to inspect.</param>
+        /// <returns>True for a supported table mapping attribute type.</returns>
         public static bool IsTableAttribute(Type attributeType) =>
             attributeType == typeof(TableAttribute) ||
             string.Equals(attributeType.FullName, DataAnnotationsSchemaTableAttributeFullName, StringComparison.Ordinal);
 
+        /// <summary>Checks whether a type is a recognized column mapping attribute.</summary>
+        /// <param name="attributeType">The attribute type to inspect.</param>
+        /// <returns>True for a supported column mapping attribute type.</returns>
         public static bool IsColumnAttribute(Type attributeType) =>
             attributeType == typeof(ColumnAttribute) ||
             string.Equals(attributeType.FullName, DataAnnotationsSchemaColumnAttributeFullName, StringComparison.Ordinal);
@@ -1017,6 +1316,9 @@ namespace Kuery
         private static bool IsDataAnnotationsStringLengthAttribute(Type attributeType) =>
             string.Equals(attributeType.FullName, DataAnnotationsStringLengthAttributeFullName, StringComparison.Ordinal);
 
+        /// <summary>Reads the name passed to a recognized table or column attribute.</summary>
+        /// <param name="attribute">The attribute metadata to inspect.</param>
+        /// <returns>The configured name, or null when it cannot be read.</returns>
         public static string GetAttributeName(CustomAttributeData attribute)
         {
             if (attribute == null)
@@ -1042,6 +1344,9 @@ namespace Kuery
             return name;
         }
 
+        /// <summary>Reads the SQLite WITHOUT ROWID option from the attribute metadata.</summary>
+        /// <param name="attribute">The attribute metadata to inspect.</param>
+        /// <returns>True if the attribute enables WITHOUT ROWID.</returns>
         public static bool GetWithoutRowId(CustomAttributeData attribute)
         {
             foreach (var namedArgument in attribute.NamedArguments)
@@ -1067,6 +1372,9 @@ namespace Kuery
             return null;
         }
 
+        /// <summary>Reads the index attributes declared on a member.</summary>
+        /// <param name="p">The mapped CLR member to inspect.</param>
+        /// <returns>The index definitions applied to the member.</returns>
         public static IEnumerable<IndexedAttribute> GetIndices(MemberInfo p)
         {
             var indexedInfo = typeof(IndexedAttribute).GetTypeInfo();
@@ -1075,6 +1383,9 @@ namespace Kuery
                 .Select(x => (IndexedAttribute)InflateAttribute(x));
         }
 
+        /// <summary>Reads the maximum string length declared on a property.</summary>
+        /// <param name="p">The mapped CLR member to inspect.</param>
+        /// <returns>The declared length, or null if no supported length attribute is present.</returns>
         public static int? MaxStringLength(PropertyInfo p)
         {
             var attr = p.CustomAttributes.FirstOrDefault(x => x.AttributeType == typeof(MaxLengthAttribute));
@@ -1099,6 +1410,9 @@ namespace Kuery
             return null;
         }
 
+        /// <summary>Checks for a recognized non-null or required attribute.</summary>
+        /// <param name="p">The mapped CLR member to inspect.</param>
+        /// <returns>True if the member is marked as non-nullable.</returns>
         public static bool IsMarkedNotNull(MemberInfo p)
         {
             return p.CustomAttributes.Any(x =>
@@ -1110,27 +1424,41 @@ namespace Kuery
     [Flags]
     internal enum CreateFlags
     {
+        /// <summary>Uses explicit mapping attributes without enabling an implicit convention.</summary>
         None = 0x000,
+        /// <summary>Treats the conventional Id property as the primary key.</summary>
         ImplicitPK = 0x001,
+        /// <summary>Indexes columns whose names match the implicit index convention.</summary>
         ImplicitIndex = 0x002,
+        /// <summary>Enables both implicit primary key and implicit index conventions.</summary>
         AllImplicit = 0x003,
+        /// <summary>Requests automatic value generation for a mapped primary key.</summary>
         AutoIncPK = 0x004,
+        /// <summary>Represents the SQLite FTS3 table option.</summary>
         FullTextSearch3 = 0x100,
+        /// <summary>Represents the SQLite FTS4 table option.</summary>
         FullTextSearch4 = 0x200,
     }
 
+    /// <summary>Provides the base for queries over mapped tables.</summary>
     public abstract class BaseTableQuery
     {
+        /// <summary>Describes the direction and column for a table query sort key.</summary>
         protected class Ordering
         {
+            /// <summary>Gets or sets the mapped column to sort by.</summary>
             public string ColumnName { get; set; }
 
+            /// <summary>Gets or sets whether to sort in ascending order.</summary>
             public bool Ascending { get; set; }
         }
     }
 
+    /// <summary>Represents a composable query over a mapped table.</summary>
+    /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
     public sealed partial class TableQuery<T> : BaseTableQuery, IEnumerable<T>
     {
+        /// <summary>Gets the connection used to execute the query.</summary>
         public IDbConnection Connection { get; }
 
         internal TableMapping Table { get; }
@@ -1189,6 +1517,9 @@ namespace Kuery
             return q;
         }
 
+        /// <summary>Combines a predicate with the existing query conditions.</summary>
+        /// <param name="predExpr">The additional filter to combine with the existing query conditions.</param>
+        /// <returns>A copy of the query with the operation applied.</returns>
         public TableQuery<T> Where(Expression<Func<T, bool>> predExpr)
         {
             if (predExpr.NodeType == ExpressionType.Lambda)
@@ -1205,11 +1536,18 @@ namespace Kuery
             }
         }
 
+        /// <summary>Deletes rows matching the combined query conditions.</summary>
+        /// <returns>The number of rows deleted.</returns>
+        /// <exception cref="InvalidOperationException">The query has a row limit or offset, or no filter is specified.</exception>
         public int Delete()
         {
             return Delete(null);
         }
 
+        /// <summary>Deletes rows matching the combined query conditions.</summary>
+        /// <param name="predExpr">An optional filter to combine with the existing query conditions.</param>
+        /// <returns>The number of rows deleted.</returns>
+        /// <exception cref="InvalidOperationException">The query has a row limit or offset, or no filter is specified.</exception>
         public int Delete(Expression<Func<T, bool>> predExpr)
         {
             if (_limit.HasValue || _offset.HasValue)
@@ -1249,6 +1587,9 @@ namespace Kuery
             }
         }
 
+        /// <summary>Sets the maximum number of rows to return.</summary>
+        /// <param name="n">The maximum number of rows to return.</param>
+        /// <returns>A copy of the query with the operation applied.</returns>
         public TableQuery<T> Take(int n)
         {
             var q = Clone<T>();
@@ -1256,6 +1597,9 @@ namespace Kuery
             return q;
         }
 
+        /// <summary>Sets the number of rows to skip before returning results.</summary>
+        /// <param name="n">The number of rows to skip.</param>
+        /// <returns>A copy of the query with the operation applied.</returns>
         public TableQuery<T> Skip(int n)
         {
             var q = Clone<T>();
@@ -1263,11 +1607,17 @@ namespace Kuery
             return q;
         }
 
+        /// <summary>Returns the row at the specified zero-based offset.</summary>
+        /// <param name="index">The zero-based row offset.</param>
+        /// <returns>The row at the requested offset.</returns>
+        /// <exception cref="InvalidOperationException">The query contains no row at the requested position.</exception>
         public T ElementAt(int index)
         {
             return Skip(index).Take(1).First();
         }
 
+        /// <summary>Creates a copy with the deferred enumeration flag set.</summary>
+        /// <returns>A copy of the query with the operation applied.</returns>
         public TableQuery<T> Deferred()
         {
             var q = Clone<T>();
@@ -1275,21 +1625,41 @@ namespace Kuery
             return q;
         }
 
+        /// <summary>Adds an ascending sort key to the query.</summary>
+        /// <typeparam name="TKey">The CLR type of the sort key.</typeparam>
+        /// <param name="orderExpr">An expression selecting a mapped property to use as the sort key.</param>
+        /// <returns>A copy of the query with the operation applied.</returns>
+        /// <exception cref="NotSupportedException">The sort expression does not select a property directly.</exception>
         public TableQuery<T> OrderBy<TKey>(Expression<Func<T, TKey>> orderExpr)
         {
             return AddOrderBy(orderExpr, true);
         }
 
+        /// <summary>Adds a descending sort key to the query.</summary>
+        /// <typeparam name="TKey">The CLR type of the sort key.</typeparam>
+        /// <param name="orderExpr">An expression selecting a mapped property to use as the sort key.</param>
+        /// <returns>A copy of the query with the operation applied.</returns>
+        /// <exception cref="NotSupportedException">The sort expression does not select a property directly.</exception>
         public TableQuery<T> OrderByDescending<TKey>(Expression<Func<T, TKey>> orderExpr)
         {
             return AddOrderBy(orderExpr, false);
         }
 
+        /// <summary>Adds an ascending secondary sort key to the query.</summary>
+        /// <typeparam name="TKey">The CLR type of the sort key.</typeparam>
+        /// <param name="orderExpr">An expression selecting a mapped property to use as the sort key.</param>
+        /// <returns>A copy of the query with the operation applied.</returns>
+        /// <exception cref="NotSupportedException">The sort expression does not select a property directly.</exception>
         public TableQuery<T> ThenBy<TKey>(Expression<Func<T, TKey>> orderExpr)
         {
             return AddOrderBy(orderExpr, true);
         }
 
+        /// <summary>Adds a descending secondary sort key to the query.</summary>
+        /// <typeparam name="U">The CLR type of the secondary sort key.</typeparam>
+        /// <param name="orderExpr">An expression selecting a mapped property to use as the sort key.</param>
+        /// <returns>A copy of the query with the operation applied.</returns>
+        /// <exception cref="NotSupportedException">The sort expression does not select a property directly.</exception>
         public TableQuery<T> ThenByDescending<U>(Expression<Func<T, U>> orderExpr)
         {
             return AddOrderBy(orderExpr, false);
@@ -1338,11 +1708,15 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes the query and materializes the results in a list.</summary>
+        /// <returns>A list containing the materialized rows.</returns>
         public List<T> ToList()
         {
             return GenerateCommand("*").ExecuteQuery<T>(Table);
         }
 
+        /// <summary>Executes the query and materializes the results in an array.</summary>
+        /// <returns>An array containing the materialized rows.</returns>
         public T[] ToArray()
         {
             return GenerateCommand("*").ExecuteQuery<T>(Table).ToArray();
@@ -1713,14 +2087,19 @@ namespace Kuery
 
         private readonly struct CompileResult
         {
+            /// <summary>Creates the compiled form of a table query expression.</summary>
+            /// <param name="commandText">The SQL fragment generated for the expression.</param>
+            /// <param name="value">The evaluated CLR value associated with the SQL fragment, if available.</param>
             public CompileResult(string commandText, object value = null)
             {
                 CommandText = commandText;
                 Value = value;
             }
 
+            /// <summary>The SQL fragment produced for the expression.</summary>
             public readonly string CommandText;
 
+            /// <summary>The evaluated value associated with the fragment, if available.</summary>
             public readonly object Value;
         }
 
@@ -2138,6 +2517,8 @@ namespace Kuery
             }
         }
 
+        /// <summary>Counts rows matching the query conditions.</summary>
+        /// <returns>The number of matching rows.</returns>
         public int Count()
         {
             using (var command = GenerateCommand("count(*)"))
@@ -2151,11 +2532,16 @@ namespace Kuery
             }
         }
 
+        /// <summary>Counts rows matching the query and the additional predicate.</summary>
+        /// <param name="predExpr">The additional filter to combine with the existing query conditions.</param>
+        /// <returns>The number of matching rows.</returns>
         public int Count(Expression<Func<T, bool>> predExpr)
         {
             return Where(predExpr).Count();
         }
 
+        /// <summary>Executes the query and returns an enumerator over its materialized rows.</summary>
+        /// <returns>An enumerator over the query results.</returns>
         public IEnumerator<T> GetEnumerator()
         {
             return ToList().GetEnumerator();
@@ -2166,23 +2552,35 @@ namespace Kuery
             return GetEnumerator();
         }
 
+        /// <summary>Returns the first row in the query result.</summary>
+        /// <returns>The first matching row.</returns>
+        /// <exception cref="InvalidOperationException">The query contains no row at the requested position.</exception>
         public T First()
         {
             var query = Take(1);
             return query.ToList().First();
         }
 
+        /// <summary>Returns the first row matching the additional predicate.</summary>
+        /// <param name="predExpr">The additional filter to combine with the existing query conditions.</param>
+        /// <returns>The first matching row.</returns>
+        /// <exception cref="InvalidOperationException">The query contains no row at the requested position.</exception>
         public T First(Expression<Func<T, bool>> predExpr)
         {
             return Where(predExpr).First();
         }
 
+        /// <summary>Returns the first matching row or its default value.</summary>
+        /// <returns>The first matching row, or the default value if no row matches.</returns>
         public T FirstOrDefault()
         {
             var query = Take(1);
             return query.ToList().FirstOrDefault();
         }
 
+        /// <summary>Returns the first matching row or its default value.</summary>
+        /// <param name="predExpr">The additional filter to combine with the existing query conditions.</param>
+        /// <returns>The first matching row, or the default value if no row matches.</returns>
         public T FirstOrDefault(Expression<Func<T, bool>> predExpr)
         {
             return Where(predExpr).FirstOrDefault();

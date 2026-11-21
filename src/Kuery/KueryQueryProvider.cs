@@ -11,6 +11,7 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery
 {
+    /// <summary>Creates and executes LINQ queries against a Kuery database connection.</summary>
     public sealed class KueryQueryProvider : IQueryProvider
     {
         readonly QueryContext _context;
@@ -30,6 +31,10 @@ namespace Kuery
             _executor = executor ?? throw new ArgumentNullException(nameof(executor));
         }
 
+        /// <summary>Creates a deferred query for the specified expression tree.</summary>
+        /// <param name="expression">The LINQ expression tree to translate.</param>
+        /// <returns>A sequence that executes when enumerated.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="expression"/> is null.</exception>
         public IQueryable CreateQuery(Expression expression)
         {
             Requires.NotNull(expression, nameof(expression));
@@ -39,18 +44,34 @@ namespace Kuery
             return (IQueryable)Activator.CreateInstance(queryType, this, expression);
         }
 
+        /// <summary>Creates a deferred query for the specified expression tree.</summary>
+        /// <typeparam name="TElement">The element type of the query result.</typeparam>
+        /// <param name="expression">The LINQ expression tree to translate.</param>
+        /// <returns>A sequence that executes when enumerated.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="expression"/> is null.</exception>
         public IQueryable<TElement> CreateQuery<TElement>(Expression expression)
         {
             Requires.NotNull(expression, nameof(expression));
             return new KueryQueryable<TElement>(this, expression);
         }
 
+        /// <summary>Translates and executes the specified expression against the database.</summary>
+        /// <param name="expression">The LINQ expression tree to translate.</param>
+        /// <returns>The materialized result of the expression.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="expression"/> is null.</exception>
+        /// <exception cref="NotSupportedException">The expression cannot be translated to SQL.</exception>
         public object Execute(Expression expression)
         {
             Requires.NotNull(expression, nameof(expression));
             return _executor.Execute(_context, expression, expression.Type);
         }
 
+        /// <summary>Translates and executes the specified expression against the database.</summary>
+        /// <typeparam name="TResult">The expected CLR result type.</typeparam>
+        /// <param name="expression">The LINQ expression tree to translate.</param>
+        /// <returns>The materialized result of the expression.</returns>
+        /// <exception cref="ArgumentNullException"><paramref name="expression"/> is null.</exception>
+        /// <exception cref="NotSupportedException">The expression cannot be translated to SQL.</exception>
         public TResult Execute<TResult>(Expression expression)
         {
             Requires.NotNull(expression, nameof(expression));

@@ -12,8 +12,14 @@ namespace Kuery.Query
 
         private sealed class QueryableMethodNormalizingExpressionVisitor : ExpressionVisitor
         {
+            /// <summary>Keeps normalized query extension nodes intact during method rewriting.</summary>
+            /// <param name="node">The expression to visit.</param>
+            /// <returns>The visited expression.</returns>
             protected override Expression VisitExtension(Expression node) => node;
 
+            /// <summary>Rewrites supported shorthand ordering methods to standard ordering calls.</summary>
+            /// <param name="node">The method call to visit.</param>
+            /// <returns>The visited expression.</returns>
             protected override Expression VisitMethodCall(MethodCallExpression node)
             {
                 var visited = (MethodCallExpression)base.VisitMethodCall(node);
@@ -29,6 +35,9 @@ namespace Kuery.Query
                     new[] { elementType, elementType }, visited.Arguments[0], Expression.Quote(Expression.Lambda(element, element)));
             }
 
+            /// <summary>Inlines a directly invoked lambda into the query expression.</summary>
+            /// <param name="node">The lambda invocation to visit.</param>
+            /// <returns>The visited expression.</returns>
             protected override Expression VisitInvocation(InvocationExpression node)
             {
                 var expression = RelationalQueryableMethodTranslatingExpressionVisitor.StripQuote(node.Expression);
