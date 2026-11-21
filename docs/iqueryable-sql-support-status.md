@@ -10,17 +10,18 @@ EF Core への依存、変更追跡、マイグレーションは含まない。
 |---|---|
 | 絞り込み | Where。複数条件、射影・ページング後の絞り込み |
 | 射影 | スカラー、匿名型、コンストラクター、MemberInit、エンティティ。計算式・対応関数も使用可能 |
-| ソート | OrderBy / OrderByDescending / ThenBy / ThenByDescending。計算式と射影先メンバーも使用可能 |
+| ソート | OrderBy / OrderByDescending / ThenBy / ThenByDescending / Order / OrderDescending。計算式と射影先メンバーも使用可能 |
 | ページング | Skip(int) / Take(int)。繰り返しと演算順序を保持。負の Skip は0、負の Take は空集合 |
 | 重複排除 | Distinct。射影後の Distinct、Distinct 後の Count / 集約 |
-| 集約 | Count / LongCount / Sum / Min / Max / Average。述語・セレクター付きの標準オーバーロード |
+| 集約 | Count / LongCount / Sum / Min / Max / Average / MinBy / MaxBy。述語・セレクター付きの標準オーバーロード |
 | 存在・全件判定 | Any / All / 最上位の Contains。null 補償付き EXISTS / NOT EXISTS。エンティティ Contains は既存の単一主キーで比較 |
 | 要素取得 | First / FirstOrDefault / Single / SingleOrDefault / Last / LastOrDefault / ElementAt(int) / ElementAtOrDefault(int) |
 | 結合 | Join。単一・複合キー、複数結合、自己結合、左右の入力クエリの絞り込み・射影・ページング |
 | 外部結合 | LeftJoin / RightJoin / FullJoin、従来の標準 LEFT JOIN パターン。独立した左右の入力と、結合後の合成 |
 | 逆順・型・既定値 | Reverse（明示的な並び順が必要）、Cast、OfType（派生型は TPH）、引数なし DefaultIfEmpty |
-| クロス結合 | 外側に依存しない SelectMany。結果セレクターの有無をサポート |
-| グループ化 | GroupBy の単一・複合・計算式キー、キーと集約の Select、HAVING。集約結果への追加の絞り込み・ソート |
+| SelectMany | クロス結合、相関 WHERE を使う内部・外部結合、対応 DB での APPLY / LATERAL |
+| グループ化 | GroupBy の単一・複合・計算式キー、キーと集約の Select、HAVING。最終 IGrouping、要素セレクター、順序付きグループ内の先頭行と上位 N 件にも対応 |
+| GroupJoin | 標準 LEFT JOIN パターン、および最終演算子の結果に含める内側のグループ |
 | 集合演算 | Union / Concat / Intersect / Except。入れ子、各入力のページング、演算後の Where / Select / ソート / ページング / 集約 |
 | サブクエリ | IQueryable の Contains / Any / All / 集約。相関条件と SELECT 内のスカラー集約 |
 
@@ -63,8 +64,9 @@ DB の規則に依存し、すべての .NET のオーバーロードや境界�
 | SQL Server | TOP / OFFSET FETCH | `[name]` | `@p1` |
 | MySQL | LIMIT / OFFSET | `` `name` `` | `@p1` |
 
-- 非同期取得は既存の ToListAsync / CountAsync / FirstAsync / FirstOrDefaultAsync を提供する。
-  CancellationToken をコマンドと読み取りに渡す。
+- 非同期は ToListAsync、ToArrayAsync、ToDictionaryAsync、ToHashSetAsync、判定・集約・要素取得を提供する。
+  AsAsyncEnumerable は結果をストリーミングし、CancellationToken をコマンドと読み取りに渡す。
+  グループの結果は1グループ分を集めてから返す。接続は利用側で開き、列挙中は開いた状態を保つ。
 - ExecuteUpdate / ExecuteDelete と非同期版は、条件付きの単一テーブルを対象とする。
   値の計算にも共通の式変換を使う。
 - クエリ計画は上限256件の LRU キャッシュを共有する。毎回実行時の値を読み取り、
@@ -82,11 +84,16 @@ DB の規則に依存し、すべての .NET のオーバーロードや境界�
   任意のコンストラクターの内部処理を推測して、そのプロパティ参照を SQL へ展開することはしない。
 - 結合・集合演算・サブクエリは同じ接続の Kuery クエリ同士に限定する。
   集合演算の左右は同じ結果形状が必要。MemberInit の代入順は左右で異なっていてもよい。
-- GroupBy の IGrouping 自体の読み取り、相関 SelectMany、比較子付きの演算、
-  インデックス付きの Where / Select、Index / Range 指定のページングは未対応。
+- 任意の比較子付きの SQL 演算、インデックス付きの Where / Select、Index / Range 指定のページングは未対応。
+- 相関条件を JOIN に移せる SelectMany は4 DB で扱う。内側で相関した射影やページングを行う形には
+  SQL Server の APPLY または PostgreSQL / MySQL の LATERAL を使う。SQLite ではこれらが必要な形を拒否する。
+- グループを構築するクエリでは、行への絞り込み・ソート・ページングは GroupBy の前に置く。
+  グループ内の上位 N 件は OrderBy に続く First / FirstOrDefault または Take(int).ToList() を1か所使用し、
+  同じ射影内で別のグループ集約やコレクションを参照しない。GroupJoin の最終射影はグループ自体、ToList、ToArray を扱う。
+  グループの構築と上位行の変換にはウィンドウ関数に対応する DB が必要。
 - 一括更新・削除では条件なし、JOIN、GroupBy、Distinct、ソート、ページング、射影を拒否する。
   更新・削除に含まれるサブクエリには、各 DB 固有の対象テーブル参照の制約も適用される。
-- Include、関連マッピング、CTE、ウィンドウ関数、
+- Include、関連マッピング、CTE、任意のウィンドウ関数の LINQ API、
   SkipWhile / TakeWhile / Zip / Aggregate などの汎用処理は対象外。
 - 生 SQL・通常の CRUD・マッピング属性・従来の Table<T>() は今回の再設計の対象外。
 
@@ -156,6 +163,28 @@ OfType は対象型と登録された子孫型を取得する。未登録型・�
 既存の CRUD / Table / CreateTable には TPH の自動処理を追加しない。
 TPH の ExecuteUpdate / ExecuteDelete は拒否し、TPT / TPC は対象外とする。
 
-[40種類の集計方法と検証状況](query-operator-coverage.md)も参照。
+[44種類の集計方法と検証状況](query-operator-coverage.md)も参照。
 
 エンティティ Contains では主キーなし・複数主キーのマッピングを拒否する。匿名型などの任意の構造比較は対象外。
+
+
+## 生 SQL との合成と診断
+
+```cs
+var query = connection.FromSql<Product>($"SELECT Id, Name, Price FROM Products WHERE Price > {minimum}")
+    .Where(p => p.Name != null)
+    .OrderBy(p => p.Price)
+    .TagWith("Product search");
+
+string sql = query.ToQueryString();
+await foreach (var product in query.AsAsyncEnumerable(cancellationToken))
+{
+    Console.WriteLine(product.Name);
+}
+```
+
+FromSql の本文は、対象 DB で派生テーブルとして実行できる単一の SELECT を記述する。
+補間値は SQL パラメータになるため、引用符の外に配置する。列名にはマッピング名を使う。
+文末のセミコロン、TPH のマッピング、生 SQL を起点とする一括更新・削除は対象外。
+ToQueryString は SQL のプレースホルダーとタグを返し、DB コマンドは実行しない。
+タグや TagWithCallSite のパスは SQL と DB ログに現れる。

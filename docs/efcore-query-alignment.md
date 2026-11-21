@@ -69,3 +69,10 @@ Kuery の公開 KueryQueryProvider / KueryQueryable は、EF Core の EntityQuer
 EF Core のモデル構築 API は導入しない。StructuralTypeProjectionExpression は SQL の列と候補型、
 StructuralTypeShaperExpression は型識別に基づく結果構築の入口を表す。
 FullJoinExpression は論理的な完全外部結合を保持し、後処理で SQLite / MySQL の UNION ALL へ変換する。
+
+
+QueryableMethodNormalizingExpressionVisitor は Order / OrderDescending を既存の並べ替えに正規化する。
+MinBy / MaxBy は順序と先頭行の取得に変換し、nullable キーの扱いを方言間で揃える。
+CollectionShaperExpression と CollectionResultCoordinator は SQL の行を最終グループやコレクションにまとめる。
+相関 SelectMany は通常の結合へ変換できる場合に条件を移し、必要な場合は APPLY / LATERAL を保持する。
+FromSqlQueryRootExpression と FromSqlExpression はパラメータ抽出前のクエリルートと SQL 式を分ける。
