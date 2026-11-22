@@ -9,20 +9,30 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query.Internal
 {
+    /// <summary>Extracts per-execution values and tags and normalizes query roots for translation and caching.</summary>
     internal sealed class ExpressionTreeFuncletizer : ExpressionVisitor
     {
         readonly IDbConnection _connection;
+        /// <summary>The extracted parameter values in runtime slot order.</summary>
         internal readonly List<object> Values = new List<object>();
         readonly bool _allowTags;
         List<string> _tags;
+        /// <summary>Gets the tags extracted from the current query, if any.</summary>
         internal IReadOnlyList<string> Tags => _tags;
 
+        /// <summary>Creates a parameter extractor bound to the query's connection.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <param name="allowTags">Whether diagnostic query tags are allowed during extraction.</param>
         internal ExpressionTreeFuncletizer(IDbConnection connection, bool allowTags = true)
         {
             _connection = connection;
             _allowTags = allowTags;
         }
 
+        /// <summary>Resets extracted state and replaces independent values with parameter slots.</summary>
+        /// <param name="expression">The expression to translate, inspect, or render.</param>
+        /// <returns>The normalized expression ready for structural caching.</returns>
+        /// <exception cref="System.NotSupportedException">A captured value cannot be evaluated or a query root uses a different connection or provider.</exception>
         internal Expression ExtractParameters(Expression expression)
         {
             Values.Clear();
@@ -102,6 +112,9 @@ namespace Kuery.Query.Internal
             return base.Visit(node);
         }
 
+        /// <summary>Checks whether the CLR type is handled as a scalar during parameter extraction.</summary>
+        /// <param name="type">The CLR type associated with the value or result.</param>
+        /// <returns>True if the type is a supported scalar.</returns>
         internal static bool IsScalar(Type type)
         {
             type = Nullable.GetUnderlyingType(type) ?? type;
@@ -134,6 +147,7 @@ namespace Kuery.Query.Internal
 
         private sealed class DependencyDetector : ExpressionVisitor
         {
+            /// <summary>Whether the visited expression depends on query translation or a lambda parameter.</summary>
             internal bool Dependent;
             /// <summary>Detects expressions that depend on a query or must remain in SQL.</summary>
             /// <param name="node">The expression to visit.</param>

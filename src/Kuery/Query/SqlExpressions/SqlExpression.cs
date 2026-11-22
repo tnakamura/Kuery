@@ -3,6 +3,7 @@ using System.Linq.Expressions;
 
 namespace Kuery.Query.SqlExpressions
 {
+    /// <summary>Provides CLR type and nullability metadata for scalar SQL expressions.</summary>
     internal abstract class SqlExpression : Expression
     {
         /// <summary>Initializes a SQL expression with its CLR type and nullability.</summary>
@@ -18,6 +19,7 @@ namespace Kuery.Query.SqlExpressions
         public sealed override ExpressionType NodeType => ExpressionType.Extension;
         /// <summary>Gets the CLR type of the value represented by this SQL expression.</summary>
         public sealed override Type Type { get; }
+        /// <summary>Gets whether the SQL expression can evaluate to NULL.</summary>
         internal bool IsNullable { get; }
         /// <summary>Returns this node because it exposes no visitable child expressions.</summary>
         /// <param name="visitor">The visitor to apply to the child expressions.</param>

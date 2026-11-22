@@ -7,24 +7,42 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query
 {
+    /// <summary>Translates query roots and LINQ operators into SQL queries and result shapes.</summary>
     internal sealed partial class RelationalQueryableMethodTranslatingExpressionVisitor : ExpressionVisitor
     {
         int _alias;
+        /// <summary>Allocates the next unique table alias for this translation.</summary>
+        /// <returns>The generated SQL alias.</returns>
         internal string Alias() => "t" + _alias++;
+        /// <summary>Creates a typed SQL integer constant.</summary>
+        /// <param name="value">The integer to render as a SQL literal.</param>
+        /// <returns>The SQL literal expression.</returns>
         internal static SqlConstantExpression Integer(int value) => new SqlConstantExpression(value, typeof(int));
         readonly SqlExpressionFactory _sqlExpressionFactory = new SqlExpressionFactory();
         readonly RelationalSqlTranslatingExpressionVisitor _sqlTranslator;
 
+        /// <summary>Creates a translator with a shared scalar translator and alias scope.</summary>
         internal RelationalQueryableMethodTranslatingExpressionVisitor()
         {
             _sqlTranslator = new RelationalSqlTranslatingExpressionVisitor(this);
         }
 
+        /// <summary>Combines a condition with an existing condition, if present.</summary>
+        /// <param name="left">The existing condition, or null if there is none.</param>
+        /// <param name="right">The additional condition to apply.</param>
+        /// <returns>The combined predicate, or the right predicate when the left is absent.</returns>
         internal static SqlExpression And(SqlExpression left, SqlExpression right)
             => left == null ? right : new SqlBinaryExpression(ExpressionType.AndAlso, left, right, typeof(bool), false);
 
+        /// <summary>Validates and translates a filtered single-table query to a bulk delete.</summary>
+        /// <param name="expression">The expression tree node supplied by the query pipeline.</param>
+        /// <returns>The translated delete operation.</returns>
         internal NonQueryExpression TranslateExecuteDelete(Expression expression) => TranslateMutation(expression, "delete", null);
 
+        /// <summary>Translates a filtered single-table query and its assignments to a bulk update.</summary>
+        /// <param name="expression">The expression tree node supplied by the query pipeline.</param>
+        /// <param name="setters">The property assignments for an update, if applicable.</param>
+        /// <returns>The translated update operation.</returns>
         internal NonQueryExpression TranslateExecuteUpdate(Expression expression, IReadOnlyList<SetPropertyCall> setters)
             => TranslateMutation(expression, "update", setters);
 
@@ -57,6 +75,10 @@ namespace Kuery.Query
             return nonQuery;
         }
 
+        /// <summary>Translates a query that can be composed as a SQL source.</summary>
+        /// <param name="expression">The expression tree node supplied by the query pipeline.</param>
+        /// <returns>The SQL query and result shape of the source.</returns>
+        /// <exception cref="System.NotSupportedException">The expression cannot be translated as a composable SQL source.</exception>
         internal ShapedQueryExpression Translate(Expression expression)
         {
             var result = (ShapedQueryExpression)Visit(expression);
@@ -64,6 +86,9 @@ namespace Kuery.Query
             return result;
         }
 
+        /// <summary>Translates the outermost query and finalizes a grouping if one is returned.</summary>
+        /// <param name="expression">The expression tree node supplied by the query pipeline.</param>
+        /// <returns>The complete SQL query and CLR result shape.</returns>
         internal ShapedQueryExpression TranslateRoot(Expression expression)
         {
             var source = (ShapedQueryExpression)Visit(expression);
@@ -238,6 +263,10 @@ namespace Kuery.Query
             return source;
         }
 
+        /// <summary>Translates membership testing to an existential query with matching value or entity key semantics.</summary>
+        /// <param name="source">The translated query whose elements are searched.</param>
+        /// <param name="item">The scalar value or entity identity to search for.</param>
+        /// <returns>A query whose scalar result reports whether a match exists.</returns>
         internal ShapedQueryExpression TranslateContains(ShapedQueryExpression source, Expression item)
         {
             PushdownIntoSubquery(source, false);
@@ -728,6 +757,9 @@ namespace Kuery.Query
             throw new NotSupportedException("Set operands must have matching projection shapes.");
         }
 
+        /// <summary>Wraps the current SELECT as a derived table and rebinds its projected values to the outer query.</summary>
+        /// <param name="source">The shaped query to replace with an outer query over a derived table.</param>
+        /// <param name="liftOrderings">Whether to preserve the inner ordering in the outer query when possible.</param>
         internal void PushdownIntoSubquery(ShapedQueryExpression source, bool liftOrderings = true)
         {
             var inner = source.QueryExpression;
@@ -743,6 +775,9 @@ namespace Kuery.Query
             source.QueryExpression = outer;
         }
 
+        /// <summary>Translates a CLR projection, preserving structural and collection shaping where required.</summary>
+        /// <param name="expression">The expression tree node supplied by the query pipeline.</param>
+        /// <returns>The expression used to construct the result from SQL values.</returns>
         internal Expression Projection(Expression expression)
         {
             if (expression is OptionalShaperExpression optional)
@@ -764,25 +799,49 @@ namespace Kuery.Query
             return Scalar(expression);
         }
 
+        /// <summary>Translates one CLR expression to a scalar SQL expression.</summary>
+        /// <param name="expression">The expression tree node supplied by the query pipeline.</param>
+        /// <returns>The translated SQL value or predicate.</returns>
         internal SqlExpression Scalar(Expression expression) => _sqlTranslator.Translate(expression);
+        /// <summary>Unwraps any expression tree quotation nodes.</summary>
+        /// <param name="expression">The expression tree node supplied by the query pipeline.</param>
+        /// <returns>The first non-quoted expression.</returns>
         internal static Expression StripQuote(Expression expression)
         { while (expression.NodeType == ExpressionType.Quote) expression = ((UnaryExpression)expression).Operand; return expression; }
+        /// <summary>Unwraps CLR conversion and checked conversion nodes.</summary>
+        /// <param name="expression">The expression tree node supplied by the query pipeline.</param>
+        /// <returns>The innermost expression beneath the conversions.</returns>
         internal static Expression StripConvert(Expression expression)
         { while (expression is UnaryExpression u && (u.NodeType == ExpressionType.Convert || u.NodeType == ExpressionType.ConvertChecked)) expression = u.Operand; return expression; }
+        /// <summary>Unwraps a supported lambda from a quoted query argument.</summary>
+        /// <param name="expression">The expression tree node supplied by the query pipeline.</param>
+        /// <returns>The lambda, which may have up to two parameters.</returns>
+        /// <exception cref="System.NotSupportedException">The expression does not contain a lambda with at most two parameters.</exception>
         internal static LambdaExpression Lambda(Expression expression)
         {
             if (!(StripQuote(expression) is LambdaExpression lambda) || lambda.Parameters.Count > 2) throw Unsupported(expression);
             return lambda;
         }
+        /// <summary>Substitutes projection expressions for the parameters of a lambda.</summary>
+        /// <param name="lambda">The lambda whose parameters are to be replaced.</param>
+        /// <param name="arguments">The projections replacing the parameters, in declaration order.</param>
+        /// <returns>The rebound lambda body.</returns>
+        /// <exception cref="System.NotSupportedException">The argument count differs from the number of lambda parameters.</exception>
         internal static Expression Bind(LambdaExpression lambda, params Expression[] arguments)
         {
             if (lambda.Parameters.Count != arguments.Length) throw Unsupported(lambda);
             return new ProjectionBinder(lambda.Parameters.Zip(arguments, (parameter, argument) => new { parameter, argument })
                 .ToDictionary(x => x.parameter, x => x.argument)).Visit(lambda.Body);
         }
+        /// <summary>Creates a translation exception describing the unsupported expression.</summary>
+        /// <param name="expression">The expression tree node supplied by the query pipeline.</param>
+        /// <returns>The exception to throw at the translation boundary.</returns>
         internal static NotSupportedException Unsupported(Expression expression)
             => new NotSupportedException("Cannot translate expression to SQL: " + expression + " (" + expression.GetType().Name + "). Use AsEnumerable() for explicit client evaluation.");
 
+        /// <summary>Extracts scalar SQL expressions from a projection shape.</summary>
+        /// <param name="expression">The expression tree node supplied by the query pipeline.</param>
+        /// <returns>The SQL values that make up the projection.</returns>
         internal static IEnumerable<SqlExpression> Leaves(Expression expression)
         {
             var query = new SelectExpression();
@@ -793,6 +852,8 @@ namespace Kuery.Query
         private sealed class ProjectionBinder : ExpressionVisitor
         {
             readonly IReadOnlyDictionary<ParameterExpression, Expression> _bindings;
+            /// <summary>Creates a binder with a map from lambda parameters to their projected values.</summary>
+            /// <param name="bindings">The projected values keyed by lambda parameter.</param>
             internal ProjectionBinder(IReadOnlyDictionary<ParameterExpression, Expression> bindings)
             {
                 _bindings = bindings;
@@ -834,6 +895,10 @@ namespace Kuery.Query
             readonly SelectExpression _query;
             readonly string _alias;
             readonly IDictionary<Expression, Expression> _replacements;
+            /// <summary>Creates a visitor that projects inner SQL values and produces outer column references.</summary>
+            /// <param name="query">The inner SELECT to which expressions are added.</param>
+            /// <param name="alias">The SQL alias used to reference the table source or projected column.</param>
+            /// <param name="replacements">An optional map to populate with original expressions and their lifted projections.</param>
             internal ProjectionLifter(SelectExpression query, string alias, IDictionary<Expression, Expression> replacements = null)
             {
                 _query = query;
@@ -876,6 +941,7 @@ namespace Kuery.Query
 
         private sealed class CorrelationDetector : ExpressionVisitor
         {
+            /// <summary>Whether the visited expression references an outer projection.</summary>
             internal bool Found;
             /// <summary>Detects a reference to an outer projection in a collection selector.</summary>
             /// <param name="node">The expression to visit.</param>

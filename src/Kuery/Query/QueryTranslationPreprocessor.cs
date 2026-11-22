@@ -3,8 +3,12 @@ using System.Linq.Expressions;
 
 namespace Kuery.Query
 {
+    /// <summary>Normalizes supported LINQ expression patterns before relational translation.</summary>
     internal sealed class QueryTranslationPreprocessor
     {
+        /// <summary>Rewrites supported LINQ aliases and directly invoked lambdas.</summary>
+        /// <param name="query">The query expression or SELECT to process.</param>
+        /// <returns>The expression ready for relational translation.</returns>
         internal Expression Process(Expression query)
         {
             return new QueryableMethodNormalizingExpressionVisitor().Visit(query);

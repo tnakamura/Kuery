@@ -10,12 +10,17 @@ namespace Kuery
     /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
     public sealed class KueryQueryable<T> : IOrderedQueryable<T>
     {
+        /// <summary>Creates the root query for the supplied provider.</summary>
+        /// <param name="provider">The query provider that owns the connection and execution pipeline.</param>
         internal KueryQueryable(KueryQueryProvider provider)
         {
             Provider = provider;
             Expression = Expression.Constant(this);
         }
 
+        /// <summary>Wraps a composed query expression for the supplied provider.</summary>
+        /// <param name="provider">The query provider that owns the connection and execution pipeline.</param>
+        /// <param name="expression">The expression to translate, inspect, or render.</param>
         internal KueryQueryable(KueryQueryProvider provider, Expression expression)
         {
             Provider = provider;

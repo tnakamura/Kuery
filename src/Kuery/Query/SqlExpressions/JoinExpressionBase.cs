@@ -1,5 +1,6 @@
 namespace Kuery.Query.SqlExpressions
 {
+    /// <summary>Provides common metadata for joined table sources.</summary>
     internal abstract class JoinExpressionBase : TableExpressionBase
     {
         /// <summary>Initializes a join with its input table source.</summary>
@@ -8,6 +9,7 @@ namespace Kuery.Query.SqlExpressions
         {
             Table = table;
         }
+        /// <summary>Gets the table source being joined to the containing query.</summary>
         internal TableExpressionBase Table { get; }
     }
 }

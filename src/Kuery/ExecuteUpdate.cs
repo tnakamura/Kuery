@@ -4,16 +4,23 @@ using System.Linq.Expressions;
 
 namespace Kuery
 {
+    /// <summary>Pairs a mapped property selector with the expression that supplies its update value.</summary>
     internal sealed class SetPropertyCall
     {
+        /// <summary>Creates a property assignment from the target member and value expression.</summary>
+        /// <param name="propertyExpression">The lambda selecting the mapped property to set.</param>
+        /// <param name="valueExpression">The lambda computing the value to write for each selected row.</param>
+        /// <exception cref="System.ArgumentNullException">The property selector or value expression is null.</exception>
         internal SetPropertyCall(LambdaExpression propertyExpression, LambdaExpression valueExpression)
         {
             PropertyExpression = propertyExpression ?? throw new ArgumentNullException(nameof(propertyExpression));
             ValueExpression = valueExpression ?? throw new ArgumentNullException(nameof(valueExpression));
         }
 
+        /// <summary>Gets the lambda that selects the mapped property to update.</summary>
         internal LambdaExpression PropertyExpression { get; }
 
+        /// <summary>Gets the lambda that computes the new value for a selected row.</summary>
         internal LambdaExpression ValueExpression { get; }
     }
 
@@ -34,6 +41,7 @@ namespace Kuery
             _setters = setters ?? throw new ArgumentNullException(nameof(setters));
         }
 
+        /// <summary>Gets the property assignments in the order they were added.</summary>
         internal IReadOnlyList<SetPropertyCall> Setters => _setters;
 
         /// <summary>Appends a constant property assignment for all selected rows.</summary>

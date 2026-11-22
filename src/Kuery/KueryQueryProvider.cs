@@ -18,13 +18,19 @@ namespace Kuery
 
         readonly IKueryLinqExecutor _executor;
 
+        /// <summary>Gets the connection shared by query roots created by this provider.</summary>
         internal IDbConnection Connection => _context.Connection;
 
+        /// <summary>Creates a LINQ provider using the default executor for the supplied connection.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
         internal KueryQueryProvider(IDbConnection connection)
             : this(new QueryContext(connection), new KueryLinqExecutor())
         {
         }
 
+        /// <summary>Creates a LINQ provider bound to a connection and an executor.</summary>
+        /// <param name="context">The query execution context containing the database connection.</param>
+        /// <param name="executor">The component that executes and materializes SQL commands.</param>
         internal KueryQueryProvider(QueryContext context, IKueryLinqExecutor executor)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -78,18 +84,30 @@ namespace Kuery
             return (TResult)_executor.Execute(_context, expression, typeof(TResult));
         }
 
+        /// <summary>Executes a filtered bulk delete.</summary>
+        /// <param name="expression">The expression to translate, inspect, or render.</param>
+        /// <returns>The number of rows deleted.</returns>
         internal int ExecuteDelete(Expression expression)
         {
             Requires.NotNull(expression, nameof(expression));
             return _executor.ExecuteDelete(_context, expression);
         }
 
+        /// <summary>Executes a filtered bulk delete asynchronously.</summary>
+        /// <param name="expression">The expression to translate, inspect, or render.</param>
+        /// <param name="cancellationToken">A token that can cancel database execution and reads.</param>
+        /// <returns>A task whose result is the number of rows deleted.</returns>
+        /// <exception cref="System.OperationCanceledException">The database operation was canceled.</exception>
         internal Task<int> ExecuteDeleteAsync(Expression expression, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(expression, nameof(expression));
             return _executor.ExecuteDeleteAsync(_context, expression, cancellationToken);
         }
 
+        /// <summary>Executes a filtered bulk update with the specified property assignments.</summary>
+        /// <param name="expression">The expression to translate, inspect, or render.</param>
+        /// <param name="setters">The property assignments for an update, if applicable.</param>
+        /// <returns>The number of rows updated.</returns>
         internal int ExecuteUpdate(Expression expression, IReadOnlyList<SetPropertyCall> setters)
         {
             Requires.NotNull(expression, nameof(expression));
@@ -97,6 +115,12 @@ namespace Kuery
             return _executor.ExecuteUpdate(_context, expression, setters);
         }
 
+        /// <summary>Executes a filtered bulk update asynchronously with the specified property assignments.</summary>
+        /// <param name="expression">The expression to translate, inspect, or render.</param>
+        /// <param name="setters">The property assignments for an update, if applicable.</param>
+        /// <param name="cancellationToken">A token that can cancel database execution and reads.</param>
+        /// <returns>A task whose result is the number of rows updated.</returns>
+        /// <exception cref="System.OperationCanceledException">The database operation was canceled.</exception>
         internal Task<int> ExecuteUpdateAsync(
             Expression expression,
             IReadOnlyList<SetPropertyCall> setters,
@@ -107,6 +131,12 @@ namespace Kuery
             return _executor.ExecuteUpdateAsync(_context, expression, setters, cancellationToken);
         }
 
+        /// <summary>Executes a LINQ expression asynchronously using the requested result type.</summary>
+        /// <typeparam name="TResult">The expected CLR result type.</typeparam>
+        /// <param name="expression">The expression to translate, inspect, or render.</param>
+        /// <param name="cancellationToken">A token that can cancel database execution and reads.</param>
+        /// <returns>A task whose result is the materialized query result.</returns>
+        /// <exception cref="System.OperationCanceledException">The database operation was canceled.</exception>
         internal async Task<TResult> ExecuteAsync<TResult>(Expression expression, CancellationToken cancellationToken = default)
         {
             Requires.NotNull(expression, nameof(expression));
@@ -114,9 +144,19 @@ namespace Kuery
             return (TResult)result;
         }
 
+        /// <summary>Compiles an expression and returns its SQL without running a command.</summary>
+        /// <param name="expression">The expression to translate, inspect, or render.</param>
+        /// <param name="resultType">The CLR type expected for the result.</param>
+        /// <returns>The command text with parameter placeholders and any query tags.</returns>
         internal string GetQueryString(Expression expression, Type resultType)
             => new QueryCompiler().CompileQuery(_context, expression, resultType, false, out _).CommandText;
 
+        /// <summary>Opens the result stream for a LINQ expression on asynchronous enumeration.</summary>
+        /// <typeparam name="T">The mapped CLR type to read from the result.</typeparam>
+        /// <param name="expression">The expression to translate, inspect, or render.</param>
+        /// <param name="cancellationToken">A token that can cancel database execution and reads.</param>
+        /// <returns>An asynchronous sequence of materialized rows.</returns>
+        /// <exception cref="System.OperationCanceledException">The database operation was canceled.</exception>
         internal IAsyncEnumerable<T> StreamAsync<T>(Expression expression, CancellationToken cancellationToken)
             => _executor.StreamAsync<T>(_context, expression, cancellationToken);
 

@@ -2,8 +2,11 @@ using System.Linq.Expressions;
 
 namespace Kuery.Query.SqlExpressions
 {
+    /// <summary>Represents a cross join against a table source.</summary>
     internal sealed class CrossJoinExpression : JoinExpressionBase
     {
+        /// <summary>Creates a cross join to the supplied table source.</summary>
+        /// <param name="table">The table source or mapping associated with the operation.</param>
         internal CrossJoinExpression(TableExpressionBase table) : base(table)
         {
         }

@@ -5,11 +5,16 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query
 {
+    /// <summary>Stores the target query and assignments for a bulk update or delete.</summary>
     internal sealed class NonQueryExpression : Expression
     {
+        /// <summary>Gets or sets the SQL query selecting the rows to modify.</summary>
         internal SelectExpression QueryExpression { get; set; }
+        /// <summary>Gets or sets the SQL operation kind for the mutation.</summary>
         internal string Operation { get; set; }
+        /// <summary>Gets or sets the target table mapping.</summary>
         internal TableMapping Table { get; set; }
+        /// <summary>The mapped column names and SQL expressions assigned by an update.</summary>
         internal readonly List<KeyValuePair<string, SqlExpression>> Setters = new List<KeyValuePair<string, SqlExpression>>();
         /// <summary>Gets the affected row count type.</summary>
         public override Type Type => typeof(int);

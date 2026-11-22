@@ -5,6 +5,7 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query
 {
+    /// <summary>Provides shared SQL rendering rules for dialect implementations.</summary>
     internal abstract class SqlDialect : ISqlDialect
     {
         /// <summary>Gets the database dialect that these SQL rules target.</summary>

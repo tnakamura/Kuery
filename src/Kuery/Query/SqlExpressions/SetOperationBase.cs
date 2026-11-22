@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 
 namespace Kuery.Query.SqlExpressions
 {
+    /// <summary>Provides shared metadata for a SQL set operation over two SELECT statements.</summary>
     internal abstract class SetOperationBase : TableExpressionBase
     {
         /// <summary>Initializes a set operation with two SELECT inputs.</summary>
@@ -15,9 +16,16 @@ namespace Kuery.Query.SqlExpressions
             Source2 = source2;
             IsDistinct = distinct;
         }
+        /// <summary>Gets the SELECT on the left side of the set operation.</summary>
         internal SelectExpression Source1 { get; }
+        /// <summary>Gets the SELECT on the right side of the set operation.</summary>
         internal SelectExpression Source2 { get; }
+        /// <summary>Gets whether the set operation eliminates duplicate rows.</summary>
         internal bool IsDistinct { get; }
+        /// <summary>Replaces the SELECT inputs while preserving the set operation kind.</summary>
+        /// <param name="source1">The SELECT on the left side of the set operation.</param>
+        /// <param name="source2">The SELECT on the right side of the set operation.</param>
+        /// <returns>This operation if unchanged, or the updated operation.</returns>
         internal abstract SetOperationBase Update(SelectExpression source1, SelectExpression source2);
         /// <summary>Visits the two SELECT statements that participate in the set operation.</summary>
         /// <param name="visitor">The visitor to apply to the child expressions.</param>

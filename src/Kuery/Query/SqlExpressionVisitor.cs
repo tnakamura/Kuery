@@ -4,6 +4,7 @@ using Kuery.Query.SqlExpressions;
 namespace Kuery.Query
 {
     // The dispatch points intentionally use EF Core's names to make SQL visitors easy to compare.
+    /// <summary>Dispatches SQL expression nodes to type-specific visitors.</summary>
     internal abstract class SqlExpressionVisitor : ExpressionVisitor
     {
         /// <summary>Dispatches SQL extension nodes to the visitor for their specific expression type.</summary>

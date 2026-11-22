@@ -2,8 +2,12 @@ using System.Linq.Expressions;
 
 namespace Kuery.Query.SqlExpressions
 {
+    /// <summary>Represents a left outer join with its matching condition.</summary>
     internal sealed class LeftJoinExpression : PredicateJoinExpressionBase
     {
+        /// <summary>Creates a left outer join to the supplied table source.</summary>
+        /// <param name="table">The table source or mapping associated with the operation.</param>
+        /// <param name="predicate">The SQL condition used to match rows in the join.</param>
         internal LeftJoinExpression(TableExpressionBase table, SqlExpression predicate) : base(table, predicate)
         {
         }

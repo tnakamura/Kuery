@@ -6,17 +6,27 @@ using Kuery.Query.SqlExpressions;
 namespace Kuery.Query
 {
     // Parameter-dependent null compensation runs on a copy of the cached SQL tree.
+    /// <summary>Applies CLR null comparison semantics and identifies SQL that depends on runtime null values.</summary>
     internal sealed class SqlNullabilityProcessor : SqlExpressionVisitor
     {
         readonly IReadOnlyList<object> _parameterValues;
         readonly SqlExpressionFactory _sqlExpressionFactory = new SqlExpressionFactory();
+        /// <summary>Gets whether the processed SQL remains valid for different parameter values.</summary>
         internal bool CanCache { get; private set; } = true;
 
+        /// <summary>Creates a null semantics processor for the current parameter values.</summary>
+        /// <param name="parameterValues">The runtime parameter values in slot order.</param>
         internal SqlNullabilityProcessor(IReadOnlyList<object> parameterValues)
         {
             _parameterValues = parameterValues;
         }
+        /// <summary>Applies null compensation to the supplied SQL tree or value.</summary>
+        /// <param name="query">The translated SELECT to process.</param>
+        /// <returns>The processed SQL expression or SELECT.</returns>
         internal SelectExpression Process(SelectExpression query) => (SelectExpression)Visit(query);
+        /// <summary>Applies null compensation to the supplied SQL tree or value.</summary>
+        /// <param name="expression">The expression to translate, inspect, or render.</param>
+        /// <returns>The processed SQL expression or SELECT.</returns>
         internal SqlExpression Process(SqlExpression expression) => (SqlExpression)Visit(expression);
 
         /// <summary>Rewrites nullable comparisons to preserve CLR semantics in SQL.</summary>

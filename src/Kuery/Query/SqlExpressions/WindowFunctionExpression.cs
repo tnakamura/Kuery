@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 
 namespace Kuery.Query.SqlExpressions
 {
+    /// <summary>Identifies the SQL window operations used for grouped materialization.</summary>
     internal enum WindowFunction
     {
         /// <summary>Numbers rows within each partition in window order.</summary>
@@ -13,8 +14,13 @@ namespace Kuery.Query.SqlExpressions
         DenseRank
     }
 
+    /// <summary>Represents a SQL window function with optional partition keys and ordered rows.</summary>
     internal sealed class WindowFunctionExpression : SqlExpression
     {
+        /// <summary>Creates a window function over the supplied partitions and sort order.</summary>
+        /// <param name="function">The SQL window operation to invoke.</param>
+        /// <param name="partitions">The SQL expressions that partition the window rows.</param>
+        /// <param name="orderings">The SQL sort keys in priority order.</param>
         internal WindowFunctionExpression(WindowFunction function, IReadOnlyList<SqlExpression> partitions,
             IReadOnlyList<OrderingExpression> orderings) : base(typeof(long), false)
         {
@@ -23,8 +29,11 @@ namespace Kuery.Query.SqlExpressions
             Orderings = orderings;
         }
 
+        /// <summary>Gets the window operation to render.</summary>
         internal WindowFunction Function { get; }
+        /// <summary>Gets the expressions that divide rows into independent partitions.</summary>
         internal IReadOnlyList<SqlExpression> Partitions { get; }
+        /// <summary>Gets the sort keys used within the window.</summary>
         internal IReadOnlyList<OrderingExpression> Orderings { get; }
 
         /// <summary>Visits the partition keys and window orderings.</summary>

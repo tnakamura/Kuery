@@ -4,6 +4,7 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query
 {
+    /// <summary>Applies SQLite syntax and function translations to relational SQL.</summary>
     internal sealed class SqliteDialect : SqlDialect
     {
         /// <summary>Gets the database dialect that these SQL rules target.</summary>

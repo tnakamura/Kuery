@@ -1,5 +1,6 @@
 namespace Kuery.Query.SqlExpressions
 {
+    /// <summary>Provides common metadata for joins with an ON condition.</summary>
     internal abstract class PredicateJoinExpressionBase : JoinExpressionBase
     {
         /// <summary>Initializes a join with its input table source and join condition.</summary>
@@ -9,6 +10,7 @@ namespace Kuery.Query.SqlExpressions
         {
             JoinPredicate = predicate;
         }
+        /// <summary>Gets the ON condition used to match rows.</summary>
         internal SqlExpression JoinPredicate { get; }
     }
 }

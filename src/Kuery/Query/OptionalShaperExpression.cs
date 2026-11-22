@@ -5,11 +5,17 @@ using Kuery.Query.SqlExpressions;
 namespace Kuery.Query
 {
     // A missing row defaults the whole value, rather than constructing an object with NULL members.
+    /// <summary>Represents a value that defaults when its source row is missing.</summary>
     internal sealed class OptionalShaperExpression : Expression
     {
+        /// <summary>Creates a result shape that checks for a row before reading its value.</summary>
+        /// <param name="value">The value used by the operation.</param>
+        /// <param name="presence">The SQL marker whose null value signals the absence of a row, if applicable.</param>
         internal OptionalShaperExpression(Expression value, SqlExpression presence)
         { Value = value; Presence = presence; }
+        /// <summary>Gets the CLR value shape to materialize when the row is present.</summary>
         internal Expression Value { get; }
+        /// <summary>Gets the SQL marker whose null value indicates a missing row.</summary>
         internal SqlExpression Presence { get; }
         /// <summary>Gets the CLR type of the value being shaped.</summary>
         public override Type Type => Value.Type;

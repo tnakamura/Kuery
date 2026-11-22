@@ -7,8 +7,14 @@ using System.Text;
 
 namespace Kuery
 {
+    /// <summary>Builds parameterized ADO.NET commands for mapped operations and raw SQL.</summary>
     internal static class SqlBuilder
     {
+        /// <summary>Creates a select command for a mapped entity lookup.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <param name="map">The mapping that associates CLR properties with database columns.</param>
+        /// <param name="pk">The primary key value to bind for the row lookup.</param>
+        /// <returns>The command with its key argument bound when a key is mapped.</returns>
         internal static IDbCommand CreateGetByPrimaryKeyCommand(this IDbConnection connection, TableMapping map, object pk)
         {
             var command = connection.CreateCommand();
@@ -40,6 +46,9 @@ namespace Kuery
             return command;
         }
 
+        /// <summary>Creates a provider-specific command that reads the last generated numeric key.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <returns>The command that reads the generated key.</returns>
         internal static IDbCommand CreateLastInsertRowIdCommand(this IDbConnection connection)
         {
             string commandText;
@@ -64,6 +73,11 @@ namespace Kuery
             return command;
         }
 
+        /// <summary>Creates an insert command using the mapped insert columns and entity values.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <param name="item">The entity supplying mapped values for the command.</param>
+        /// <param name="type">The CLR type associated with the value or result.</param>
+        /// <returns>The parameterized insert command.</returns>
         internal static IDbCommand CreateInsertCommand(this IDbConnection connection, object item, Type type)
         {
             var map = SqlMapper.GetMapping(type);
@@ -132,6 +146,11 @@ namespace Kuery
             return command;
         }
 
+        /// <summary>Creates an update command using the entity values and mapped key.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <param name="item">The entity supplying mapped values for the command.</param>
+        /// <param name="type">The CLR type associated with the value or result.</param>
+        /// <returns>The parameterized update command.</returns>
         internal static IDbCommand CreateUpdateCommand(this IDbConnection connection, object item, Type type)
         {
             var mapping = SqlMapper.GetMapping(type);
@@ -193,6 +212,10 @@ namespace Kuery
             return command;
         }
 
+        /// <summary>Wraps a mapped name in the provider's identifier delimiters.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <param name="name">The database table or column name to delimit.</param>
+        /// <returns>The delimited identifier.</returns>
         internal static string EscapeLiteral(this IDbConnection connection, string name)
         {
             if (connection.IsPostgreSql())
@@ -206,6 +229,9 @@ namespace Kuery
             return "[" + name + "]";
         }
 
+        /// <summary>Checks the concrete connection type against the known SQLite provider types.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <returns>True when the connection type is recognized as SQLite.</returns>
         internal static bool IsSqlite(this IDbConnection connection)
         {
             switch (connection.GetType().FullName)
@@ -218,6 +244,9 @@ namespace Kuery
             }
         }
 
+        /// <summary>Checks whether the connection type is the Npgsql provider type.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <returns>True when the connection type is recognized as PostgreSQL.</returns>
         internal static bool IsPostgreSql(this IDbConnection connection)
         {
             switch (connection.GetType().FullName)
@@ -229,6 +258,9 @@ namespace Kuery
             }
         }
 
+        /// <summary>Checks the concrete connection type against the known SqlClient provider types.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <returns>True when the connection type is recognized as SQL Server.</returns>
         internal static bool IsSqlServer(this IDbConnection connection)
         {
             switch (connection.GetType().FullName)
@@ -241,6 +273,9 @@ namespace Kuery
             }
         }
 
+        /// <summary>Checks whether the connection type is the MySqlConnector provider type.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <returns>True when the connection type is recognized as MySQL.</returns>
         internal static bool IsMySql(this IDbConnection connection)
         {
             switch (connection.GetType().FullName)
@@ -252,6 +287,9 @@ namespace Kuery
             }
         }
 
+        /// <summary>Selects the parameter prefix for the connection provider.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <returns>The prefix used in SQL command text and parameter names.</returns>
         internal static string GetParameterPrefix(this IDbConnection connection)
         {
             if (connection.IsSqlite())
@@ -266,11 +304,20 @@ namespace Kuery
                 return "@";
         }
 
+        /// <summary>Adds the provider prefix to an unprefixed parameter name.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <param name="name">The parameter name before adding its provider prefix.</param>
+        /// <returns>The complete parameter name used by the command.</returns>
         internal static string GetParameterName(this IDbConnection connection, string name)
         {
             return connection.GetParameterPrefix() + name;
         }
 
+        /// <summary>Creates a delete command targeting a mapped primary key.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <param name="item">The entity whose mapped primary key identifies the row to delete.</param>
+        /// <param name="type">The CLR type associated with the value or result.</param>
+        /// <returns>The parameterized delete command.</returns>
         internal static IDbCommand CreateDeleteCommand(this IDbConnection connection, object item, Type type)
         {
             var map = SqlMapper.GetMapping(type);
@@ -283,6 +330,11 @@ namespace Kuery
             return connection.CreateDeleteCommand(map.PK.GetValue(item), map);
         }
 
+        /// <summary>Creates a delete command targeting a mapped primary key.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <param name="primaryKey">The mapped primary key value of the row to delete.</param>
+        /// <param name="map">The mapping that associates CLR properties with database columns.</param>
+        /// <returns>The parameterized delete command.</returns>
         internal static IDbCommand CreateDeleteCommand(this IDbConnection connection, object primaryKey, TableMapping map)
         {
             var pk = map.PK;
@@ -306,6 +358,11 @@ namespace Kuery
             return command;
         }
 
+        /// <summary>Creates a provider-specific write command that handles row conflicts.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <param name="item">The entity supplying mapped values for the command.</param>
+        /// <param name="type">The CLR type associated with the value or result.</param>
+        /// <returns>The parameterized command for inserting or replacing the row.</returns>
         internal static IDbCommand CreateInsertOrReplaceCommand(this IDbConnection connection, object item, Type type)
         {
             if (connection.IsSqlite())
@@ -594,6 +651,12 @@ WHEN NOT MATCHED THEN
             return command;
         }
 
+        /// <summary>Creates a command with parameter values supplied by the caller.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <param name="sql">The SQL command text.</param>
+        /// <param name="param">The optional parameter values supplied as a dictionary or an object with public fields or properties.</param>
+        /// <returns>The command with its SQL text and parameters assigned.</returns>
+        /// <remarks>The caller owns the returned command.</remarks>
         internal static IDbCommand CreateParameterizedCommand(this IDbConnection connection, string sql, object param = null)
         {
             var command = connection.CreateCommand();

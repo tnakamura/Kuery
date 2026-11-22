@@ -424,6 +424,11 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a command and buffers all of its mapped rows.</summary>
+        /// <typeparam name="T">The mapped CLR type to read from the result.</typeparam>
+        /// <param name="command">The database command to execute.</param>
+        /// <param name="map">The mapping that associates CLR properties with database columns.</param>
+        /// <returns>The materialized rows.</returns>
         internal static List<T> ExecuteQuery<T>(this IDbCommand command, TableMapping map)
         {
             using (var reader = command.ExecuteReader())
@@ -432,6 +437,11 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a command and reads its first mapped row.</summary>
+        /// <typeparam name="T">The mapped CLR type to read from the result.</typeparam>
+        /// <param name="command">The database command to execute.</param>
+        /// <param name="map">The mapping that associates CLR properties with database columns.</param>
+        /// <returns>The first mapped row, or the default value if the reader is empty.</returns>
         internal static T ExecuteQueryFirstOrDefault<T>(this IDbCommand command, TableMapping map)
         {
             using (var reader = command.ExecuteReader())
@@ -693,6 +703,7 @@ namespace Kuery
     {
     }
 
+    /// <summary>Describes the database table and columns mapped to a CLR type.</summary>
     internal sealed class TableMapping
     {
         /// <summary>Gets the CLR type represented by this mapping.</summary>
@@ -719,6 +730,9 @@ namespace Kuery
 
         private readonly IReadOnlyDictionary<string, Column> _lookupByPropertyName;
 
+        /// <summary>Builds the table, column, and key metadata from a CLR type and mapping conventions.</summary>
+        /// <param name="type">The CLR type whose table and properties are mapped.</param>
+        /// <param name="createFlags">The flags that control implicit mapping conventions.</param>
         internal TableMapping(
             Type type,
             CreateFlags createFlags = CreateFlags.None)
@@ -825,6 +839,7 @@ namespace Kuery
         public Column FindColumn(string columnName) =>
             _lookupByColumnName.TryGetValue(columnName.ToLower(), out var column) ? column : null;
 
+        /// <summary>Describes a mapped property and how values for its database column are read and written.</summary>
         internal sealed class Column
         {
             private readonly PropertyInfo _prop;
@@ -865,8 +880,10 @@ namespace Kuery
             /// <summary>Gets whether the property value is represented as text in the database.</summary>
             public bool StoreAsText { get; }
 
+            /// <summary>The CLR type whose mapping contains this column.</summary>
             internal readonly Type MappedType;
 
+            /// <summary>The cached delegate that reads a column by ordinal and assigns the converted value to an entity.</summary>
             internal readonly Action<object, IDataRecord, int> FastSetter;
 
             /// <summary>Builds column metadata from a mapped property and the mapping flags.</summary>
@@ -1007,6 +1024,7 @@ namespace Kuery
         }
     }
 
+    /// <summary>Describes whether and how a CLR enum is mapped to text.</summary>
     sealed class EnumCacheInfo
     {
         /// <summary>Builds cached metadata about a CLR type's enum representation.</summary>
@@ -1042,6 +1060,7 @@ namespace Kuery
         public Dictionary<int, string> EnumValues { get; }
     }
 
+    /// <summary>Caches enum metadata used during parameter binding and materialization.</summary>
     static class EnumCache
     {
         private static readonly Dictionary<Type, EnumCacheInfo> _cache = new Dictionary<Type, EnumCacheInfo>();
@@ -1071,6 +1090,7 @@ namespace Kuery
         }
     }
 
+    /// <summary>Reads mapping conventions and attributes and resolves corresponding SQL metadata.</summary>
     static class Orm
     {
         /// <summary>The conventional default length for string columns.</summary>
@@ -1421,6 +1441,7 @@ namespace Kuery
         }
     }
 
+    /// <summary>Controls implicit mapping conventions and table creation options.</summary>
     [Flags]
     internal enum CreateFlags
     {
@@ -1461,6 +1482,7 @@ namespace Kuery
         /// <summary>Gets the connection used to execute the query.</summary>
         public IDbConnection Connection { get; }
 
+        /// <summary>Gets the table mapping used to render SQL and read results.</summary>
         internal TableMapping Table { get; }
 
         private Expression _where;
@@ -1485,12 +1507,17 @@ namespace Kuery
 
         private bool _deferred;
 
+        /// <summary>Creates a table query for a connection and a mapped entity type.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
+        /// <param name="table">The table source or mapping associated with the operation.</param>
         internal TableQuery(IDbConnection connection, TableMapping table)
         {
             Connection = connection;
             Table = table;
         }
 
+        /// <summary>Creates a table query using the cached mapping for its CLR type.</summary>
+        /// <param name="connection">The connection associated with the query or command.</param>
         internal TableQuery(IDbConnection connection)
         {
             Connection = connection;
@@ -2587,8 +2614,10 @@ namespace Kuery
         }
     }
 
+    /// <summary>Builds delegates that assign reader values to mapped properties.</summary>
     static class FastSetter
     {
+        /// <summary>Builds mapped property setters when the entity type is only known at runtime.</summary>
         internal static class Typeless
         {
             private static readonly MethodInfo _getSetterMethodInfo;
@@ -2600,6 +2629,9 @@ namespace Kuery
                     BindingFlags.NonPublic | BindingFlags.Static);
             }
 
+            /// <summary>Builds a setter for the specified property using its runtime mapped type.</summary>
+            /// <param name="column">The mapped column whose values the setter will assign.</param>
+            /// <returns>A setter that accepts the target object, current record, and column ordinal.</returns>
             internal static Action<object, IDataRecord, int> GetFastSetter(
                 TableMapping.Column column)
             {
@@ -2608,6 +2640,10 @@ namespace Kuery
             }
         }
 
+        /// <summary>Builds a delegate that reads a reader field and assigns it to a mapped property.</summary>
+        /// <typeparam name="T">The CLR type declaring the mapped property or inheriting it.</typeparam>
+        /// <param name="column">The mapped column whose values the setter will assign.</param>
+        /// <returns>A setter that accepts the target object, current record, and column ordinal.</returns>
         internal static Action<object, IDataRecord, int> GetFastSetter<T>(
             TableMapping.Column column)
         {

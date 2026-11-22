@@ -3,6 +3,7 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query
 {
+    /// <summary>Specifies how execution interprets the rows returned by a query.</summary>
     internal enum QueryResultKind
     {
         /// <summary>Materializes all rows as a sequence.</summary>

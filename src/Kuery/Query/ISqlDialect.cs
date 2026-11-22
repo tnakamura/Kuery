@@ -3,6 +3,7 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query
 {
+    /// <summary>Identifies the database dialect used during SQL generation.</summary>
     internal enum SqlDialectKind
     {
         /// <summary>The SQLite dialect.</summary>
@@ -15,6 +16,7 @@ namespace Kuery.Query
         MySql,
     }
 
+    /// <summary>Defines provider-specific rules for SQL identifiers, parameters, casts, and functions.</summary>
     internal interface ISqlDialect
     {
         /// <summary>Gets the database dialect that these SQL rules target.</summary>

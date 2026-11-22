@@ -8,8 +8,13 @@ using Kuery.Query.SqlExpressions;
 namespace Kuery.Query
 {
     // Marks the collection to fill from adjacent rows with the same SQL identifier.
+    /// <summary>Describes how adjacent rows form a projected collection and how to recognize a missing child.</summary>
     internal sealed class CollectionShaperExpression : Expression
     {
+        /// <summary>Creates a collection shaper for the given SQL grouping identifier and element shape.</summary>
+        /// <param name="identifier">The SQL identifier that determines which adjacent rows belong to the same group.</param>
+        /// <param name="element">The expression used to materialize an element.</param>
+        /// <param name="presence">The SQL marker whose null value signals the absence of a row, if applicable.</param>
         internal CollectionShaperExpression(SqlExpression identifier, Expression element, SqlExpression presence = null)
         {
             Identifier = identifier;
@@ -17,8 +22,11 @@ namespace Kuery.Query
             Presence = presence;
         }
 
+        /// <summary>Gets the SQL value that identifies a group of adjacent rows.</summary>
         internal SqlExpression Identifier { get; }
+        /// <summary>Gets the expression that materializes an element of the collection.</summary>
         internal Expression Element { get; }
+        /// <summary>Gets the SQL value used to skip a missing child row, if needed.</summary>
         internal SqlExpression Presence { get; }
         /// <summary>Gets the enumerable CLR type of the materialized collection.</summary>
         public override Type Type => typeof(IEnumerable<>).MakeGenericType(Element.Type);
@@ -30,6 +38,9 @@ namespace Kuery.Query
         protected override Expression VisitChildren(ExpressionVisitor visitor) => this;
     }
 
+    /// <summary>Represents a materialized LINQ grouping with a key and a sequence of elements.</summary>
+    /// <typeparam name="TKey">The CLR type of the grouping key.</typeparam>
+    /// <typeparam name="TElement">The CLR type of the group elements.</typeparam>
     internal sealed class ResultGrouping<TKey, TElement> : IGrouping<TKey, TElement>
     {
         readonly IEnumerable<TElement> _elements;

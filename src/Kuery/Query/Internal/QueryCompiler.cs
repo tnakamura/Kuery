@@ -6,8 +6,18 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query.Internal
 {
+    /// <summary>Coordinates parameter extraction, structural plan lookup, and SQL command binding.</summary>
     internal sealed class QueryCompiler
     {
+        /// <summary>Normalizes an expression, reuses or compiles its query plan, and binds the command for this execution.</summary>
+        /// <param name="context">The query execution context containing the database connection.</param>
+        /// <param name="expression">The expression to translate, inspect, or render.</param>
+        /// <param name="resultType">The CLR type expected for the result.</param>
+        /// <param name="async">Whether this is an asynchronous execution.</param>
+        /// <param name="plan">When this method returns, the plan reused or compiled for execution.</param>
+        /// <param name="operation">The command kind, such as select, update, or delete.</param>
+        /// <param name="setters">The property assignments for an update, if applicable.</param>
+        /// <returns>A command containing generated SQL, query tags, and runtime bindings.</returns>
         internal RelationalCommand CompileQuery(QueryContext context, Expression expression, Type resultType, bool async,
             out CompiledQuery plan, string operation = "select", IReadOnlyList<SetPropertyCall> setters = null)
         {

@@ -77,6 +77,12 @@ namespace Kuery
             return count;
         }
 
+        /// <summary>Executes a command asynchronously through the provider’s database command.</summary>
+        /// <param name="command">The database command to execute.</param>
+        /// <param name="cancellationToken">A token that can cancel database execution and reads.</param>
+        /// <returns>A task whose result is the affected row count returned by the provider.</returns>
+        /// <exception cref="System.NotSupportedException">The command is not a DbCommand.</exception>
+        /// <exception cref="System.OperationCanceledException">The database operation was canceled.</exception>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static async Task<int> TryExecuteNonQueryAsync(this IDbCommand command, CancellationToken cancellationToken = default)
         {
@@ -91,6 +97,12 @@ namespace Kuery
             }
         }
 
+        /// <summary>Reads a scalar asynchronously through the provider’s database command.</summary>
+        /// <param name="command">The database command to execute.</param>
+        /// <param name="cancellationToken">A token that can cancel database execution and reads.</param>
+        /// <returns>A task whose result is the scalar returned by the provider.</returns>
+        /// <exception cref="System.NotSupportedException">The command is not a DbCommand.</exception>
+        /// <exception cref="System.OperationCanceledException">The database operation was canceled.</exception>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static async Task<object> TryExecuteScalarAsync(this IDbCommand command, CancellationToken cancellationToken = default)
         {
@@ -483,6 +495,13 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a DbCommand asynchronously and returns its result reader.</summary>
+        /// <param name="command">The database command to execute.</param>
+        /// <param name="cancellationToken">A token that can cancel database execution and reads.</param>
+        /// <returns>A task whose result is the open reader for the command's result.</returns>
+        /// <exception cref="System.NotSupportedException">The command is not a DbCommand.</exception>
+        /// <exception cref="System.OperationCanceledException">The database operation was canceled.</exception>
+        /// <remarks>The caller owns and must dispose the returned reader.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static async Task<DbDataReader> TryExecuteReaderAsync(this IDbCommand command, CancellationToken cancellationToken = default)
         {
@@ -497,6 +516,14 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a command and materializes the mapped rows asynchronously.</summary>
+        /// <typeparam name="T">The mapped CLR type to read from the result.</typeparam>
+        /// <param name="command">The database command to execute.</param>
+        /// <param name="map">The mapping that associates CLR properties with database columns.</param>
+        /// <param name="cancellationToken">A token that can cancel database execution and reads.</param>
+        /// <returns>A task whose result is the materialized result rows.</returns>
+        /// <exception cref="System.NotSupportedException">The command is not a DbCommand.</exception>
+        /// <exception cref="System.OperationCanceledException">The database operation was canceled.</exception>
         internal static async Task<List<T>> ExecuteQueryAsync<T>(
             this IDbCommand command,
             TableMapping map,
@@ -508,6 +535,14 @@ namespace Kuery
             }
         }
 
+        /// <summary>Executes a command and reads its first mapped row asynchronously.</summary>
+        /// <typeparam name="T">The mapped CLR type to read from the result.</typeparam>
+        /// <param name="command">The database command to execute.</param>
+        /// <param name="map">The mapping that associates CLR properties with database columns.</param>
+        /// <param name="cancellationToken">A token that can cancel database execution and reads.</param>
+        /// <returns>A task whose result is the first mapped row, or the default value if the reader is empty.</returns>
+        /// <exception cref="System.NotSupportedException">The command is not a DbCommand.</exception>
+        /// <exception cref="System.OperationCanceledException">The database operation was canceled.</exception>
         internal static async Task<T> ExecuteQueryFirstOrDefaultAsync<T>(
             this IDbCommand command,
             TableMapping map,

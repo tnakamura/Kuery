@@ -4,8 +4,14 @@ using System.Threading;
 
 namespace Kuery.Query.Internal
 {
+    /// <summary>Reuses SQL command templates when their text and parameter layout are independent of runtime values.</summary>
     internal static class RelationalCommandCache
     {
+        /// <summary>Binds a cached template or generates and caches SQL when its shape is stable.</summary>
+        /// <param name="plan">The compiled plan that supplies SQL or row materialization delegates.</param>
+        /// <param name="dialect">The provider SQL dialect for the operation.</param>
+        /// <param name="values">The extracted runtime parameter values in slot order.</param>
+        /// <returns>The command bound to the supplied runtime values.</returns>
         internal static RelationalCommand GetRelationalCommand(CompiledQuery plan, ISqlDialect dialect, IReadOnlyList<object> values)
         {
             var template = Volatile.Read(ref plan.CommandTemplate);

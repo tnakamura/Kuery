@@ -10,11 +10,15 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query
 {
+    /// <summary>Compiles expressions that construct CLR results from projected SQL rows.</summary>
     internal sealed class RelationalShapedQueryCompilingExpressionVisitor : ExpressionVisitor
     {
         readonly ParameterExpression _record = Expression.Parameter(typeof(IDataRecord), "record");
         SelectExpression _query;
 
+        /// <summary>Compiles the delegates needed to construct query results from SQL rows.</summary>
+        /// <param name="shapedQuery">The translated SELECT and the associated CLR projection.</param>
+        /// <returns>The SQL tree and its compiled result delegates.</returns>
         internal CompiledQuery Compile(ShapedQueryExpression shapedQuery)
         {
             _query = shapedQuery.QueryExpression;
@@ -54,10 +58,15 @@ namespace Kuery.Query
         sealed class CollectionProjectionBindingVisitor : ExpressionVisitor
         {
             readonly CollectionShaperExpression _collection;
+            /// <summary>The expressions to evaluate once from the first row of a group.</summary>
             internal readonly List<Expression> OuterValues = new List<Expression>();
+            /// <summary>The lambda parameter holding the group's shared values.</summary>
             internal readonly ParameterExpression Values = Expression.Parameter(typeof(object[]), "values");
+            /// <summary>The lambda parameter holding the accumulated elements of the group.</summary>
             internal readonly ParameterExpression Elements = Expression.Parameter(typeof(IList), "elements");
 
+            /// <summary>Creates a binder for the collection being constructed.</summary>
+            /// <param name="collection">The collection shaper being bound.</param>
             internal CollectionProjectionBindingVisitor(CollectionShaperExpression collection)
             {
                 _collection = collection;
@@ -88,6 +97,7 @@ namespace Kuery.Query
 
         sealed class CollectionFindingVisitor : ExpressionVisitor
         {
+            /// <summary>Whether a collection projection was found.</summary>
             internal bool Found;
             /// <summary>Detects a collection shaper in a projected result.</summary>
             /// <param name="node">The expression to visit.</param>
@@ -99,6 +109,11 @@ namespace Kuery.Query
             }
         }
 
+        /// <summary>Converts a provider value to the CLR type required by a projection.</summary>
+        /// <param name="value">The reader value to convert, including DBNull.</param>
+        /// <param name="type">The target CLR type of the projection.</param>
+        /// <returns>The converted CLR value or null for a nullable target.</returns>
+        /// <exception cref="System.InvalidOperationException">A SQL NULL was read for a non-nullable target type.</exception>
         internal static object ConvertValue(object value, Type type)
         {
             var target = Nullable.GetUnderlyingType(type) ?? type;

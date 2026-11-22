@@ -8,6 +8,7 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query.Internal
 {
+    /// <summary>Defines the execution operations used by the Kuery LINQ provider.</summary>
     internal interface IKueryLinqExecutor
     {
         /// <summary>Compiles and executes the query and materializes its result.</summary>

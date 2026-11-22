@@ -5,10 +5,17 @@ using Kuery.Query.SqlExpressions;
 namespace Kuery.Query
 {
     // Lower logical operators before null processing, without changing the cached SQL tree.
+    /// <summary>Applies provider-specific changes to a translated SQL tree.</summary>
     internal sealed class RelationalQueryTranslationPostprocessor : SqlExpressionVisitor
     {
         readonly SqlDialectKind _dialect;
+        /// <summary>Creates a SQL rewrite pass for the specified dialect.</summary>
+        /// <param name="dialect">The provider SQL dialect for the operation.</param>
         internal RelationalQueryTranslationPostprocessor(SqlDialectKind dialect) { _dialect = dialect; }
+        /// <summary>Rewrites the translated SQL tree for the current dialect.</summary>
+        /// <param name="query">The query expression or SELECT to process.</param>
+        /// <returns>The original query or its rewritten equivalent.</returns>
+        /// <remarks>On SQLite and MySQL, an isolated full join is rewritten as a left join unioned with unmatched right-hand rows using UNION ALL.</remarks>
         internal SelectExpression Process(SelectExpression query) => (SelectExpression)Visit(query);
 
         /// <summary>Rewrites full joins into equivalent set operations for dialects that require it.</summary>

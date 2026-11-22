@@ -6,15 +6,22 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query
 {
+    /// <summary>Translates supported CLR expressions inside a query to scalar SQL expressions.</summary>
     internal sealed class RelationalSqlTranslatingExpressionVisitor : ExpressionVisitor
     {
         readonly RelationalQueryableMethodTranslatingExpressionVisitor _queryableMethodTranslatingExpressionVisitor;
         readonly SqlExpressionFactory _sqlExpressionFactory = new SqlExpressionFactory();
+        /// <summary>Creates a scalar translator that uses the query translator for subqueries.</summary>
+        /// <param name="compiler">The query translator used for translating nested queries.</param>
         internal RelationalSqlTranslatingExpressionVisitor(RelationalQueryableMethodTranslatingExpressionVisitor compiler)
         {
             _queryableMethodTranslatingExpressionVisitor = compiler;
         }
 
+        /// <summary>Converts an expression to a scalar SQL value or predicate.</summary>
+        /// <param name="expression">The bound CLR expression to translate.</param>
+        /// <returns>The scalar SQL expression.</returns>
+        /// <exception cref="System.NotSupportedException">The expression has no supported scalar SQL translation.</exception>
         internal SqlExpression Translate(Expression expression)
         {
             if (Visit(expression) is SqlExpression translated) return translated;

@@ -6,6 +6,7 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query
 {
+    /// <remarks>Grouping translation can project ranked rows and coordinate collection materialization.</remarks>
     internal sealed partial class RelationalQueryableMethodTranslatingExpressionVisitor
     {
         void CompleteGrouping(ShapedQueryExpression source, GroupByShaperExpression grouping)
@@ -152,11 +153,14 @@ namespace Kuery.Query
         {
             readonly GroupByShaperExpression _grouping;
 
+            /// <summary>Creates a visitor that looks for terminal element selection on the supplied grouping.</summary>
+            /// <param name="grouping">The grouping whose references are being translated.</param>
             internal GroupedElementFindingVisitor(GroupByShaperExpression grouping)
             {
                 _grouping = grouping;
             }
 
+            /// <summary>Gets the recognized grouped-element selector, if one was found.</summary>
             internal MethodCallExpression Candidate { get; private set; }
 
             /// <summary>Locates the supported terminal operation selecting elements from a group.</summary>
@@ -188,6 +192,11 @@ namespace Kuery.Query
             readonly Expression _grouping;
             readonly IReadOnlyDictionary<Expression, Expression> _keys;
 
+            /// <summary>Creates a visitor that replaces the grouped terminal and key references with projected expressions.</summary>
+            /// <param name="candidate">The terminal grouped-element call to replace.</param>
+            /// <param name="replacement">The expression replacing the original grouped-element terminal call.</param>
+            /// <param name="grouping">The grouping whose references are being translated.</param>
+            /// <param name="keys">The translated key expressions keyed by their original expression nodes.</param>
             internal GroupedElementReplacingVisitor(Expression candidate, Expression replacement, Expression grouping,
                 IReadOnlyDictionary<Expression, Expression> keys)
             {

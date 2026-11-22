@@ -7,17 +7,29 @@ using System.Reflection;
 namespace Kuery.Query
 {
     // Read-side metadata is deliberately separate from TableMapping and existing CRUD mapping.
+    /// <summary>Describes table-per-hierarchy metadata for reading a mapped type and its derived types.</summary>
     internal sealed class InheritanceMapping
     {
         static readonly ConcurrentDictionary<Type, Lazy<InheritanceMapping>> Cache = new ConcurrentDictionary<Type, Lazy<InheritanceMapping>>();
+        /// <summary>Finds or creates the read-side hierarchy mapping for the requested type.</summary>
+        /// <param name="type">The mapped CLR type to check for a table-per-hierarchy registration.</param>
+        /// <returns>The matching hierarchy, or null if the type has no discriminator mapping.</returns>
+        /// <exception cref="System.NotSupportedException">The hierarchy registration or its column mappings are unsupported.</exception>
         internal static InheritanceMapping Find(Type type) => Cache.GetOrAdd(type, t => new Lazy<InheritanceMapping>(() => Create(t))).Value;
+        /// <summary>Gets the mapping for the shared root table.</summary>
         internal TableMapping Root { get; private set; }
+        /// <summary>Gets the name of the string discriminator column.</summary>
         internal string DiscriminatorColumn { get; private set; }
+        /// <summary>Gets the concrete type registrations ordered by discriminator value.</summary>
         internal IReadOnlyList<Entry> Entries { get; private set; }
+        /// <summary>Gets the union of mapped columns across the root and all registered concrete types.</summary>
         internal IReadOnlyList<TableMapping.Column> Columns { get; private set; }
+        /// <summary>Associates one concrete entity mapping with its discriminator value.</summary>
         internal sealed class Entry
         {
+            /// <summary>The table mapping for the concrete entity type.</summary>
             internal TableMapping Mapping;
+            /// <summary>The string discriminator value identifying the concrete entity type.</summary>
             internal string Value;
         }
 

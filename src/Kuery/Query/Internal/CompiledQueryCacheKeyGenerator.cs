@@ -8,10 +8,19 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query.Internal
 {
+    /// <summary>Builds structural query plan keys from normalized expressions and execution metadata.</summary>
     internal static class CompiledQueryCacheKeyGenerator
     {
         [ThreadStatic]
         static KeyWriter _keyWriter;
+        /// <summary>Builds a cache key from query structure, mappings, and execution options.</summary>
+        /// <param name="expression">The expression to translate, inspect, or render.</param>
+        /// <param name="dialect">The dialect identifier used to separate plans for different providers.</param>
+        /// <param name="resultType">The CLR type expected for the result.</param>
+        /// <param name="operation">The command kind, such as select, update, or delete.</param>
+        /// <param name="async">Whether this is an asynchronous execution.</param>
+        /// <returns>A key that excludes per-execution parameter values.</returns>
+        /// <remarks>Generate keys from expressions that have already been normalized by parameter extraction.</remarks>
         internal static string GenerateCacheKey(Expression expression, SqlDialectKind dialect, Type resultType, string operation, bool async)
         {
             var writer = _keyWriter ?? new KeyWriter();
@@ -31,8 +40,10 @@ namespace Kuery.Query.Internal
 
         private sealed class KeyWriter : ExpressionVisitor
         {
+            /// <summary>The buffer containing the structural cache key being written.</summary>
             internal readonly StringBuilder Text = new StringBuilder(512);
             readonly Dictionary<ParameterExpression, int> _parameters = new Dictionary<ParameterExpression, int>();
+            /// <summary>Clears the key buffer and the parameter identities before reuse.</summary>
             internal void Reset() { Text.Clear(); _parameters.Clear(); }
             /// <summary>Appends the node kind, CLR type and contents to the structural cache key.</summary>
             /// <param name="node">The expression to visit.</param>

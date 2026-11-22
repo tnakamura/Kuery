@@ -12,10 +12,20 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query.Internal
 {
+    /// <summary>Binds SQL commands and reads LINQ query results from the configured connection.</summary>
     internal sealed class KueryLinqExecutor : IKueryLinqExecutor
     {
         readonly QueryCompiler _queryCompiler = new QueryCompiler();
 
+        /// <summary>Obtains the compiled query plan and binds its SQL command for one execution.</summary>
+        /// <param name="context">The query execution context containing the database connection.</param>
+        /// <param name="expression">The expression to translate, inspect, or render.</param>
+        /// <param name="resultType">The CLR type expected for the result.</param>
+        /// <param name="async">Whether this is an asynchronous execution.</param>
+        /// <param name="plan">When this method returns, the compiled plan used to read results.</param>
+        /// <param name="operation">The command kind, such as select, update, or delete.</param>
+        /// <param name="setters">The property assignments for an update, if applicable.</param>
+        /// <returns>The SQL command text and parameter values.</returns>
         internal RelationalCommand Prepare(QueryContext context, Expression expression, Type resultType, bool async,
             out CompiledQuery plan, string operation = "select", IReadOnlyList<SetPropertyCall> setters = null)
             => _queryCompiler.CompileQuery(context, expression, resultType, async, out plan, operation, setters);

@@ -4,6 +4,7 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query
 {
+    /// <summary>Applies PostgreSQL syntax and function translations to relational SQL.</summary>
     internal sealed class PostgreSqlDialect : SqlDialect
     {
         /// <summary>Gets the database dialect that these SQL rules target.</summary>

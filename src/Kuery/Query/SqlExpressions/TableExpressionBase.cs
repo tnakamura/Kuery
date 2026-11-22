@@ -3,6 +3,7 @@ using System.Linq.Expressions;
 
 namespace Kuery.Query.SqlExpressions
 {
+    /// <summary>Provides alias metadata for table sources in a relational query.</summary>
     internal abstract class TableExpressionBase : Expression
     {
         /// <summary>Initializes a table source with its SQL alias.</summary>
@@ -11,6 +12,7 @@ namespace Kuery.Query.SqlExpressions
         {
             Alias = alias;
         }
+        /// <summary>Gets or sets the alias used to reference this table source.</summary>
         internal string Alias { get; set; }
         /// <summary>Gets the common CLR type used for a relational table source.</summary>
         public override Type Type => typeof(object);

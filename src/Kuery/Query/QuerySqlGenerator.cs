@@ -9,6 +9,7 @@ using Kuery.Query.SqlExpressions;
 
 namespace Kuery.Query
 {
+    /// <summary>Renders the relational SQL tree and collects the parameters for the selected dialect.</summary>
     internal sealed class QuerySqlGenerator : SqlExpressionVisitor
     {
         static readonly HashSet<string> PredicateOperations = new HashSet<string>
@@ -30,14 +31,21 @@ namespace Kuery.Query
         bool _runtimeShape;
         string _sqlFragment;
 
+        /// <summary>Creates a generator for a dialect and the runtime values of one execution.</summary>
+        /// <param name="dialect">The provider SQL dialect for the operation.</param>
+        /// <param name="values">The extracted runtime parameter values in slot order.</param>
         internal QuerySqlGenerator(ISqlDialect dialect, IReadOnlyList<object> values)
         {
             _dialect = dialect;
             _values = values;
         }
 
+        /// <summary>Gets whether generation produced SQL independent of runtime values.</summary>
         internal bool CanCache => !_runtimeShape;
 
+        /// <summary>Processes and renders a relational query or mutation for execution.</summary>
+        /// <param name="queryExpression">The translated read query, update, or delete to render.</param>
+        /// <returns>The SQL command and its parameter bindings.</returns>
         internal RelationalCommand GetCommand(Expression queryExpression)
         {
             var nonQuery = queryExpression as NonQueryExpression;
@@ -191,6 +199,9 @@ namespace Kuery.Query
             return node;
         }
 
+        /// <summary>Renders a SQL expression in a value position.</summary>
+        /// <param name="expression">The translated SQL expression to render.</param>
+        /// <returns>The SQL fragment used in a projection or value expression.</returns>
         internal string Value(SqlExpression expression)
         {
             if (_dialect.Kind == SqlDialectKind.SqlServer && IsPredicate(expression))
@@ -198,6 +209,9 @@ namespace Kuery.Query
             return Render(expression);
         }
 
+        /// <summary>Renders a condition in a SQL predicate position.</summary>
+        /// <param name="expression">The translated SQL expression to render.</param>
+        /// <returns>The SQL fragment suitable for a WHERE, HAVING, or ON clause.</returns>
         internal string Predicate(SqlExpression expression)
         {
             if (IsPredicate(expression)) return Render(expression);
