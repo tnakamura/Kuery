@@ -8,7 +8,7 @@
     <Copyright>tnakamura</Copyright>
     <Authors>tnakamura</Authors>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Description>Simple ORM for .NET</Description>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -18,58 +18,14 @@
     <RepositoryUrl>https://github.com/tnakamura/Kuery</RepositoryUrl>
     <IncludeSymbols>True</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <PackageReleaseNotes># Release Notes
+    <PackageReleaseNotes>## v0.2.0
 
-## v0.1.0
-
-### Highlights
-
-- Added a full IQueryable execution pipeline for Query&lt;T&gt;() (sync/async) with expression-based SQL translation.
-- Expanded LINQ-to-SQL support significantly, including projection, filtering, aggregation, set semantics, joins, grouping, and having.
-- Added extensive SQLite test coverage for newly supported query patterns.
-- Upgraded project/tooling baseline (including move to .NET 10 and .slnx).
-
-### Added
-
-- Query&lt;T&gt;()-based LINQ provider core:
-- IQueryable/IQueryProvider integration
-- query model, translator, SQL generator, and executor
-- async query extensions
-- Dialect-aware SQL generation and predicate translation.
-- New LINQ support:
-- Select, Distinct, Any, Single/SingleOrDefault
-- LongCount, Last/LastOrDefault, ElementAt(int)/ElementAtOrDefault
-- Sum, Min, Max, Average
-- Join, GroupBy, HAVING, composite GroupBy key
-- Queryable.All
-- Predicate/function support extensions:
-- arithmetic operators
-- Contains()/StartsWith()/EndsWith()/Replace/Trim*/Substring/Length/IndexOf
-- string.IsNullOrEmpty, string.IsNullOrWhiteSpace, Equals(object)
-- Math.Abs/Round/Floor/Ceiling/Max/Min
-- DateTime.Now/UtcNow, DateTime.Add*, date/time member access (Year, Month, etc.)
-- conditional (CASE WHEN), Nullable.HasValue, concat, Convert.ToXxx, ToString(), Like(string, string)
-
-### Changed
-
-- Improved unsupported-LINQ behavior with explicit translation errors and documentation.
-- Refactored predicate translation to reduce duplication and improve maintainability.
-- Updated packages and project/runtime settings.
-
-### Fixed
-
-- Fixed .NET 10 expression-tree compatibility issues (notably implicit conversion patterns affecting Contains() scenarios).
-- Added targeted fixes for conversion handling (e.g., Convert.ToInt16) and related test coverage.
-Tests
-- Added broad SQLite coverage for:
-- SQL builder behavior
-- IQueryable provider behavior
-- newly implemented operators/functions (including join/group/having and conversion scenarios)
-
-### Tooling / Project
-
-- Migrated solution format from .sln to .slnx.
-- Updated target/runtime baseline through .NET 10 transition.
+- Rebuilt the LINQ-to-SQL pipeline with typed SQL translation, direct result materialization, and compiled query caching.
+- Added MySQL support alongside SQLite, PostgreSQL, and SQL Server.
+- Expanded LINQ support for outer joins, set operations, grouping, subqueries, and query-only table-per-hierarchy inheritance.
+- Added `FromSql&lt;T&gt;()` for composing LINQ over parameterized SQL, `ToQueryString()` and `TagWith()` for inspecting and annotating queries, and `AsAsyncEnumerable()` for async streaming.
+- Added `ExecuteUpdate` and `ExecuteDelete`, along with async equivalents, for set-based changes. Added support for DataAnnotations mapping attributes.
+- **Breaking changes.** `KueryQueryProvider` and `KueryQueryable&lt;T&gt;` are now internal. Use `IQueryProvider` and `IQueryable&lt;T&gt;` in consuming code. `BaseTableQuery` was removed. Use `TableQuery&lt;T&gt;` or `IEnumerable&lt;T&gt;` as appropriate.
 </PackageReleaseNotes>
   </PropertyGroup>
 
