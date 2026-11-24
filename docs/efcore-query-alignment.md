@@ -33,8 +33,8 @@ Kuery でも `src/Kuery/Query/`、`Query/Internal/`、`Query/SqlExpressions/` �
 | キャッシュキー | EFCore/Query/CompiledQueryCacheKeyGenerator.cs | Query/Internal/CompiledQueryCacheKeyGenerator.cs |
 | SQL コマンドの雛形 | EFCore.Relational/Query/Internal/RelationalCommandCache.cs | Query/Internal/RelationalCommandCache.cs |
 
-Kuery の公開 KueryQueryProvider / KueryQueryable は、EF Core の EntityQueryProvider / EntityQueryable に近い入口であり、
-既存 API の互換性のため名前を維持する。ADO.NET の実行と破棄は Internal/KueryLinqExecutor に残す。
+公開 API の `Query<T>()` は `IQueryable<T>` を返す。内部実装の `KueryQueryProvider` と `KueryQueryable<T>` は、
+EF Core の EntityQueryProvider と EntityQueryable に対応する。ADO.NET の実行と破棄は Internal/KueryLinqExecutor が担う。
 
 ## 実装を確認する順序
 

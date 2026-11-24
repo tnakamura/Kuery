@@ -8,7 +8,7 @@ namespace Kuery
 {
     /// <summary>Represents a deferred LINQ query that Kuery translates to SQL.</summary>
     /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
-    public sealed class KueryQueryable<T> : IOrderedQueryable<T>
+    internal sealed class KueryQueryable<T> : IOrderedQueryable<T>
     {
         /// <summary>Creates the root query for the supplied provider.</summary>
         /// <param name="provider">The query provider that owns the connection and execution pipeline.</param>

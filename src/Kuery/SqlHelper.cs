@@ -1461,11 +1461,12 @@ namespace Kuery
         FullTextSearch4 = 0x200,
     }
 
-    /// <summary>Provides the base for queries over mapped tables.</summary>
-    public abstract class BaseTableQuery
+    /// <summary>Represents a composable query over a mapped table.</summary>
+    /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
+    public sealed partial class TableQuery<T> : IEnumerable<T>
     {
         /// <summary>Describes the direction and column for a table query sort key.</summary>
-        protected class Ordering
+        private sealed class Ordering
         {
             /// <summary>Gets or sets the mapped column to sort by.</summary>
             public string ColumnName { get; set; }
@@ -1473,14 +1474,9 @@ namespace Kuery
             /// <summary>Gets or sets whether to sort in ascending order.</summary>
             public bool Ascending { get; set; }
         }
-    }
 
-    /// <summary>Represents a composable query over a mapped table.</summary>
-    /// <typeparam name="T">The CLR type being queried or mapped.</typeparam>
-    public sealed partial class TableQuery<T> : BaseTableQuery, IEnumerable<T>
-    {
         /// <summary>Gets the connection used to execute the query.</summary>
-        public IDbConnection Connection { get; }
+        private IDbConnection Connection { get; }
 
         /// <summary>Gets the table mapping used to render SQL and read results.</summary>
         internal TableMapping Table { get; }
@@ -1492,18 +1488,6 @@ namespace Kuery
         private int? _limit;
 
         private int? _offset;
-
-        private BaseTableQuery _joinInner;
-
-        private Expression _joinInnerKeySelector;
-
-        private BaseTableQuery _joinOuter;
-
-        private Expression _joinOuterKeySelector;
-
-        private Expression _joinSelector;
-
-        private Expression _selector;
 
         private bool _deferred;
 
@@ -1524,9 +1508,9 @@ namespace Kuery
             Table = SqlMapper.GetMapping(typeof(T));
         }
 
-        private TableQuery<TOther> Clone<TOther>()
+        private TableQuery<T> Clone()
         {
-            var q = new TableQuery<TOther>(Connection, Table);
+            var q = new TableQuery<T>(Connection, Table);
             q._where = _where;
             q._deferred = _deferred;
             if (_orderBys != null)
@@ -1535,12 +1519,6 @@ namespace Kuery
             }
             q._limit = _limit;
             q._offset = _offset;
-            q._joinInner = _joinInner;
-            q._joinInnerKeySelector = _joinInnerKeySelector;
-            q._joinOuter = _joinOuter;
-            q._joinOuterKeySelector = _joinOuterKeySelector;
-            q._joinSelector = _joinSelector;
-            q._selector = _selector;
             return q;
         }
 
@@ -1553,7 +1531,7 @@ namespace Kuery
             {
                 var lambda = (LambdaExpression)predExpr;
                 var pred = lambda.Body;
-                var q = Clone<T>();
+                var q = Clone();
                 q.AddWhere(pred);
                 return q;
             }
@@ -1619,7 +1597,7 @@ namespace Kuery
         /// <returns>A copy of the query with the operation applied.</returns>
         public TableQuery<T> Take(int n)
         {
-            var q = Clone<T>();
+            var q = Clone();
             q._limit = n;
             return q;
         }
@@ -1629,7 +1607,7 @@ namespace Kuery
         /// <returns>A copy of the query with the operation applied.</returns>
         public TableQuery<T> Skip(int n)
         {
-            var q = Clone<T>();
+            var q = Clone();
             q._offset = n;
             return q;
         }
@@ -1647,7 +1625,7 @@ namespace Kuery
         /// <returns>A copy of the query with the operation applied.</returns>
         public TableQuery<T> Deferred()
         {
-            var q = Clone<T>();
+            var q = Clone();
             q._deferred = true;
             return q;
         }
@@ -1711,7 +1689,7 @@ namespace Kuery
 
                 if (mem != null && mem.Expression.NodeType == ExpressionType.Parameter)
                 {
-                    var q = Clone<T>();
+                    var q = Clone();
                     if (q._orderBys == null)
                     {
                         q._orderBys = new List<Ordering>();
@@ -1787,11 +1765,6 @@ namespace Kuery
 
         private IDbCommand GenerateCommandForPostgreSql(string selectionList)
         {
-            if (_joinInner != null && _joinOuter != null)
-            {
-                throw new NotSupportedException("Joins are not supported.");
-            }
-
             var commandText = new StringBuilder();
             commandText.Append("select ");
             commandText.Append(selectionList);
@@ -1861,11 +1834,6 @@ namespace Kuery
 
         private IDbCommand GenerateCommandForSqlite(string selectionList)
         {
-            if (_joinInner != null && _joinOuter != null)
-            {
-                throw new NotSupportedException("Joins are not supported.");
-            }
-
             var commandText = new StringBuilder();
             commandText.Append("select ");
             commandText.Append(selectionList);
@@ -1942,11 +1910,6 @@ namespace Kuery
 
         private IDbCommand GenerateCommandForMySql(string selectionList)
         {
-            if (_joinInner != null && _joinOuter != null)
-            {
-                throw new NotSupportedException("Joins are not supported.");
-            }
-
             var commandText = new StringBuilder();
             commandText.Append("select ");
             commandText.Append(selectionList);
@@ -2021,11 +1984,6 @@ namespace Kuery
 
         private IDbCommand GenerateCommandForSqlServer(string selectionList)
         {
-            if (_joinInner != null && _joinOuter != null)
-            {
-                throw new NotSupportedException("Joins are not supported.");
-            }
-
             var commandText = new StringBuilder();
             commandText.Append("select ");
             if (_limit.HasValue && !_offset.HasValue)

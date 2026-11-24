@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -36,6 +37,32 @@ namespace Kuery.Tests.Sqlite
 
         public void Dispose() => _connection.Dispose();
         IQueryable<PipelineRow> Query => _connection.Query<PipelineRow>();
+
+        [Fact]
+        public void NonGenericCreateQueryExecutesProjectedQuery()
+        {
+            var source = Query;
+            var projection = source.Where(row => row.Id <= 2).OrderBy(row => row.Id).Select(row => row.Id);
+
+            IQueryable query = source.Provider.CreateQuery(projection.Expression);
+
+            Assert.Equal(typeof(int), query.ElementType);
+            Assert.Equal(new[] { 1, 2 }, Assert.IsAssignableFrom<IOrderedQueryable<int>>(query).ToArray());
+        }
+
+        [Fact]
+        public void QueryImplementationDetailsAreNotPublic()
+        {
+            var exportedTypes = typeof(SqlHelper).Assembly.GetExportedTypes();
+            var tableQuery = typeof(TableQuery<>);
+
+            Assert.DoesNotContain(exportedTypes, type =>
+                type == typeof(KueryQueryable<>) || type == typeof(KueryQueryProvider) || type.FullName == "Kuery.BaseTableQuery");
+            Assert.Contains(tableQuery, exportedTypes);
+            Assert.True(tableQuery.GetNestedType("Ordering", BindingFlags.NonPublic)?.IsNestedPrivate);
+            Assert.True(tableQuery.GetProperty("Connection", BindingFlags.Instance | BindingFlags.NonPublic)?.GetMethod.IsPrivate);
+            Assert.Null(typeof(SetPropertyCalls<>).GetConstructor(Type.EmptyTypes));
+        }
 
         [Fact]
         public void PagingAndFilteringPreserveOperatorOrder()

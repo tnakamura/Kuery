@@ -31,7 +31,7 @@ namespace Kuery
         readonly IReadOnlyList<SetPropertyCall> _setters;
 
         /// <summary>Initializes an empty list of property assignments.</summary>
-        public SetPropertyCalls()
+        internal SetPropertyCalls()
             : this(Array.Empty<SetPropertyCall>())
         {
         }

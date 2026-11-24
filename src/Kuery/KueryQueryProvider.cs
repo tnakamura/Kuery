@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Kuery.Query;
@@ -12,7 +13,7 @@ using Kuery.Query.SqlExpressions;
 namespace Kuery
 {
     /// <summary>Creates and executes LINQ queries against a Kuery database connection.</summary>
-    public sealed class KueryQueryProvider : IQueryProvider
+    internal sealed class KueryQueryProvider : IQueryProvider
     {
         readonly QueryContext _context;
 
@@ -47,7 +48,9 @@ namespace Kuery
 
             var elementType = GetElementType(expression.Type);
             var queryType = typeof(KueryQueryable<>).MakeGenericType(elementType);
-            return (IQueryable)Activator.CreateInstance(queryType, this, expression);
+            return (IQueryable)Activator.CreateInstance(
+                queryType, BindingFlags.Instance | BindingFlags.NonPublic,
+                binder: null, args: new object[] { this, expression }, culture: null);
         }
 
         /// <summary>Creates a deferred query for the specified expression tree.</summary>
