@@ -962,6 +962,7 @@ namespace Kuery.Tests.Npgsql
                 }
 
                 var result = connection.Table<Customer>()
+                    .OrderBy(x => x.Id)
                     .ElementAt(0);
                 Assert.Equal("23", result.Code);
             }
@@ -985,6 +986,7 @@ namespace Kuery.Tests.Npgsql
                 }
 
                 var result = await connection.Table<Customer>()
+                    .OrderBy(x => x.Id)
                     .ElementAtAsync(1);
                 Assert.Equal("24", result.Code);
             }

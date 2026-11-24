@@ -66,7 +66,7 @@ namespace Kuery.Tests.Sqlite
 
         [Theory]
         [InlineData((int)SqlDialectKind.Sqlite, false)]
-        [InlineData((int)SqlDialectKind.PostgreSql, true)]
+        [InlineData((int)SqlDialectKind.PostgreSql, false)]
         [InlineData((int)SqlDialectKind.SqlServer, true)]
         [InlineData((int)SqlDialectKind.MySql, false)]
         public void FullJoinUsesTheDialectAndPreservesTheCachedTree(int dialectKind, bool native)

@@ -68,7 +68,7 @@ EF Core の EntityQueryProvider と EntityQueryable に対応する。ADO.NET �
 読み取り専用 TPH は InheritanceMapping に必要最小限の型識別情報を持つ。
 EF Core のモデル構築 API は導入しない。StructuralTypeProjectionExpression は SQL の列と候補型、
 StructuralTypeShaperExpression は型識別に基づく結果構築の入口を表す。
-FullJoinExpression は論理的な完全外部結合を保持し、後処理で SQLite / MySQL の UNION ALL へ変換する。
+FullJoinExpression は論理的な完全外部結合を保持し、SQLite / PostgreSQL / MySQL では後処理で UNION ALL へ変換する。
 
 
 QueryableMethodNormalizingExpressionVisitor は Order / OrderDescending を既存の並べ替えに正規化する。

@@ -15,7 +15,7 @@ namespace Kuery.Query
         /// <summary>Rewrites the translated SQL tree for the current dialect.</summary>
         /// <param name="query">The query expression or SELECT to process.</param>
         /// <returns>The original query or its rewritten equivalent.</returns>
-        /// <remarks>On SQLite and MySQL, an isolated full join is rewritten as a left join unioned with unmatched right-hand rows using UNION ALL.</remarks>
+        /// <remarks>On SQLite, PostgreSQL, and MySQL, an isolated full join is rewritten as a left join unioned with unmatched right-hand rows using UNION ALL.</remarks>
         internal SelectExpression Process(SelectExpression query) => (SelectExpression)Visit(query);
 
         /// <summary>Rewrites full joins into equivalent set operations for dialects that require it.</summary>
@@ -24,7 +24,8 @@ namespace Kuery.Query
         protected override Expression VisitSelect(SelectExpression node)
         {
             var query = (SelectExpression)base.VisitSelect(node);
-            if (_dialect != SqlDialectKind.MySql && _dialect != SqlDialectKind.Sqlite) return query;
+            // PostgreSQL requires a hash- or merge-joinable condition for FULL JOIN, which null-compensated keys may lack.
+            if (_dialect != SqlDialectKind.MySql && _dialect != SqlDialectKind.Sqlite && _dialect != SqlDialectKind.PostgreSql) return query;
             var full = query.Joins.Count == 1 ? query.Joins[0] as FullJoinExpression : null;
             if (full == null) return query;
             if (query.Predicate != null || query.Having != null || query.GroupBy.Count != 0 || query.Orderings.Count != 0

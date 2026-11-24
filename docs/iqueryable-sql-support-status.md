@@ -118,8 +118,8 @@ LeftJoin / RightJoin は .NET 10 の Queryable API を使う。FullJoin は
 利用環境に標準 Queryable.FullJoin がある場合は、結果セレクター付きの標準形と null 比較子も同じ経路で変換する。
 比較子を指定した独自の等値比較は拒否する。
 
-RightJoin は左右を入れ替えた LEFT JOIN、SQLite / MySQL の FullJoin は
-LEFT JOIN と右側の未一致行の UNION ALL に変換する。PostgreSQL / SQL Server は FULL OUTER JOIN を使う。
+RightJoin は左右を入れ替えた LEFT JOIN に変換する。SQLite / PostgreSQL / MySQL の FullJoin は
+LEFT JOIN と右側の未一致行の UNION ALL に変換する。SQL Server は FULL OUTER JOIN を使う。
 存在マーカーで未一致を判定するため、重複と全列 null の一致行を保持する。
 
 DefaultIfEmpty は引数なしのみ対応する。参照型は null、値型は default(T) を返す。
